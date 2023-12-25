@@ -1,3 +1,17 @@
+TODO LIST:
+- Fix Task's preconditions with a docker image to run this in... PLEASEEEE
+
+
+
+
+
+
+
+
+
+
+
+
 <br>
 <p align="center">
   <img width="220" height="100" src="./docs/assets/logos/logo.svg">
