@@ -77,7 +77,6 @@ patches:
       - op: add
         path: "/spec/template/spec/nodeSelector"
         value:
-
           kubernetes.io/arch: amd64
     target:
       kind: StatefulSet
