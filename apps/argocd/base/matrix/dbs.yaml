@@ -5,7 +5,7 @@ metadata:
 spec:
   project: matrix
   source:
-    repoURL: 'https://github.com/gruberdev/homelab.git'
+    repoURL: 'https://github.com/lordmuffin/homelab.git'
     path: apps/matrix/databases
     targetRevision: main
   destination:

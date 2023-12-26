@@ -7,7 +7,7 @@ metadata:
 spec:
   project: services
   source:
-    repoURL: 'https://github.com/gruberdev/homelab.git'
+    repoURL: 'https://github.com/lordmuffin/homelab.git'
     path: apps/data/metabase
     targetRevision: main
   destination:
