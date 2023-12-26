@@ -39,3 +39,6 @@ p2p:
       # A master node is always required for creating the cluster and is implied.
       # The setting below adds 2 additional master nodes, for a total of 3.
       master_nodes: 2
+
+k3s:
+  enabled: true
