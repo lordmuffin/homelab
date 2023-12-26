@@ -28,7 +28,6 @@ patches:
     - op: add
       path: "/spec/template/spec/nodeSelector"
       value:
-        kubernetes.io/hostname: node-one
   target:
     kind: Deployment
     name: lidarr

@@ -59,7 +59,6 @@ spec:
             cpu: 100m
             memory: 256Mi
         nodeSelector:
-          kubernetes.io/hostname: node-one
         affinity: {}
         tolerations:
           - key: CriticalAddonsOnly

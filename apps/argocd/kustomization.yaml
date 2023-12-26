@@ -38,8 +38,8 @@ resources:
   - base/repo-role.yaml
   - base/repo-rb.yaml
 
-  - https://github.com/gruberdev/homelab/apps/networking/tailscale
-  - https://github.com/gruberdev/homelab/apps/networking/cloudflared
+  - https://github.com/lordmuffin/homelab/apps/networking/tailscale
+  # - https://github.com/lordmuffin/homelab/apps/networking/cloudflared
   - https://raw.githubusercontent.com/argoproj/argo-cd/v2.9.3/manifests/install.yaml
   - base/styles-cm.yaml
 
@@ -69,7 +69,6 @@ patches:
       - op: add
         path: "/spec/template/spec/nodeSelector"
         value:
-          kubernetes.io/hostname: node-one
           kubernetes.io/arch: amd64
     target:
       kind: Deployment
@@ -77,7 +76,6 @@ patches:
       - op: add
         path: "/spec/template/spec/nodeSelector"
         value:
-          kubernetes.io/hostname: node-one
           kubernetes.io/arch: amd64
     target:
       kind: StatefulSet
@@ -99,7 +97,7 @@ patches:
   - path: overlay/argocd-deployment.yaml
   - path: overlay/argocd-repo-deployment.yaml
   - path: overlay/argocd-cm.yaml
-  - path: overlay/cloudflared-cm.yaml
+  # - path: overlay/cloudflared-cm.yaml
   - path: overlay/argocd-rbac.yaml
   - path: overlay/argocd-cr.yaml
 commonAnnotations:

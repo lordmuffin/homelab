@@ -27,4 +27,4 @@ kubectl apply -k apps/networking/unifi
 [website-uri]: https://www.ui.com/
 [docker-uri]: https://github.com/jacobalberty/unifi-docker
 [terraform-uri]: https://registry.terraform.io/providers/paultyng/unifi/latest/docs
-[homelab-terraform]: https://github.com/gruberdev/homelab/tree/main/terraform/modules/unifi
+[homelab-terraform]: https://github.com/lordmuffin/homelab/tree/main/terraform/modules/unifi
