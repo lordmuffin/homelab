@@ -5,7 +5,7 @@ metadata:
 spec:
   project: apps
   source:
-    repoURL: 'https://github.com/gruberdev/homelab.git'
+    repoURL: 'https://github.com/lordmuffin/homelab.git'
     path: apps/services/mlops/wandb
     targetRevision: main
   destination:

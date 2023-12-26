@@ -8,7 +8,7 @@ metadata:
 spec:
   project: cluster
   source:
-    repoURL: 'https://github.com/gruberdev/homelab.git'
+    repoURL: 'https://github.com/lordmuffin/homelab.git'
     path: apps/argocd/base/data
     targetRevision: main
   destination:

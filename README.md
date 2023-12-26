@@ -1,3 +1,17 @@
+TODO LIST:
+- Fix Task's preconditions with a docker image to run this in... PLEASEEEE
+
+
+
+
+
+
+
+run task argocd:secret & repo with variables for user and pass
+
+
+
+
 <br>
 <p align="center">
   <img width="220" height="100" src="./docs/assets/logos/logo.svg">
@@ -183,7 +197,7 @@
 
 <!-- Cluster Utilities/Internal Tooling -->
 
-[argocd-updater-ex]: https://github.com/gruberdev/homelab/commit/75c00de5eba89b9978ed241e67e638e4d838fae4
+[argocd-updater-ex]: https://github.com/lordmuffin/homelab/commit/75c00de5eba89b9978ed241e67e638e4d838fae4
 [argocd-updater-uri]: https://argocd-image-updater.readthedocs.io/en/stable/
 [descheduler-uri]: https://github.com/kubernetes-sigs/descheduler
 [kube-fledged-uri]: https://github.com/senthilrch/kube-fledged
@@ -201,49 +215,49 @@
 
 <!-- Project Folders -->
 
-[homelab-argocd]: https://github.com/gruberdev/homelab/tree/main/apps/argocd
-[homelab-drone]: https://github.com/gruberdev/homelab/tree/main/apps/drone
-[homelab-ha]: https://github.com/gruberdev/homelab/tree/main/apps/home/ha
-[homelab-wyze]: https://github.com/gruberdev/homelab/tree/main/apps/home/wyze
-[homelab-nvidia]: https://github.com/gruberdev/homelab/blob/main/docs/nvidia.md
-[homelab-nfs]: https://github.com/gruberdev/homelab/blob/main/apps/argocd/base/core/nfs.yaml
-[homelab-kube]: https://github.com/gruberdev/homelab/blob/main/apps/argocd/base/monitoring/kube-prometheus.yaml
-[homelab-kuma]: https://github.com/gruberdev/homelab/tree/main/apps/monitoring/uptime-kuma
-[homelab-crossplane]: https://github.com/gruberdev/homelab/tree/main/apps/utilities/crossplane
-[homelab-adguard]: https://github.com/gruberdev/homelab/tree/main/apps/networking/adguard
-[homelab-mongo]: https://github.com/gruberdev/homelab/blob/main/apps/argocd/base/apps/mongodb.yaml
-[homelab-wavy]: https://github.com/gruberdev/homelab/tree/main/apps/services/wavy
-[homelab-unifi-controller]: https://github.com/gruberdev/homelab/tree/main/apps/networking/unifi/controller
-[homelab-gitea]: https://github.com/gruberdev/homelab/blob/main/apps/argocd/base/services/gitea.yaml
-[homelab-change]: https://github.com/gruberdev/homelab/tree/main/apps/services/changedetection
-[homelab-redis]: https://github.com/gruberdev/homelab/tree/main/apps/data/redis
-[homelab-grocy]: https://github.com/gruberdev/homelab/tree/main/apps/services/grocy
-[homelab-mysql]: https://github.com/gruberdev/homelab/blob/main/docs/mysql.md
-[homelab-tailscale]: https://github.com/gruberdev/homelab/tree/main/apps/networking/tailscale
-[homelab-vault]: https://github.com/gruberdev/homelab/blob/main/apps/argocd/base/apps/vault.yaml
-[homelab-matrix]: https://github.com/gruberdev/homelab/tree/main/apps/matrix
-[homelab-n8n]: https://github.com/gruberdev/homelab/tree/main/apps/services/n8n
-[homelab-flame]: https://github.com/gruberdev/homelab/tree/main/apps/monitoring/flame
-[homelab-poller]: https://github.com/gruberdev/homelab/tree/main/apps/networking/unifi/poller
-[homelab-cloudflared]: https://github.com/gruberdev/homelab/tree/main/apps/networking/cloudflared
-[homelab-kubevip]: https://github.com/gruberdev/homelab/tree/main/apps/networking/kube-vip
-[homelab-rssgen]: https://github.com/gruberdev/homelab/tree/main/apps/services/rss/gen
-[homelab-chatgpt]: https://github.com/gruberdev/homelab/tree/main/apps/services/chatgpt/discord-bot
-[homelab-p-chatgpt]: https://github.com/gruberdev/homelab/tree/main/apps/services/chatgpt/memory-plugin
-[homelab-milvus]: https://github.com/gruberdev/homelab/blob/main/apps/argocd/base/mlops/milvus.yaml
-[homelab-sonarr]: https://github.com/gruberdev/homelab/tree/main/apps/services/media/sonarr
-[homelab-prowlarr]: https://github.com/gruberdev/homelab/tree/main/apps/services/media/prowlarr
-[homelab-rsshub]: https://github.com/gruberdev/homelab/tree/main/apps/services/rss/hub
-[homelab-feedpushr]: https://github.com/gruberdev/homelab/tree/main/apps/services/rss/feedpushr
-[homelab-beets]: https://github.com/gruberdev/homelab/tree/main/apps/services/media/beets
-[homelab-lidarr]: https://github.com/gruberdev/homelab/tree/main/apps/services/media/lidarr
-[homelab-metabase]: https://github.com/gruberdev/homelab/tree/main/apps/data/metabase
-[homelab-certmanager]: https://github.com/gruberdev/homelab/tree/main/apps/networking/certmanager
-[homelab-externaldns]: https://github.com/gruberdev/homelab/tree/main/apps/argocd/base/networking/external-dns
-[homelab-jellyfin]: https://github.com/gruberdev/homelab/tree/main/apps/services/media/jellyfin
-[homelab-agones]: https://github.com/gruberdev/homelab/tree/main/apps/services/agones
-[homelab-gpu-exporter]: https://github.com/gruberdev/homelab/blob/main/apps/argocd/base/monitoring/nvidia.yaml
-[homelab-unifi]: https://github.com/gruberdev/homelab/tree/main/apps/networking/unifi/controller
+[homelab-argocd]: https://github.com/lordmuffin/homelab/tree/main/apps/argocd
+[homelab-drone]: https://github.com/lordmuffin/homelab/tree/main/apps/drone
+[homelab-ha]: https://github.com/lordmuffin/homelab/tree/main/apps/home/ha
+[homelab-wyze]: https://github.com/lordmuffin/homelab/tree/main/apps/home/wyze
+[homelab-nvidia]: https://github.com/lordmuffin/homelab/blob/main/docs/nvidia.md
+[homelab-nfs]: https://github.com/lordmuffin/homelab/blob/main/apps/argocd/base/core/nfs.yaml
+[homelab-kube]: https://github.com/lordmuffin/homelab/blob/main/apps/argocd/base/monitoring/kube-prometheus.yaml
+[homelab-kuma]: https://github.com/lordmuffin/homelab/tree/main/apps/monitoring/uptime-kuma
+[homelab-crossplane]: https://github.com/lordmuffin/homelab/tree/main/apps/utilities/crossplane
+[homelab-adguard]: https://github.com/lordmuffin/homelab/tree/main/apps/networking/adguard
+[homelab-mongo]: https://github.com/lordmuffin/homelab/blob/main/apps/argocd/base/apps/mongodb.yaml
+[homelab-wavy]: https://github.com/lordmuffin/homelab/tree/main/apps/services/wavy
+[homelab-unifi-controller]: https://github.com/lordmuffin/homelab/tree/main/apps/networking/unifi/controller
+[homelab-gitea]: https://github.com/lordmuffin/homelab/blob/main/apps/argocd/base/services/gitea.yaml
+[homelab-change]: https://github.com/lordmuffin/homelab/tree/main/apps/services/changedetection
+[homelab-redis]: https://github.com/lordmuffin/homelab/tree/main/apps/data/redis
+[homelab-grocy]: https://github.com/lordmuffin/homelab/tree/main/apps/services/grocy
+[homelab-mysql]: https://github.com/lordmuffin/homelab/blob/main/docs/mysql.md
+[homelab-tailscale]: https://github.com/lordmuffin/homelab/tree/main/apps/networking/tailscale
+[homelab-vault]: https://github.com/lordmuffin/homelab/blob/main/apps/argocd/base/apps/vault.yaml
+[homelab-matrix]: https://github.com/lordmuffin/homelab/tree/main/apps/matrix
+[homelab-n8n]: https://github.com/lordmuffin/homelab/tree/main/apps/services/n8n
+[homelab-flame]: https://github.com/lordmuffin/homelab/tree/main/apps/monitoring/flame
+[homelab-poller]: https://github.com/lordmuffin/homelab/tree/main/apps/networking/unifi/poller
+[homelab-cloudflared]: https://github.com/lordmuffin/homelab/tree/main/apps/networking/cloudflared
+[homelab-kubevip]: https://github.com/lordmuffin/homelab/tree/main/apps/networking/kube-vip
+[homelab-rssgen]: https://github.com/lordmuffin/homelab/tree/main/apps/services/rss/gen
+[homelab-chatgpt]: https://github.com/lordmuffin/homelab/tree/main/apps/services/chatgpt/discord-bot
+[homelab-p-chatgpt]: https://github.com/lordmuffin/homelab/tree/main/apps/services/chatgpt/memory-plugin
+[homelab-milvus]: https://github.com/lordmuffin/homelab/blob/main/apps/argocd/base/mlops/milvus.yaml
+[homelab-sonarr]: https://github.com/lordmuffin/homelab/tree/main/apps/services/media/sonarr
+[homelab-prowlarr]: https://github.com/lordmuffin/homelab/tree/main/apps/services/media/prowlarr
+[homelab-rsshub]: https://github.com/lordmuffin/homelab/tree/main/apps/services/rss/hub
+[homelab-feedpushr]: https://github.com/lordmuffin/homelab/tree/main/apps/services/rss/feedpushr
+[homelab-beets]: https://github.com/lordmuffin/homelab/tree/main/apps/services/media/beets
+[homelab-lidarr]: https://github.com/lordmuffin/homelab/tree/main/apps/services/media/lidarr
+[homelab-metabase]: https://github.com/lordmuffin/homelab/tree/main/apps/data/metabase
+[homelab-certmanager]: https://github.com/lordmuffin/homelab/tree/main/apps/networking/certmanager
+[homelab-externaldns]: https://github.com/lordmuffin/homelab/tree/main/apps/argocd/base/networking/external-dns
+[homelab-jellyfin]: https://github.com/lordmuffin/homelab/tree/main/apps/services/media/jellyfin
+[homelab-agones]: https://github.com/lordmuffin/homelab/tree/main/apps/services/agones
+[homelab-gpu-exporter]: https://github.com/lordmuffin/homelab/blob/main/apps/argocd/base/monitoring/nvidia.yaml
+[homelab-unifi]: https://github.com/lordmuffin/homelab/tree/main/apps/networking/unifi/controller
 
 <!-- ArgoCD Status Badges -->
 

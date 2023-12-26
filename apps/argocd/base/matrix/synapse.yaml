@@ -50,7 +50,7 @@ spec:
             reloader.stakater.com/auto: "true"
           labels: {}
           nodeSelector:
-            kubernetes.io/hostname: node-one
+
           extraEnv: []
           extraVolumes:
             - name: bridges

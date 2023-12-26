@@ -29,7 +29,7 @@ spec:
           mtls:
             enabled: true
           nodeSelector:
-            kubernetes.io/hostname: node-one
+
           podSecurityPolicy: false
           privileged: true
           resources:
@@ -69,7 +69,7 @@ spec:
             renewDeadline: 10s
             retryPeriod: 2s
           nodeSelector:
-            kubernetes.io/hostname: node-one
+
           podChaos:
             podFailure:
               pauseImage: gcr.io/google-containers/pause:latest
@@ -114,7 +114,7 @@ spec:
             paths:
             - /
           nodeSelector:
-            kubernetes.io/hostname: node-one
+
           persistentVolume:
             enabled: false
             mountPath: /data
@@ -143,7 +143,7 @@ spec:
           imagePullPolicy: IfNotPresent
           name: chaos-mesh-dns-server
           nodeSelector:
-            kubernetes.io/hostname: node-one
+
           replicas: 1
           resources:
             requests:
@@ -160,7 +160,7 @@ spec:
           image: prom/prometheus:v2.18.1
           imagePullPolicy: IfNotPresent
           nodeSelector:
-            kubernetes.io/hostname: node-one
+
           resources:
             limits:
               cpu: 500m

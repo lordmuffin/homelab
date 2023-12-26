@@ -54,7 +54,7 @@ kubectl apply -f https://raw.githubusercontent.com/gruberdev/homelab/main/apps/a
 [docs-uri]: https://cert-manager.io/docs/
 [helm-uri]: https://github.com/cert-manager/cert-manager/tree/master/deploy/charts/cert-manager
 [manifests-uri]: https://github.com/cert-manager/cert-manager/tree/master/deploy/manifests
-[argocd-file]: https://github.com/gruberdev/homelab/blob/main/apps/argocd/base/networking/external-dns/cloudflare.yaml
+[argocd-file]: https://github.com/lordmuffin/homelab/blob/main/apps/argocd/base/networking/external-dns/cloudflare.yaml
 [tracking-error-explain]: https://foxutech.medium.com/how-to-fix-too-long-must-have-at-most-262144-bytes-in-argocd-2a00cddbbe99
 [tracking-error-explain-2]: https://www.arthurkoziel.com/fixing-argocd-crd-too-long-error/
 [original-github-crd-issue]: https://github.com/argoproj/argo-cd/issues/820

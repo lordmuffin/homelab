@@ -9,7 +9,7 @@ metadata:
 spec:
   project: core
   source:
-    repoURL: 'https://github.com/gruberdev/homelab.git'
+    repoURL: 'https://github.com/lordmuffin/homelab.git'
     path: apps/argocd
     targetRevision: main
   destination:
