@@ -8,6 +8,7 @@ includes:
   tailscale: ./tasks/tailscale.yaml
   argocd: ./tasks/argocd.yaml
   prometheus-operator: ./tasks/prometheus-operator.yaml
+  namespaces: ./tasks/namespaces.yaml
   vault: ./tasks/vault.yaml
   vultr: ./tasks/vultr.yaml
   tf: ./tasks/terraform.yaml

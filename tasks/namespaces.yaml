@@ -1,0 +1,37 @@
+version: '3'
+vars:
+  CYAN: tput setaf 6
+  RED: tput setaf 1
+  YELLOW: tput setaf 3
+  GREEN: tput setaf 2
+  BLUE: tput setaf 1
+  PURPLE: tput setaf 5
+  BG_B: tput setab 0
+  BOLD: tput bold
+  RESET: tput sgr0
+  CLEAR: tput reset
+  INT_REGISTRY: registry.localhost
+  PATH_ERROR: is not installed or correctly configured in PATH.
+
+
+silent: true
+
+tasks:
+  create:
+    desc: Create default namespaces if needed
+    dir: apps/argocd
+    preconditions:
+    - sh: 'which kubectl'
+      msg: 'kubectl {{.PATH_ERROR}}'
+    cmds:
+    - kubectl create namespace networking
+    - kubectl create namespace homeassistant
+    - kubectl create namespace mlops
+    - kubectl create namespace media
+    - kubectl create namespace unifi
+    - kubectl create namespace services
+    - kubectl create namespace rss
+    - kubectl create namespace gitea
+    - kubectl create namespace monitoring
+
+    ignore_error: true
