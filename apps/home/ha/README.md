@@ -63,8 +63,8 @@ kubectl apply -k github.com/gruberdev/homelab/apps/home/ha
 [own-ha-uri]: https://github.com/gruberdev/homeassistant
 [website-uri]: https://www.home-assistant.io/
 [github-uri]: https://github.com/home-assistant
-[operator-uri]: https://github.com/gruberdev/homelab/tree/main/apps/data/postgres
-[argo-uri]: https://github.com/gruberdev/homelab/tree/main/apps/argocd
+[operator-uri]: https://github.com/lordmuffin/homelab/tree/main/apps/data/postgres
+[argo-uri]: https://github.com/lordmuffin/homelab/tree/main/apps/argocd
 [awesome-uri]: https://github.com/frenck/awesome-home-assistant
 
 <!---HACS Components-->

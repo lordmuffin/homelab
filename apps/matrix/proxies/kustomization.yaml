@@ -1,9 +1,9 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 bases:
-- https://github.com/gruberdev/homelab/apps/networking/tailscale/proxy
-- https://github.com/gruberdev/homelab/apps/networking/tailscale
-- https://github.com/gruberdev/homelab/apps/networking/cloudflared
+- https://github.com/lordmuffin/homelab/apps/networking/tailscale/proxy
+- https://github.com/lordmuffin/homelab/apps/networking/tailscale
+- https://github.com/lordmuffin/homelab/apps/networking/cloudflared
 
 patchesStrategicMerge:
 - overlay/cloudflared-cm.yaml
@@ -22,7 +22,7 @@ patches:
     - op: add
       path: "/spec/template/spec/nodeSelector"
       value:
-        kubernetes.io/hostname: node-one
+
   target:
     kind: Deployment
     name: ts-proxy

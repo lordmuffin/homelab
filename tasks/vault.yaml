@@ -46,7 +46,7 @@ tasks:
         msg: 'jq {{.PATH_ERROR}}'
       - sh: 'which kubectl'
         msg: 'kubectl {{.PATH_ERROR}}'
-      - sh: 'which Helm'
+      - sh: 'which helm'
         msg: 'helm {{.PATH_ERROR}}'
     dir: apps/argocd/overlay
     cmds:

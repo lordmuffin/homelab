@@ -4,7 +4,7 @@ bases:
 - ./base
 
 resources:
-- https://github.com/gruberdev/homelab/apps/networking/cloudflared
+- https://github.com/lordmuffin/homelab/apps/networking/cloudflared
 
 patchesStrategicMerge:
 - overlay/cloudflared-cm.yaml

@@ -4,7 +4,7 @@ bases:
 - ./base
 - github.com/gruberdev/homelab/apps/data/postgres/exporter
 resources:
-- https://github.com/gruberdev/homelab/apps/networking/cloudflared
+- https://github.com/lordmuffin/homelab/apps/networking/cloudflared
 patchesStrategicMerge:
 - overlay/cloudflared-cm.yaml
 namespace: services

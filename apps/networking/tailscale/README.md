@@ -30,7 +30,7 @@
 [awesome-uri]: https://github.com/cedrickchee/awesome-wireguard
 [operator-docs-uri]: https://tailscale.com/kb/1236/kubernetes-operator/
 [admin-uri]: https://login.tailscale.com/admin/machines
-[acl-uri]: https://github.com/gruberdev/homelab/blob/main/policy.hujson
+[acl-uri]: https://github.com/lordmuffin/homelab/blob/main/policy.hujson
 [inlets-uri]: https://inlets.dev/pricing/
 [zero-uri]: https://medium.com/netmaker/battle-of-the-vpns-which-one-is-fastest-speed-test-21ddc9cd50db
 [headscale-uri]: https://github.com/juanfont/headscale

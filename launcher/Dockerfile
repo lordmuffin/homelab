@@ -38,6 +38,11 @@ RUN set -ex; \
     chmod +x kuota-calc
 
 RUN set -ex; \
+    curl -fLO "https://releases.hashicorp.com/vault/1.15.4/vault_1.15.4_linux_amd64.zip" && \
+    unzip -o vault_1.15.4_linux_amd64.zip && rm vault_1.15.4_linux_amd64.zip && \
+    chmod +x vault
+
+RUN set -ex; \
     curl -sLO https://github.com/argoproj/argo-workflows/releases/download/v3.5.2/argo-linux-amd64.gz && \
     gunzip argo-linux-amd64.gz && \
     chmod +x argo-linux-amd64
@@ -48,7 +53,7 @@ FROM alpine:3.16.0 AS runtime
 
 LABEL maintainer="LINE Open Source <dl_oss_dev@linecorp.com>"
 
-RUN apk add --no-cache python3 py3-pip
+RUN apk update && apk add --no-cache python3 py3-pip git jq
 RUN pip install yamllint
 RUN mkdir /launcher
 
@@ -61,6 +66,7 @@ COPY --from=downloader /downloads/kubeconform /usr/local/bin/kubeconform
 COPY --from=downloader /downloads/task/task /usr/local/bin/task
 COPY --from=downloader /downloads/terraform /usr/local/bin/terraform
 COPY --from=downloader /downloads/kuota-calc /usr/local/bin/kuota-calc
+COPY --from=downloader /downloads/vault /usr/local/bin/vault
 COPY --from=downloader /downloads/argo-linux-amd64 /usr/local/bin/argocd
 
 # Test

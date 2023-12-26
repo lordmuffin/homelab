@@ -216,4 +216,4 @@ Done
 [cuda-list]: https://catalog.ngc.nvidia.com/orgs/nvidia/containers/cuda/tags
 [k3s-docs]: https://docs.k3s.io/advanced#nvidia-container-runtime-support
 [nvidia-gpu-operator]: https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/overview.html
-[gfd-uri]: https://github.com/gruberdev/homelab/blob/main/apps/argocd/base/utilities/gfd.yaml
+[gfd-uri]: https://github.com/lordmuffin/homelab/blob/main/apps/argocd/base/utilities/gfd.yaml
