@@ -8,6 +8,11 @@ users:
   # Replace with your github user and un-comment the line below:
   - github:lordmuffin
 
+install:
+  auto: true
+  device: "auto"
+  reboot: true
+
 p2p:
   # Disabling DHT makes co-ordination to discover nodes only in the local network
   disable_dht: true #Enabled by default
