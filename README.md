@@ -22,6 +22,7 @@ sudo docker run --rm -ti --net host quay.io/kairos/auroraboot \
                     --set "flavor=ubuntu" \
                     --set "flavor_release=22.04" \
                     --set repository="kairos-io/kairos" \
+                    --set network.token="<TOKEN>" \
                     --cloud-config https://raw.githubusercontent.com/lordmuffin/homelab/main/launcher/kairos-config/k3s-HA-lab.yaml
 ```
 
