@@ -59,6 +59,7 @@ RUN mkdir /launcher
 
 WORKDIR /launcher
 
+COPY --from=downloader /usr/bin/curl /usr/local/bin/curl
 COPY --from=downloader /downloads/kubectl /usr/local/bin/kubectl
 COPY --from=downloader /downloads/kustomize /usr/local/bin/kustomize
 COPY --from=downloader /downloads/linux-arm64/helm /usr/local/bin/helm

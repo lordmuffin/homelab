@@ -1,0 +1,35 @@
+version: '3'
+vars:
+  CYAN: tput setaf 6
+  RED: tput setaf 1
+  YELLOW: tput setaf 3
+  GREEN: tput setaf 2
+  BLUE: tput setaf 1
+  PURPLE: tput setaf 5
+  BG_B: tput setab 0
+  BOLD: tput bold
+  RESET: tput sgr0
+  CLEAR: tput reset
+  INT_REGISTRY: registry.localhost
+  PATH_ERROR: is not installed or correctly configured in PATH.
+
+
+silent: true
+
+tasks:
+  install:
+    vars:
+      LATEST:
+        sh: curl -s https://api.github.com/repos/prometheus-operator/prometheus-operator/releases/latest | jq -cr .tag_name
+    desc: Installs the latest prometheus-operator into default
+    dir: apps/argocd
+    preconditions:
+    - sh: 'which curl'
+      msg: 'curl {{.PATH_ERROR}}'
+    - sh: 'which jq'
+      msg: 'jq {{.PATH_ERROR}}'
+    - sh: 'which kubectl'
+      msg: 'kubectl {{.PATH_ERROR}}'
+    cmds:
+    - curl -sL https://github.com/prometheus-operator/prometheus-operator/releases/download/{{.LATEST}}/bundle.yaml | kubectl create -f -
+    ignore_error: true
