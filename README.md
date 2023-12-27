@@ -16,14 +16,48 @@ run task argocd:secret & repo with variables for user and pass
 
 Run this on a linux server to serve AuroraBoot
 ```
+
+cat <<EOF | sudo docker run --rm -i --net host quay.io/kairos/auroraboot \
+                    --cloud-config - \
+                    --set "container_image=quay.io/kairos/ubuntu:22.04-standard-amd64-generic-v2.4.3-k3sv1.28.2-k3s1"
+#cloud-config
+
+# https://github.com/kairos-io/kairos/issues/885
+config_url: ""
+
+install:
+  auto: true
+  device: "auto"
+  reboot: true
+
+hostname: kairoslab-{{ trunc 4 .MachineID }}
+users:
+- name: kairos
+  passwd: kairos
+  ssh_authorized_keys:
+  - github:lordmuffin
+p2p:
+  disable_dht: true #Enabled by default
+  network_token: "<INSERT YOUR TOKEN>"
+  auto:
+    enable: true
+    ha:
+      enable: true
+      master_nodes: 2
+EOF
+
+```
+
+OLD:
+```
 sudo docker run --rm -ti --net host quay.io/kairos/auroraboot \
-                    --set "artifact_version=v2.4.3" \
+                    --set "artifact_version=v2.4.3-k3sv1.28.2+k3s1" \
                     --set "release_version=v2.4.3" \
                     --set "flavor=ubuntu" \
                     --set "flavor_release=22.04" \
                     --set repository="kairos-io/kairos" \
-                    --set network.token="<TOKEN>" \
-                    --cloud-config https://raw.githubusercontent.com/lordmuffin/homelab/main/launcher/kairos-config/k3s-HA-lab.yaml
+                    --cloud-config https://raw.githubusercontent.com/lordmuffin/homelab/main/launcher/kairos-config/k3s-HA-lab.yaml \
+                    --set "network.token=<TOKEN HERE>"
 ```
 
 ## Docker Launcher Steps
