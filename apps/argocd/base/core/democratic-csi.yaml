@@ -67,12 +67,12 @@ spec:
             instance_id:
             httpConnection:
               protocol: http
-              host: server address
+              host: 192.168.1.10
               port: 80
               # use only 1 of apiKey or username/password
               # if both are present, apiKey is preferred
               # apiKey is only available starting in TrueNAS-12
-              apiKey: <INSERT API KEY HERE>
+              apiKey: 1-WpJf0HKS62Wj4Kv1wDdkRJi8ZU3l8cA6ryRO5HKVeEa363oPy0xfU1jLhgYl3UkW #gitleaks:allow
               # username: root
               # password:
               # allowInsecure: true
