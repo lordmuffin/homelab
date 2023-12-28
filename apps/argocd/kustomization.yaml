@@ -14,6 +14,7 @@ resources:
   # Core apps
   - base/core/argocd.yaml
   - base/core/data.yaml
+  - base/core/democratic-csi.yaml
   - base/core/nvidia.yaml
   - base/core/nvidia-extra.yaml
   - base/core/networking.yaml
