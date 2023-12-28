@@ -117,9 +117,9 @@ spec:
               # 512, 1K, 2K, 4K, 8K, 16K, 64K, 128K default is 16K
               zvolBlocksize:
             iscsi:
-              targetPortal: "server[:port]"
+              targetPortal: "192.168.1.10:3260"
               # for multipath
-              targetPortals: [] # [ "server[:port]", "server[:port]", ... ]
+              # targetPortals: [] # [ "server[:port]", "server[:port]", ... ]
               # leave empty to omit usage of -I with iscsiadm
               interface:
 
