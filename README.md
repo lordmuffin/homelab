@@ -12,6 +12,9 @@ run task argocd:secret & repo with variables for user and pass
 
 # Install Steps
 
+## Provision Kairos Virtual Machines
+Be sure to deploy the required VM's ahead of time and then run the Kairos Steps for the control nodes first.
+
 ## Kairos Steps
 
 Run this on a linux server to serve AuroraBoot
@@ -36,6 +39,10 @@ users:
   passwd: kairos
   ssh_authorized_keys:
   - github:lordmuffin
+
+kubevip:
+  eip: "192.168.1.20"
+
 p2p:
   disable_dht: true #Enabled by default
   network_token: "<INSERT YOUR TOKEN>"

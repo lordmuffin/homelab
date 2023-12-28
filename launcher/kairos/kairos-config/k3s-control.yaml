@@ -1,0 +1,18 @@
+#cloud-config
+
+hostname: kairos-{{ trunc 4 .MachineID }}
+users:
+- name: kairos
+  # Change to your pass here
+  passwd: kairos
+  ssh_authorized_keys:
+  # Replace with your github user and un-comment the line below:
+  - github:lordmuffin
+
+k3s:
+  enabled: true
+  args:
+  - --disable=traefik,servicelb
+  - --server https://192.168.1.247:6443
+  env:
+    K3S_TOKEN: K102dfcfd37a528cf6a7d216d0641009be7b80014927bb8e6520bb9e7a7c760219e::server:9a219b32b86c08e34a527b2d31eefae3
