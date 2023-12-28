@@ -226,7 +226,7 @@ spec:
             enabled: true
             size: 5Gi
             mountPath: "/vault/data"
-            storageClass: iscsi
+            F
             accessMode: ReadWriteOnce
             annotations: {}
           # See https://www.vaultproject.io/docs/audit/index.html to know more
@@ -238,7 +238,7 @@ spec:
             mountPath: "/vault/audit"
             # Name of the storage class to use.  If null it will use the
             # configured default Storage Class.
-            storageClass: iscsi
+            storageClass: freenas-iscsi-csi
             # Access Mode of the storage device being used for the PVC
             accessMode: ReadWriteOnce
             # Annotations to apply to the PVC

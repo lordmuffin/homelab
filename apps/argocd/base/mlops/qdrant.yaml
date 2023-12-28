@@ -72,7 +72,7 @@ spec:
           accessModes:
             - ReadWriteOnce
           size: 10Gi
-          storageClassName: iscsi
+          storageClassName: freenas-iscsi-csi
         snapshotRestoration:
           enabled: false
         config:

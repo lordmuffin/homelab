@@ -607,7 +607,7 @@ spec:
                   resources:
                     requests:
                       storage: 30Gi
-                  storageClassName: iscsi
+                  storageClassName: freenas-iscsi-csi
             walCompression: true
           service:
             externalTrafficPolicy: Cluster

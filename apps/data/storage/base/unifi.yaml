@@ -6,7 +6,7 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: iscsi
+  storageClassName: freenas-iscsi-csi
   resources:
     requests:
       storage: 10Gi
@@ -19,7 +19,7 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: iscsi
+  storageClassName: freenas-iscsi-csi
   resources:
     requests:
       storage: 50Gi
@@ -32,7 +32,7 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: iscsi
+  storageClassName: freenas-iscsi-csi
   resources:
     requests:
       storage: 2Gi

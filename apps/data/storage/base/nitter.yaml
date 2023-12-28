@@ -6,7 +6,7 @@ metadata:
 spec:
   accessModes:
   - ReadWriteOnce
-  storageClassName: iscsi
+  storageClassName: freenas-iscsi-csi
   resources:
     requests:
       storage: 1Gi

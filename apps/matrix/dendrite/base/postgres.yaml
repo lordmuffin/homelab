@@ -26,7 +26,7 @@ spec:
     version: "14"
   volume:
     size: 1Gi
-    storageClass: iscsi
+    storageClass: freenas-iscsi-csi
   additionalVolumes:
   - name: data
     mountPath: /home/postgres/pgdata/partitions
