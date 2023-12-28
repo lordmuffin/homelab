@@ -6,8 +6,8 @@ spec:
   project: core
   source:
     repoURL: https://github.com/democratic-csi/democratic-csi.git
-    targetRevision: v1.8.4
-    path: examples/freenas-api-iscsi.yaml
+    targetRevision: democratic-csi-0.14.3
+    path: stable/democratic-csi
     helm:
       releaseName: democratic-csi
       values: |

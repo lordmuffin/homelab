@@ -33,5 +33,6 @@ tasks:
     - kubectl create namespace rss
     - kubectl create namespace gitea
     - kubectl create namespace monitoring
+    - kubectl create namespace democratic-csi
 
     ignore_error: true
