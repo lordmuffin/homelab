@@ -226,7 +226,7 @@ spec:
             enabled: true
             size: 5Gi
             mountPath: "/vault/data"
-            F
+            storageClass: freenas-iscsi-csi
             accessMode: ReadWriteOnce
             annotations: {}
           # See https://www.vaultproject.io/docs/audit/index.html to know more
