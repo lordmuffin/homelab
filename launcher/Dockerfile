@@ -53,7 +53,7 @@ FROM alpine:3.16.0 AS runtime
 
 LABEL maintainer="LINE Open Source <dl_oss_dev@linecorp.com>"
 
-RUN apk update && apk add --no-cache python3 py3-pip git jq
+RUN apk update && apk add --no-cache python3 py3-pip git jq openssl
 RUN pip install yamllint
 RUN mkdir /launcher
 

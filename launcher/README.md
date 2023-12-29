@@ -25,3 +25,7 @@ docker build ./launcher/. --build-arg TARGETOS=linux --build-arg TARGETARCH=amd6
 ```
 docker run --rm -v ~/.kube/:/root/.kube:ro -v ${PWD}:/launcher -ti homelab-launcher:v0.1.3 task version
 ```
+
+```
+kubectl run homelab-launcher --restart=Never --rm -i --tty --image ghcr.io/lordmuffin/homelab-launcher:v0.1.3 -- /bin/bash
+```

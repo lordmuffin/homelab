@@ -4,6 +4,15 @@ TODO LIST:
 
 
 run task argocd:secret & repo with variables for user and pass
+Find a way to access Argo with no ingress.
+ - Define the manual steps?
+ - Attempt to automate them?
+
+
+#### Vault
+Had to manually sync each Vault resource in ArgoCD.
+** Port forward to the vault-0 during configuration.
+
 
 
 # Install Steps

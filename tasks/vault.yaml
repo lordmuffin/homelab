@@ -50,16 +50,16 @@ tasks:
         msg: 'helm {{.PATH_ERROR}}'
     dir: apps/argocd/overlay
     cmds:
-      - kubectl config set-context --current --namespace=vault
-      - kubectl exec vault-0 -- vault operator init -key-shares=3 -key-threshold=3 -format=json > cluster-keys.json
+      # - kubectl config set-context --current --namespace=vault
+      - kubectl exec vault-0 --namespace vault -- vault operator init -key-shares=3 -key-threshold=3 -format=json > /launcher/cluster-keys.json
       - task: highlight_normal
       - echo -e "\nVault's Unseal Key:"
       - task: reset
-      - cat cluster-keys.json | jq -r ".unseal_keys_b64[]"
+      - cat /launcher/cluster-keys.json | jq -r ".unseal_keys_b64[]"
       - task: highlight_normal
       - echo -e "\nVault's Root Token:"
       - task: reset
-      - cat cluster-keys.json | jq -r ".root_token"
+      - cat /launcher/cluster-keys.json | jq -r ".root_token"
       - task: unseal
       - task: set
       - task: secret
@@ -96,7 +96,7 @@ tasks:
         msg: 'vault {{.PATH_ERROR}}'
     vars:
       VAULT_TOKEN:
-        sh: cat cluster-keys.json | jq -r ".root_token"
+        sh: cat /launcher/cluster-keys.json | jq -r ".root_token"
     dir: apps/argocd/overlay
     cmds:
       - vault login {{.VAULT_TOKEN}}
@@ -108,7 +108,7 @@ tasks:
         msg: 'vault {{.PATH_ERROR}}'
     vars:
       VAULT_TOKEN:
-        sh: cat cluster-keys.json | jq -r ".root_token"
+        sh: cat /launcher/cluster-keys.json | jq -r ".root_token"
     dir: apps/argocd/overlay
     cmds:
       - vault login {{.VAULT_TOKEN}}
@@ -120,10 +120,10 @@ tasks:
       - sh: 'which vault'
         msg: 'vault {{.PATH_ERROR}}'
     cmds:
-      - kubectl config set-context --current --namespace=vault --cluster=default
-      - kubectl exec --stdin=true --tty=true vault-0 -- vault operator unseal ${VAULT_UNSEAL_1}
-      - kubectl exec --stdin=true --tty=true vault-0 -- vault operator unseal ${VAULT_UNSEAL_2}
-      - kubectl exec --stdin=true --tty=true vault-0 -- vault operator unseal ${VAULT_UNSEAL_3}
+      # - kubectl config set-context --current --namespace=vault --cluster=default
+      - kubectl exec --stdin=true --tty=true vault-0 --namespace vault -- vault operator unseal ${VAULT_UNSEAL_1}
+      - kubectl exec --stdin=true --tty=true vault-0 --namespace vault -- vault operator unseal ${VAULT_UNSEAL_2}
+      - kubectl exec --stdin=true --tty=true vault-0 --namespace vault -- vault operator unseal ${VAULT_UNSEAL_3}
     ignore_error: true
 
   newapp:auth:

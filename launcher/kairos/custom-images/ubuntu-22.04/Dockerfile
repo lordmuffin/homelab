@@ -6,7 +6,8 @@ LABEL org.opencontainers.image.description="My custom kairos ubuntu 22.04 image"
 LABEL org.opencontainers.image.licenses=Apache-2.0
 
 RUN sudo apt-get update
-RUN sudo apt-get install -y cifs-utils nfs-common open-iscsi lsscsi sg3-utils multipath-tools scsitools
+RUN sudo apt-get install -y cifs-utils nfs-common open-iscsi lsscsi \
+    sg3-utils multipath-tools scsitools
 
 RUN sudo tee /etc/multipath.conf $"<<-'EOF'\
 defaults { \n\
