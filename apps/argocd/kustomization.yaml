@@ -13,6 +13,7 @@ resources:
 
   # Core apps
   - base/core/argocd.yaml
+  - base/core/1password.yaml
   - base/core/data.yaml
   - base/core/democratic-csi.yaml
   - base/core/nvidia.yaml
