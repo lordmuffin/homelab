@@ -55,23 +55,6 @@ images:
     newTag: v2.9.3
 patches:
   - patch: |-
-      - op: add
-        path: "/spec/templates/spec/volumes/1/secret/0/items/0/key"
-        value: "notesPlain/stringData/driver-config-file.yaml"
-      - op: add
-        path: "/spec/templates/spec/volumes/1/secret/0/items/0/value"
-        value: "/config/driver-config-file.yaml"
-    target:
-      kind: Deployment
-      name: democratic-csi-controller
-  # - patch: |-
-  #     - op: replace
-  #       path: "/spec/templates/spec/containers/0/args/-"
-  #       value: "--driver-config-file=/config/notesPlain/stringData/driver-config-file.yaml"
-  #   target:
-  #     kind: Deployment
-  #     name: democratic-csi-controller
-  - patch: |-
       - op: replace
         path: "/metadata/namespace"
         value: "monitoring"
