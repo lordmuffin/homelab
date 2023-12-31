@@ -62,6 +62,7 @@ spec:
         #    snapshotter-secret:
 
         driver:
+          existingConfigSecret: democratic-csi-driver-config-1password
           config:
             driver: freenas-api-iscsi
             instance_id:
@@ -72,7 +73,7 @@ spec:
               # use only 1 of apiKey or username/password
               # if both are present, apiKey is preferred
               # apiKey is only available starting in TrueNAS-12
-              apiKey: 1-WpJf0HKS62Wj4Kv1wDdkRJi8ZU3l8cA6ryRO5HKVeEa363oPy0xfU1jLhgYl3UkW #gitleaks:allow
+              # apiKey:
               # username: root
               # password:
               allowInsecure: true

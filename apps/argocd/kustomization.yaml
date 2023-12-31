@@ -36,7 +36,7 @@ resources:
   - base/monitoring/nvidia.yaml
 
   # Secrets
-  - base/secrets/freenas-iscsi-csi-api-key.yaml
+  - base/1password-secrets/democratic-csi-driver-config-1password.yaml
 
   # ArgoCD
   - base/cmp-plugin.yaml
