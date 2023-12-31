@@ -21,11 +21,12 @@ The purpose of the `Dockerfile` is to build a launcher image that can be used to
 docker build ./launcher/. --build-arg TARGETOS=linux --build-arg TARGETARCH=amd64 --build-arg KUBECTL_VERSION=1.28.2 --build-arg KUSTOMIZE_VERSION=5.3.0 -t homelab-launcher:v0.1.2
 ```
 
-### How to use image
+### How to use image:
 ```
 docker run --rm -v ~/.kube/:/root/.kube:ro -v ${PWD}:/launcher -ti homelab-launcher:v0.1.3 task version
 ```
 
+### Running inside k8s:
 ```
 kubectl run homelab-launcher --restart=Never --rm -i --tty --image ghcr.io/lordmuffin/homelab-launcher:v0.1.3 -- /bin/bash
 ```

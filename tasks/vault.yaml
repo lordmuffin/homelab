@@ -16,6 +16,7 @@ silent: true
 
 env:
   VAULT_SKIP_VERIFY: "true"
+  VAULT_ADDR: "http://vault.vault.svc.cluster.local:8200/"
 
 tasks:
   clear:

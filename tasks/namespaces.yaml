@@ -34,5 +34,6 @@ tasks:
     - kubectl create namespace gitea
     - kubectl create namespace monitoring
     - kubectl create namespace democratic-csi
+    - kubectl create namespace 1password
 
     ignore_error: true

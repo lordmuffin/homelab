@@ -9,6 +9,7 @@ includes:
   argocd: ./tasks/argocd.yaml
   prometheus-operator: ./tasks/prometheus-operator.yaml
   namespaces: ./tasks/namespaces.yaml
+  1password: ./tasks/1password.yaml
   vault: ./tasks/vault.yaml
   vultr: ./tasks/vultr.yaml
   tf: ./tasks/terraform.yaml

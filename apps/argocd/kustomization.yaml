@@ -34,6 +34,9 @@ resources:
   - base/monitoring/grafana.yaml
   - base/monitoring/nvidia.yaml
 
+  # Secrets
+  - base/secrets/freenas-iscsi-csi-api-key.yaml
+
   # ArgoCD
   - base/cmp-plugin.yaml
   - base/repo-role.yaml
@@ -80,6 +83,13 @@ patches:
           kubernetes.io/arch: amd64
     target:
       kind: StatefulSet
+  - patch: |-
+      - op: replace
+        path: "/spec/template/spec/containers/AUTO_RESTART"
+        value: "true"
+    target:
+      kind: Deployment
+      name: onepassword-connect-operator
   - patch: |-
       - op: replace
         path: "/spec/template/spec/volumes/0/secret/secretName"
