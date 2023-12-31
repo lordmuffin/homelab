@@ -55,10 +55,10 @@ images:
     newTag: v2.9.3
 patches:
   - patch: |-
-      - op: replace
+      - op: add
         path: "/spec/templates/spec/volumes/1/secret/0/items/0/key"
         value: "notesPlain/stringData/driver-config-file.yaml"
-      - op: replace
+      - op: add
         path: "/spec/templates/spec/volumes/1/secret/0/items/0/value"
         value: "/config/driver-config-file.yaml"
     target:
