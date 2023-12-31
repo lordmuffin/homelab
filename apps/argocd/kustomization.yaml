@@ -56,6 +56,13 @@ images:
 patches:
   - patch: |-
       - op: replace
+        path: "/spec/templates/spec/containers/0/args/-"
+        value: "--driver-config-file=/config/notesPlain/stringData/driver-config-file.yaml"
+    target:
+      kind: Deployment
+      name: democratic-csi-controller
+  - patch: |-
+      - op: replace
         path: "/metadata/namespace"
         value: "monitoring"
     target:
