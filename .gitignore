@@ -71,7 +71,6 @@ config/tls/key.pem
 apps/prometheus/kube-prometheus/*
 apps/kwatch/*
 !apps/kwatch/.gitkeep
-apps/argocd/base/secrets/*.yaml
 test/storage/*
 !test/storage/.gitkeep
 terraform/vault/secrets/*

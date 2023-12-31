@@ -4,6 +4,7 @@ kind: Kustomization
 resources:
   # ArgoCD Projects
   - base/projects/core.yaml
+  - base/projects/secrets.yaml
   - base/projects/cluster.yaml
   - base/projects/monitoring.yaml
   - base/projects/networking.yaml
@@ -22,6 +23,9 @@ resources:
   - base/core/services.yaml
   - base/core/utilities.yaml
 
+  # 1Password Secrets
+  - base/secrets/democratic-csi.yaml
+
   # Applications
   - base/apps/vault.yaml
   - base/apps/ha.yaml
@@ -34,9 +38,6 @@ resources:
   - base/monitoring/kube-prometheus.yaml
   - base/monitoring/grafana.yaml
   - base/monitoring/nvidia.yaml
-
-  # Secrets
-  - base/1password-secrets/democratic-csi-driver-config-1password.yaml
 
   # ArgoCD
   - base/cmp-plugin.yaml
