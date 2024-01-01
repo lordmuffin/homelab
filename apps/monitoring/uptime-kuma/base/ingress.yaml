@@ -3,14 +3,14 @@ kind: Ingress
 metadata:
   name: kuma
   annotations:
-    external-dns.alpha.kubernetes.io/hostname: kuma.gruber.dev.br
+    external-dns.alpha.kubernetes.io/hostname: kuma.labs.andrewpjackson.com
     external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
     external-dns.alpha.kubernetes.io/ttl: "120"
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
 spec:
   ingressClassName: nginx
   rules:
-  - host: kuma.gruber.dev.br
+  - host: kuma.labs.andrewpjackson.com
     http:
       paths:
       - path: /
@@ -22,5 +22,5 @@ spec:
               name: web
   tls:
   - hosts:
-    - kuma.gruber.dev.br
+    - kuma.labs.andrewpjackson.com
     secretName: kuma-tls
