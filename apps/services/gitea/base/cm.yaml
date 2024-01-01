@@ -20,7 +20,7 @@ data:
   service: |
     DISABLE_REGISTRATION=true
   server: |
-    ROOT_URL=https://git.gruber.dev.br
+    ROOT_URL=https://git.labs.andrewpjackson.com
   mirror: |
     DEFAULT_INTERVAL=3h
     ENABLED=true

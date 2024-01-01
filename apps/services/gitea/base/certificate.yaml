@@ -7,6 +7,6 @@ spec:
   issuerRef:
     name: letsencrypt-production
     kind: ClusterIssuer
-  commonName: git.gruber.dev.br
+  commonName: git.labs.andrewpjackson.com
   dnsNames:
-  - git.gruber.dev.br
+  - git.labs.andrewpjackson.com
