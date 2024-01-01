@@ -73,10 +73,10 @@ spec:
           # or retrieved from a secret using the accessKeyIDSecretRef
           # If using accessKeyID, omit the accessKeyIDSecretRef parameter and vice-versa
           accessKeyIDSecretRef:
-            name: aws-dns-home-k3s-lab
+            name: aws-dns-home-k3s-lab-1password
             key: access-key-id
           secretAccessKeySecretRef:
-            name: aws-dns-home-k3s-lab
+            name: aws-dns-home-k3s-lab-1password
             key: secret-access-key
           # you can also assume a role with these credentials
           role: arn:aws:iam::375094129818:role/route53-cert-manager-andrewpjackson.com-role
