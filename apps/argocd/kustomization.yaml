@@ -25,6 +25,7 @@ resources:
 
   # 1Password Secrets
   - base/secrets/democratic-csi.yaml
+  - base/secrets/certmanager.yaml
 
   # Applications
   - base/apps/vault.yaml
