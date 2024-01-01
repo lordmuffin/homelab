@@ -6,63 +6,77 @@ metadata:
 spec:
   acme:
     server: https://acme-v02.api.letsencrypt.org/directory
-    email: rpg.gruber@gmail.com
+    email: dorkmeisterx69@gmail.com
     privateKeySecretRef:
       name: letsencrypt-production
     solvers:
     - selector:
         dnsNames:
-        - '*.gruber.dev.br'
-        - gruber.dev.br
-        - onchange.gruber.dev.br
-        - ai.gruber.dev.br
-        - home.gruber.dev.br
-        - monitoring.gruber.dev.br
-        - grafana.gruber.dev.br
-        - jupyter.gruber.dev.br
-        - ha.gruber.dev.br
-        - argo.gruber.dev.br
-        - chat.gruber.dev.br
-        - status.gruber.dev.br
-        - kuma.gruber.dev.br
-        - manga.gruber.dev.br
-        - books.gruber.dev.br
-        - finance.gruber.dev.br
-        - budget.gruber.dev.br
-        - n8n.gruber.dev.br
-        - read.gruber.dev.br
-        - unifi.gruber.dev.br
-        - lab.gruber.dev.br
-        - g.gruber.dev.br
-        - twt.gruber.dev.br
-        - hub.gruber.dev.br
-        - proxy.gruber.dev.br
-        - vods.gruber.dev.br
-        - openai.gruber.dev.br
-        - api.vods.gruber.dev.br
-        - gpt.gruber.dev.br
-        - matrix.gruber.dev.br
-        - argocd.gruber.dev.br
-        - langflow.gruber.dev.br
-        - lanchain.gruber.dev.br
-        - lang.gruber.dev.br
-        - tv.gruber.dev.br
-        - sonarr.gruber.dev.br
-        - prowlarr.gruber.dev.br
-        - downloads.gruber.dev.br
-        - lidarr.gruber.dev.br
-        - music.gruber.dev.br
-        - bazarr.gruber.dev.br
-        - links.gruber.dev.br
-        - git.gruber.dev.br
-        - copilot.gruber.dev.br
-        - gym.gruber.dev.br
-        - dashboard.gruber.dev.br
-        - dash.gruber.dev.br
-        - hajimari.gruber.dev.br
+        - '*.labs.andrewpjackson.com'
+        - labs.andrewpjackson.com
+        - onchange.labs.andrewpjackson.com
+        - ai.labs.andrewpjackson.com
+        - home.labs.andrewpjackson.com
+        - monitoring.labs.andrewpjackson.com
+        - grafana.labs.andrewpjackson.com
+        - jupyter.labs.andrewpjackson.com
+        - ha.labs.andrewpjackson.com
+        - argo.labs.andrewpjackson.com
+        - chat.labs.andrewpjackson.com
+        - status.labs.andrewpjackson.com
+        - kuma.labs.andrewpjackson.com
+        - manga.labs.andrewpjackson.com
+        - books.labs.andrewpjackson.com
+        - finance.labs.andrewpjackson.com
+        - budget.labs.andrewpjackson.com
+        - n8n.labs.andrewpjackson.com
+        - read.labs.andrewpjackson.com
+        - unifi.labs.andrewpjackson.com
+        - lab.labs.andrewpjackson.com
+        - g.labs.andrewpjackson.com
+        - twt.labs.andrewpjackson.com
+        - hub.labs.andrewpjackson.com
+        - proxy.labs.andrewpjackson.com
+        - vods.labs.andrewpjackson.com
+        - openai.labs.andrewpjackson.com
+        - api.vods.labs.andrewpjackson.com
+        - gpt.labs.andrewpjackson.com
+        - matrix.labs.andrewpjackson.com
+        - argocd.labs.andrewpjackson.com
+        - langflow.labs.andrewpjackson.com
+        - lanchain.labs.andrewpjackson.com
+        - lang.labs.andrewpjackson.com
+        - tv.labs.andrewpjackson.com
+        - sonarr.labs.andrewpjackson.com
+        - prowlarr.labs.andrewpjackson.com
+        - downloads.labs.andrewpjackson.com
+        - lidarr.labs.andrewpjackson.com
+        - music.labs.andrewpjackson.com
+        - bazarr.labs.andrewpjackson.com
+        - links.labs.andrewpjackson.com
+        - git.labs.andrewpjackson.com
+        - copilot.labs.andrewpjackson.com
+        - gym.labs.andrewpjackson.com
+        - dashboard.labs.andrewpjackson.com
+        - dash.labs.andrewpjackson.com
+        - hajimari.labs.andrewpjackson.com
+      # dns01:
+      #   cloudflare:
+      #     email: rpg.gruber@gmail.com
+      #     apiKeySecretRef:
+      #       name: cloudflare-api-key-secret
+      #       key: api-key
       dns01:
-        cloudflare:
-          email: rpg.gruber@gmail.com
-          apiKeySecretRef:
-            name: cloudflare-api-key-secret
-            key: api-key
+        route53:
+          region: us-east-1
+          # The AWS access key ID can be specified using the literal accessKeyID parameter
+          # or retrieved from a secret using the accessKeyIDSecretRef
+          # If using accessKeyID, omit the accessKeyIDSecretRef parameter and vice-versa
+          accessKeyIDSecretRef:
+            name: aws-dns-home-k3s-lab
+            key: access-key-id
+          secretAccessKeySecretRef:
+            name: aws-dns-home-k3s-lab
+            key: secret-access-key
+          # you can also assume a role with these credentials
+          role: arn:aws:iam::375094129818:role/route53-cert-manager-andrewpjackson.com-role
