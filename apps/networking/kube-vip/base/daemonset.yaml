@@ -25,8 +25,6 @@ spec:
       - args:
         - manager
         - --prometheusHTTPServer
-        - --taint
-        - --inCluster
         - ""
         env:
         - name: vip_arp
