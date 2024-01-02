@@ -32,7 +32,7 @@ spec:
         - name: port
           value: "6443"
         - name: vip_interface
-          value: eno1
+          value: ens18
         - name: vip_servicesinterface
           value: ens18
         - name: vip_loglevel
