@@ -33,6 +33,8 @@ spec:
           value: "6443"
         - name: vip_interface
           value: eno1
+        - name: vip_servicesinterface
+          value: ens18
         - name: vip_loglevel
           value: "5"
         - name: vip_cidr
@@ -49,7 +51,7 @@ spec:
           value: "true"
         # - name: bgp_enable
         #   value: "true"
-        - name: enableNodeLabeling
+        - name: enable_node_labeling
           value: "true"
         - name: vip_leaderelection
           value: "true"
