@@ -74,7 +74,7 @@ spec:
           value: "192.168.1.20"
         image: ghcr.io/kube-vip/kube-vip:v0.6.4
         imagePullPolicy: Always
-        name: kube-vip:n
+        name: kube-vip
         resources:
           limits:
             cpu: 300m
