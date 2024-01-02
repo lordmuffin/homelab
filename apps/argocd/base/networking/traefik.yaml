@@ -12,11 +12,6 @@ spec:
     targetRevision: v26.0.0
     helm:
       releaseName: traefik
-      values: |
-        providers:
-          kubernetesIngress:
-            ingressEndpoint:
-              ip: "192.168.1.21"
   destination:
     namespace: kube-system
     name: in-cluster
