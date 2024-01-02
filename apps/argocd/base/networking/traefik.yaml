@@ -1,0 +1,42 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: traefik
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: networking
+  source:
+    repoURL: https://github.com/traefik/traefik-helm-chart.git
+    chart: traefik
+    targetRevision: v26.0.0
+    helm:
+      releaseName: traefik
+      values: |
+        providers:
+          kubernetesIngress:
+            ingressEndpoint:
+              ip: "192.168.1.21"
+  destination:
+    namespace: kube-system
+    name: in-cluster
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    managedNamespaceMetadata:
+      labels:
+        prometheus: enabled
+    syncOptions:
+    - Validate=false
+    - CreateNamespace=false
+    - Prune=true
+    - RespectIgnoreDifferences=true
+    - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 60s
+        factor: 2
+        maxDuration: 15m
