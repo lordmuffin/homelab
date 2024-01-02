@@ -1,15 +1,15 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: kube-vip
+  name: kube-vip-ds
 spec:
   selector:
     matchLabels:
-      name: kube-vip
+      name: kube-vip-ds
   template:
     metadata:
       labels:
-        name: kube-vip
+        name: kube-vip-ds
     spec:
       affinity:
         nodeAffinity:
@@ -48,7 +48,7 @@ spec:
         - name: vip_ddns
           value: "false"
         - name: svc_enable
-          value: "false"
+          value: "true"
         # - name: bgp_enable
         #   value: "true"
         - name: enable_node_labeling
@@ -74,7 +74,7 @@ spec:
           value: "192.168.1.20"
         image: ghcr.io/kube-vip/kube-vip:v0.6.4
         imagePullPolicy: Always
-        name: kube-vip
+        name: kube-vip-ds:n
         resources:
           limits:
             cpu: 300m
