@@ -25,6 +25,8 @@ spec:
       - args:
         - manager
         - --prometheusHTTPServer
+        - --taint
+        - --inCluster
         - ""
         env:
         - name: vip_arp
@@ -47,28 +49,32 @@ spec:
           value: "false"
         - name: svc_enable
           value: "true"
-        - name: bgp_enable
+        # - name: bgp_enable
+        #   value: "true"
+        - name: enableNodeLabeling
           value: "true"
-        - name: enableServicesElection
+        - name: leaderElection
+          value: "true"
+        - name: servicesElection
           value: "true"
         - name: EGRESS_CLEAN
           value: "true"
-        - name: bgp_routerid
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        - name: bgp_as
-          value: "64500"
-        - name: bgp_peeraddress
-          value: "192.168.1.1"
-        - name: bgp_peerpass
-        - name: bgp_peeras
-          value: "65001"
-        - name: bgp_peers
-          value: "192.168.1.2:64500::false,192.168.1.10:64500::false"
+        # - name: bgp_routerid
+        #   valueFrom:
+        #     fieldRef:
+        #       fieldPath: status.podIP
+        # - name: bgp_as
+        #   value: "64500"
+        # - name: bgp_peeraddress
+        #   value: "192.168.1.1"
+        # - name: bgp_peerpass
+        # - name: bgp_peeras
+        #   value: "65001"
+        # - name: bgp_peers
+        #   value: "192.168.1.2:64500::false,192.168.1.10:64500::false"
         - name: address
-          value: "192.168.1.40"
-        image: ghcr.io/kube-vip/kube-vip:v0.6.0
+          value: "192.168.1.20"
+        image: ghcr.io/kube-vip/kube-vip:v0.6.4
         imagePullPolicy: Always
         name: kube-vip
         resources:
