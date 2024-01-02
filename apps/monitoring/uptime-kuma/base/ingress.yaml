@@ -17,7 +17,7 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: kuma-svc
+            name: kuma-internal
             port:
               name: web
   tls:
