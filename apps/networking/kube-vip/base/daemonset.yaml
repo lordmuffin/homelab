@@ -28,7 +28,7 @@ spec:
         - ""
         env:
         - name: vip_arp
-          value: "false"
+          value: "true"
         - name: port
           value: "6443"
         - name: vip_interface
@@ -51,9 +51,7 @@ spec:
         #   value: "true"
         - name: enableNodeLabeling
           value: "true"
-        - name: leaderElection
-          value: "true"
-        - name: servicesElection
+        - name: vip_leaderelection
           value: "true"
         - name: EGRESS_CLEAN
           value: "true"
