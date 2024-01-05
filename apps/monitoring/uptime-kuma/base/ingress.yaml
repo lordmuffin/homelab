@@ -18,7 +18,7 @@ spec:
           service:
             name: kuma-internal
             port:
-              name: web
+              name: 80
   tls:
   - hosts:
     - kuma.labs.andrewpjackson.com
