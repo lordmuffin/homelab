@@ -3,8 +3,6 @@ kind: Kustomization
 
 resources:
 # - ./external-dns
-- traefik.yaml
-- traefik-patches.yaml
 - cert-manager.yaml
 - nginx-ingress.yaml
 - tailscale-operator.yaml
