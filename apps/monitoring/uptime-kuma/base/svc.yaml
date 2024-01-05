@@ -11,7 +11,7 @@ spec:
   ports:
     - name: web
       protocol: TCP
-      port: 80
+      port: 83001
       targetPort: 3001
   selector:
     app: kuma
