@@ -6,8 +6,8 @@ metadata:
     external-dns.alpha.kubernetes.io/hostname: kuma.labs.andrewpjackson.com
     external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
     external-dns.alpha.kubernetes.io/ttl: "120"
+    kubernetes.io/ingress.class: traefik
 spec:
-  ingressClassName: traefik
   rules:
   - host: kuma.labs.andrewpjackson.com
     http:
