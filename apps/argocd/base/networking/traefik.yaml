@@ -12,6 +12,12 @@ spec:
     targetRevision: v26.0.0
     helm:
       releaseName: traefik
+      values: |
+        providers:
+          kubernetesIngress:
+            enabled: true
+          kubernetesCRD:
+            enabled: true
   destination:
     namespace: kube-system
     name: in-cluster
