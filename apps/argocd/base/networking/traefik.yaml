@@ -19,7 +19,7 @@ spec:
           kubernetesCRD:
             enabled: true
         globalArguments: ["--global.checknewversion=false","--global.sendanonymoususage=false"]
-        ingressRoute
+        ingressRoute:
           dashboard:
             enabled: false
         service
