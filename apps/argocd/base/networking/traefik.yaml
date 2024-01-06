@@ -24,7 +24,7 @@ spec:
         ingressRoute:
           dashboard:
             enabled: false
-        service
+        service:
           externalIPs: ["192.168.1.40"]
   destination:
     namespace: kube-system
