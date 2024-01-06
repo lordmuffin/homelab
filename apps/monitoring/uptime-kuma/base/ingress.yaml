@@ -19,7 +19,6 @@ spec:
             name: kuma-internal
             port:
               name: web
-              number: 3001
   tls:
   - hosts:
     - kuma.labs.andrewpjackson.com
