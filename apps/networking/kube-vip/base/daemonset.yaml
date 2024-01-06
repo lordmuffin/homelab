@@ -48,7 +48,7 @@ spec:
         - name: vip_ddns
           value: "false"
         - name: svc_enable
-          value: "false"
+          value: "true"
         # - name: bgp_enable
         #   value: "true"
         - name: enable_node_labeling
