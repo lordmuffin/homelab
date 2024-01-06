@@ -18,6 +18,16 @@ spec:
             enabled: true
           kubernetesCRD:
             enabled: true
+        additional
+          checkNewVersion:
+            enabled: false
+          sendAnonymousUsage:
+            enabled: false
+        dashboard
+          ingressRoute:
+            enabled: false
+        service
+          externalIPs: 192.168.1.40
   destination:
     namespace: kube-system
     name: in-cluster
