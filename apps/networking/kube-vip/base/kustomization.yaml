@@ -7,3 +7,4 @@ resources:
 - sa.yaml
 - deployment.yaml
 - cr.yaml
+- rbac.yaml
