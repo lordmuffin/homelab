@@ -18,6 +18,7 @@ spec:
             enabled: true
           kubernetesCRD:
             enabled: true
+            ingressClass: traefik-internal
         globalArguments:
           - "--global.checknewversion=false"
           - "--global.sendanonymoususage=false"
