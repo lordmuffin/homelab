@@ -42,19 +42,19 @@ spec:
         - name: cp_enable
           value: "true"
         - name: enableUPNP
-          value: "false"
+          value: "true"
         - name: cp_namespace
           value: "kube-system"
         - name: vip_ddns
           value: "false"
         - name: svc_enable
-          value: "false"
+          value: "true"
         # - name: bgp_enable
         #   value: "true"
         - name: enable_node_labeling
           value: "true"
         - name: enableServicesElection
-          value: "false"
+          value: "true"
         - name: vip_leaderelection
           value: "true"
         - name: EGRESS_CLEAN
