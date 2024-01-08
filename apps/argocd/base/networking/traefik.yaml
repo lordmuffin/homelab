@@ -18,12 +18,13 @@ spec:
             enabled: true
           kubernetesCRD:
             enabled: true
+            ingressClass: traefik-internal
         globalArguments:
           - "--global.checknewversion=false"
           - "--global.sendanonymoususage=false"
         ingressRoute:
           dashboard:
-            enabled: false
+            enabled: true
         service:
           externalIPs: ["192.168.1.40"]
   destination:

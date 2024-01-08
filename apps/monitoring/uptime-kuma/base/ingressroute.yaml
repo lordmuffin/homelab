@@ -1,0 +1,15 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: kuma-ingressroute
+
+spec:
+  entryPoints:
+    - web
+
+  routes:
+  - match: Host(`kuma.labs.andrewpjackson.com`)
+    kind: Rule
+    services:
+    - name: kuma-internal
+      port: 3001
