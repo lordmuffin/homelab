@@ -22,4 +22,4 @@ spec:
             port:
               name: web
   tls:
-    secretName: kuma-tls
+  - secretName: kuma-tls
