@@ -21,6 +21,6 @@ spec:
           service:
             name: kuma-internal
             port:
-              name: web
+              number: 80
   tls:
   - secretName: kuma-tls
