@@ -25,4 +25,6 @@ spec:
             port:
               number: 3001
   tls:
-  - secretName: kuma-tls
+  - hosts:
+    - "kuma.labs.andrewpjackson.com"
+    secretName: kuma-tls
