@@ -23,7 +23,7 @@ spec:
           service:
             name: kuma-internal
             port:
-              number: 3001
+              name: web
   tls:
   - hosts:
     - "kuma.labs.andrewpjackson.com"
