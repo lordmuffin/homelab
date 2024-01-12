@@ -10,9 +10,9 @@ metadata:
     acme.cert-manager.io/http01-edit-in-place: "true"
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
     traefik.ingress.kubernetes.io/router.tls: true
-    kubernetes.io/ingress.class: traefik
+    kubernetes.io/ingress.class: traefik-internal
 spec:
-  ingressClassName: traefik
+  ingressClassName: traefik-internal
   rules:
   - host: kuma.labs.andrewpjackson.com
     http:
