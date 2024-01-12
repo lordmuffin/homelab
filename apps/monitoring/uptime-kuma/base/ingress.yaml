@@ -23,6 +23,6 @@ spec:
           service:
             name: kuma-internal
             port:
-              number: 80
+              number: 3001
   tls:
   - secretName: kuma-tls
