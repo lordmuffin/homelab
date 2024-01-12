@@ -13,3 +13,5 @@ spec:
   selector:
     app: kuma
   type: LoadBalancer
+  loadBalancerIP: "0.0.0.0"
+  loadBalancerClass: kube-vip.io/kube-vip-class
