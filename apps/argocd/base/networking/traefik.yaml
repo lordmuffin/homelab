@@ -13,9 +13,14 @@ spec:
     helm:
       releaseName: traefik
       values: |
+        ingressClass:
+          enabled: true
+          isDefaultClass: true
+          name: traefik-internal
         providers:
           kubernetesIngress:
             enabled: true
+            ingressClass: traefik-internal
           kubernetesCRD:
             enabled: true
             ingressClass: traefik-internal
