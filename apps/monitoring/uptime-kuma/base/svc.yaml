@@ -3,7 +3,7 @@ kind: Service
 metadata:
   name: kuma-internal
   labels:
-    app: kuma
+    app: kuma-internal
 spec:
   ports:
     - name: web

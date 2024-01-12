@@ -11,6 +11,8 @@ metadata:
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
     traefik.ingress.kubernetes.io/router.tls: true
     kubernetes.io/ingress.class: traefik-internal
+  labels:
+    app: kuma-internal
 spec:
   ingressClassName: traefik-internal
   rules:
