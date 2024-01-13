@@ -16,12 +16,9 @@ Find a way to access Argo with no ingress.
  - Attempt to automate them?
 
 
-#### 1Password Instead of Vault??
-```
-docker run --rm -v ~/.kube/:/root/.kube:ro -v ${PWD}:/launcher -e TOKEN=<1Password Token> -ti homelab-launcher:v0.1.3 task 1password:install
-```
 
-#### Vault
+
+#### Vault (OLD)
 Had to manually sync each Vault resource in ArgoCD.
 ** Port forward to the vault-0 during configuration.
 
@@ -88,8 +85,20 @@ sudo docker run --rm -ti --net host quay.io/kairos/auroraboot \
 ```
 
 ## Docker Launcher Steps
+#### 1. Install namespaces
+```
+docker run --rm -v ~/.kube/:/root/.kube:ro -v ${PWD}:/launcher -ti homelab-launcher:v0.1.3 task namespaces:create
+```
 
+#### 2. 1Password Instead of Vault??
+```
+docker run --rm -v ~/.kube/:/root/.kube:ro -v ${PWD}:/launcher -e TOKEN=<TOKEN> -ti homelab-launcher:v0.1.3 task 1password:install
+```
 
+#### 3. Install ArgoCD
+```
+docker run --rm -v ~/.kube/:/root/.kube:ro -v ${PWD}:/launcher -e GH_USER=lordmuffin -e GH_PASS=<PASSWORD> -ti homelab-launcher:v0.1.3 task argocd:install
+```
 
 <br>
 <p align="center">

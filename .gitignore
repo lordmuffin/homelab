@@ -102,3 +102,6 @@ apps/services/changedetection/base/svc.yaml
 aggregated_output.json
 
 !apps/argocd/base/utilities/sealed.yaml
+
+# 1Password Files
+1password-credentials.json
