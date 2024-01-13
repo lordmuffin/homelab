@@ -24,9 +24,11 @@ spec:
           kubernetesCRD:
             enabled: true
             ingressClass: traefik-internal
+            allowCrossNamespace: true
         globalArguments:
           - "--global.checknewversion=false"
           - "--global.sendanonymoususage=false"
+          - "--entrypoints.kuma.address=:3001"
         ingressRoute:
           dashboard:
             enabled: true
