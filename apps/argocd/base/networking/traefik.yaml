@@ -28,7 +28,7 @@ spec:
         globalArguments:
           - "--global.checknewversion=false"
           - "--global.sendanonymoususage=false"
-          - "--entrypoints.kuma.address=:3001"
+          - "--entrypoints.kuma.address=:3001/tcp"
         ingressRoute:
           dashboard:
             enabled: true
