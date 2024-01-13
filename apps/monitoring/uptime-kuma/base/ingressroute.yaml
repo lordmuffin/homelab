@@ -9,7 +9,7 @@ spec:
 
   routes:
   - match: Host(`kuma.labs.andrewpjackson.com`)
-    kind: Rule
+    # kind: Rule
     services:
     - name: kuma-internal
       port: 3001
