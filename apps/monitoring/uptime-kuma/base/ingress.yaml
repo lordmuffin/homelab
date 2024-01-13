@@ -30,3 +30,10 @@ spec:
   - hosts:
     - "kuma.labs.andrewpjackson.com"
     secretName: kuma-tls
+data:
+  resource.customizations: |
+    extensions/Ingress:
+        health.lua: |
+          hs = {}
+          hs.status = "Healthy"
+          return hs
