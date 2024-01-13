@@ -5,7 +5,7 @@ metadata:
 
 spec:
   entryPoints:
-    - web
+    - kuma
 
   routes:
   - match: Host(`kuma.labs.andrewpjackson.com`)
