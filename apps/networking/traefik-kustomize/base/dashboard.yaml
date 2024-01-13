@@ -7,7 +7,7 @@ spec:
   entryPoints:
     - websecure           # <-- using the web entrypoint, not the traefik (9000) one
   routes:           # v-- adding a host rule
-    - match: Host(`traefik.localhost`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`))
+    - match: Host(`traefik.labs.andrewpjackson.com`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`))
       kind: Rule
       services:
         - name: api@internal
