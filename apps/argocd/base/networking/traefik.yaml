@@ -13,22 +13,29 @@ spec:
     helm:
       releaseName: traefik
       values: |
+        ingressClass:
+          enabled: true
+          isDefaultClass: true
+          name: traefik-internal
         providers:
           kubernetesIngress:
             enabled: true
+            ingressClass: traefik-internal
           kubernetesCRD:
             enabled: true
             ingressClass: traefik-internal
+            allowCrossNamespace: true
         globalArguments:
           - "--global.checknewversion=false"
           - "--global.sendanonymoususage=false"
+          - "--entrypoints.kuma.address=:3001/tcp"
         ingressRoute:
           dashboard:
             enabled: true
             matchRule: PathPrefix(`/dashboard`) || PathPrefix(`/api`)
             entryPoints: ["traefik"]
         service:
-          externalIPs: ["192.168.1.40"]
+          externalIPs: ["192.168.1.40", "192.168.1.41"]
   destination:
     namespace: kube-system
     name: in-cluster

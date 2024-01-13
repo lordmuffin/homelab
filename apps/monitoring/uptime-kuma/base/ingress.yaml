@@ -6,6 +6,13 @@ metadata:
     external-dns.alpha.kubernetes.io/hostname: kuma.labs.andrewpjackson.com
     external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
     external-dns.alpha.kubernetes.io/ttl: "120"
+    cert-manager.io/cluster-issuer: letsencrypt-production
+    acme.cert-manager.io/http01-edit-in-place: "true"
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: true
+    kubernetes.io/ingress.class: traefik-internal
+  labels:
+    app: kuma-internal
 spec:
   ingressClassName: traefik-internal
   rules:
@@ -21,5 +28,12 @@ spec:
               name: web
   tls:
   - hosts:
-    - kuma.labs.andrewpjackson.com
+    - "kuma.labs.andrewpjackson.com"
     secretName: kuma-tls
+data:
+  resource.customizations: |
+    extensions/Ingress:
+        health.lua: |
+          hs = {}
+          hs.status = "Healthy"
+          return hs
