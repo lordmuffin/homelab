@@ -1,30 +1,30 @@
-# apiVersion: argoproj.io/v1alpha1
-# kind: Application
-# metadata:
-#   name: kube-vip
-# spec:
-#   project: networking
-#   source:
-#     repoURL: 'https://github.com/lordmuffin/homelab.git'
-#     path: apps/networking/kube-vip
-#     targetRevision: main
-#   destination:
-#     namespace: kube-system
-#     name: in-cluster
-#   syncPolicy:
-#     automated:
-#       prune: true
-#       selfHeal: true
-#       allowEmpty: true
-#     syncOptions:
-#     - Validate=false
-#     - CreateNamespace=false
-#     - PrunePropagationPolicy=foreground
-#     - PruneLast=false
-#     - Prune=false
-#     retry:
-#       limit: 10
-#       backoff:
-#         duration: 20s
-#         factor: 2
-#         maxDuration: 15m
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-vip
+spec:
+  project: networking
+  source:
+    repoURL: 'https://github.com/lordmuffin/homelab.git'
+    path: apps/networking/kube-vip
+    targetRevision: main
+  destination:
+    namespace: kube-system
+    name: in-cluster
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: true
+    syncOptions:
+    - Validate=false
+    - CreateNamespace=false
+    - PrunePropagationPolicy=foreground
+    - PruneLast=false
+    - Prune=false
+    retry:
+      limit: 10
+      backoff:
+        duration: 20s
+        factor: 2
+        maxDuration: 15m

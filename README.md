@@ -100,6 +100,10 @@ docker run --rm -v ~/.kube/:/root/.kube:ro -v ${PWD}:/launcher -e TOKEN=<TOKEN> 
 docker run --rm -v ~/.kube/:/root/.kube:ro -v ${PWD}:/launcher -e GH_USER=lordmuffin -e GH_PASS=<PASSWORD> -ti homelab-launcher:v0.1.3 task argocd:install
 ```
 
+#### 4. Secrets democratic-csi-driver-config
+docker run --rm -v ~/.kube/:/root/.kube:ro -v ${PWD}:/launcher -e APITOKEN=<PASSWORD> -ti homelab-launcher:v0.1.3 task secrets:democratic-csi-driver-config
+```
+
 <br>
 <p align="center">
   <img width="220" height="100" src="./docs/assets/logos/logo.svg">
