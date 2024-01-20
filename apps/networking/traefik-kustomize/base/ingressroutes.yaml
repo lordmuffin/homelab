@@ -7,7 +7,7 @@ spec:
   entryPoints:
     - web
   routes:
-  - match: Host(`whoami.andrewpjackson.com`) && PathPrefix(`/notls`)
+  - match: Host(`whoami.labs.andrewpjackson.com`)
     kind: Rule
     services:
     - name: whoami
@@ -23,7 +23,7 @@ spec:
 #   entryPoints:
 #     - websecure
 #   routes:
-#   - match: Host(`whoami.andrewpjackson.com`)
+#   - match: Host(`whoami.labs.andrewpjackson.com`)
 #     kind: Rule
 #     services:
 #     - name: whoami
