@@ -9,3 +9,12 @@ resources:
 - deployment.yaml
 - ingressroutes.yaml
 - dashboard.yaml
+
+patches:
+- target:
+    kind: Namespace
+    name: default
+  patch: |-
+    - op: replace
+      path: /metadata/name
+      value: traefik
