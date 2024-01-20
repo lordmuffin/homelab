@@ -50,11 +50,6 @@ resources:
   - https://raw.githubusercontent.com/argoproj/argo-cd/v2.9.3/manifests/install.yaml
   - base/styles-cm.yaml
 
-  # Traefik CRDs/RBAC
-  - https://raw.githubusercontent.com/traefik/traefik/v2.10/docs/content/reference/dynamic-configuration/kubernetes-crd-definition-v1.yml
-  - https://raw.githubusercontent.com/traefik/traefik/v2.10/docs/content/reference/dynamic-configuration/kubernetes-crd-rbac.yml
-
-
 namespace: argocd
 images:
   - name: quay.io/argoproj/argocd
