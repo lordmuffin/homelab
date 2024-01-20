@@ -1,14 +1,14 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  namespace: kube-system
+  namespace: traefik
   name: traefik-ingress-controller
 
 ---
 kind: Deployment
 apiVersion: apps/v1
 metadata:
-  namespace: kube-system
+  namespace: traefik
   name: traefik
   labels:
     app: traefik
@@ -52,7 +52,7 @@ spec:
 kind: Deployment
 apiVersion: apps/v1
 metadata:
-  namespace: kube-system
+  namespace: traefik
   name: whoami
   labels:
     app: whoami
