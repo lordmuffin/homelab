@@ -16,6 +16,10 @@ Find a way to access Argo with no ingress.
  - Attempt to automate them?
 
 
+#### 1Password Instead of Vault??
+```
+docker run --rm -v ~/.kube/:/root/.kube:ro -v ${PWD}:/launcher -e TOKEN=<1Password Token> -ti homelab-launcher:v0.1.3 task 1password:install
+```
 
 
 #### Vault (OLD)
@@ -59,6 +63,11 @@ users:
 
 kubevip:
   eip: "192.168.1.20"
+
+k3s:
+  enabled: true
+  args:
+  - --disable=traefik,servicelb
 
 p2p:
   disable_dht: true #Enabled by default
