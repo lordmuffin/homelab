@@ -3,7 +3,7 @@ kind: Kustomization
 
 resources:
 # - ./external-dns
-- traefik.yaml
+# - traefik.yaml
 - traefik-kustomize.yaml
 - cert-manager.yaml
 - nginx-ingress.yaml
