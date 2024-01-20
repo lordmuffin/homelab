@@ -30,6 +30,8 @@ spec:
           args:
             - --api.insecure
             - --accesslog
+            - --service.type="LoadBalancer"
+            - --service.externalIPs=["192.168.1.40"]
             - --entrypoints.web.Address=:8000
             - --entrypoints.websecure.Address=:4443
             - --providers.kubernetescrd
