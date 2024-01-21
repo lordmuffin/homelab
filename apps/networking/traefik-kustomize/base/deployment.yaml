@@ -27,6 +27,27 @@ spec:
       containers:
         - name: traefik
           image: traefik:v2.10
+          env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: aws-dns-home-k3s-lab-1password
+                  key: access-key-id
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aws-dns-home-k3s-lab-1password
+                  key: secret-access-key
+            - name: AWS_REGION
+              valueFrom:
+                secretKeyRef:
+                  name: aws-dns-home-k3s-lab-1password
+                  key: aws-region
+            - name: AWS_HOSTED_ZONE_ID
+              valueFrom:
+                secretKeyRef:
+                  name: aws-dns-home-k3s-lab-1password
+                  key: aws-hosted-zone-id
           args:
             - --api.insecure
             - --accesslog
@@ -41,12 +62,12 @@ spec:
             - --providers.kubernetesingress=true
             - --providers.kubernetesingress.ingressclass=traefik
             # - --providers.kubernetesingress.ingressendpoint.publishedservice=default/traefik-in2
-            - --certificatesresolvers.myresolver.acme.tlschallenge
-            - --certificatesresolvers.myresolver.acme.email=dorkmeisterx69@gmail.com
-            - --certificatesresolvers.myresolver.acme.storage=acme.json
+            # - --certificatesresolvers.myresolver.acme.tlschallenge
+            # - --certificatesresolvers.myresolver.acme.email=dorkmeisterx69@gmail.com
+            # - --certificatesresolvers.myresolver.acme.storage=acme.json
             # Please note that this is the staging Let's Encrypt server.
             # Once you get things working, you should remove that whole line altogether.
-            - --certificatesresolvers.myresolver.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory
+            # - --certificatesresolvers.myresolver.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory
           ports:
             - name: web
               containerPort: 8000
