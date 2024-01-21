@@ -9,7 +9,6 @@ resources:
 - deployment.yaml
 - ingressroutes.yaml
 - dashboard.yaml
-- resolver.yaml
 
 patches:
 - target:

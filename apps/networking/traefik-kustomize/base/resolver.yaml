@@ -1,7 +1,0 @@
-certificatesResolvers:
-  myresolver:
-    acme:
-      # ...
-      dnsChallenge:
-        provider: route53
-        delayBeforeCheck: 0

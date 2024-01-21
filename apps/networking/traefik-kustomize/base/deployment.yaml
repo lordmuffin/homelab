@@ -61,6 +61,8 @@ spec:
             - --providers.kubernetescrd.ingressclass=traefik
             - --providers.kubernetesingress=true
             - --providers.kubernetesingress.ingressclass=traefik
+            - --certificatesresolvers.myresolver.acme.dnschallenge.provider=route53
+            - --certificatesresolvers.myresolver.acme.dnschallenge.delaybeforecheck=0
             # - --providers.kubernetesingress.ingressendpoint.publishedservice=default/traefik-in2
             # - --certificatesresolvers.myresolver.acme.tlschallenge
             # - --certificatesresolvers.myresolver.acme.email=dorkmeisterx69@gmail.com
