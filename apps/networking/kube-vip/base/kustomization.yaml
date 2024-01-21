@@ -5,5 +5,5 @@ resources:
 - crb.yaml
 - daemonset.yaml
 - sa.yaml
-- deployment.yaml
+# - deployment.yaml
 - cr.yaml
