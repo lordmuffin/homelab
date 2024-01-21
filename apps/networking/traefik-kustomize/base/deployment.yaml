@@ -56,7 +56,7 @@ spec:
             - --entrypoints.websecure.Address=:4443
             - --entrypoints.websecure.http.tls
             - --entrypoints.websecure.http.tls.options=default
-            - --providers.kubernetescrd=true
+            - --providers.kubernetescrd
             - --providers.kubernetescrd.namespaces=traefik
             - --providers.kubernetescrd.ingressclass=traefik
             - --providers.kubernetesingress=true
