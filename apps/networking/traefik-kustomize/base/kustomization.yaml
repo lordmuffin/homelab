@@ -9,6 +9,7 @@ resources:
 - deployment.yaml
 - ingressroutes.yaml
 - dashboard.yaml
+- resolver.yaml
 
 patches:
 - target:
@@ -18,8 +19,6 @@ patches:
     - op: replace
       path: /metadata/name
       value: traefik
-
-patches:
 - target:
     kind: ClusterRoleBinding
     name: traefik-ingress-controller
