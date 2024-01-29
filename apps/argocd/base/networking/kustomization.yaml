@@ -11,6 +11,7 @@ resources:
 - tailscale.yaml
 - issuer.yaml
 # - kube-vip.yaml
+- metallb-service.yaml
 
 namespace: argocd
 
