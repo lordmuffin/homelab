@@ -25,6 +25,8 @@ spec:
     server: https://kubernetes.default.svc
   - namespace: traefik
     server: https://kubernetes.default.svc
+  - namespace: metallb-system
+    server: https://kubernetes.default.svc
   clusterResourceWhitelist:
   - group: '*'
     kind: '*'
