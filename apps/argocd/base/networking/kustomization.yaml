@@ -10,7 +10,7 @@ resources:
 - tailscale-operator.yaml
 - tailscale.yaml
 - issuer.yaml
-- kube-vip.yaml
+# - kube-vip.yaml
 
 namespace: argocd
 
