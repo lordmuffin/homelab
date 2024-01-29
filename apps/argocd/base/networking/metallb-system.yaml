@@ -6,10 +6,10 @@ spec:
   project: networking
   source:
     repoURL: 'https://github.com/lordmuffin/homelab.git'
-    path: apps/networking/metallb-service
+    path: apps/networking/metallb-system
     targetRevision: main
   destination:
-    namespace: metallb-service
+    namespace: metallb-system
     name: in-cluster
   syncPolicy:
     automated:

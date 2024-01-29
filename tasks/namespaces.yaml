@@ -24,6 +24,7 @@ tasks:
     - sh: 'which kubectl'
       msg: 'kubectl {{.PATH_ERROR}}'
     cmds:
+    - kubectl create namespace metallb-system
     - kubectl create namespace traefik
     - kubectl create namespace networking
     - kubectl create namespace homeassistant
