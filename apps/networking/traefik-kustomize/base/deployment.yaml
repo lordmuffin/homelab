@@ -59,6 +59,7 @@ spec:
             - --providers.kubernetescrd=true
             - --providers.kubernetescrd.namespaces=traefik
             - --providers.kubernetescrd.ingressclass=traefik
+            - --providers.kubernetescrd.endpoint=http://localhost:8080
             - --providers.kubernetesingress=true
             - --providers.kubernetesingress.ingressclass=traefik
             - --certificatesresolvers.myresolver.acme.dnschallenge.provider=route53
