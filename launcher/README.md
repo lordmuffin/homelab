@@ -18,7 +18,7 @@ The purpose of the `Dockerfile` is to build a launcher image that can be used to
 
 ### How to build image
 ```
-docker build ./launcher/. --build-arg TARGETOS=linux --build-arg TARGETARCH=amd64 --build-arg KUBECTL_VERSION=1.28.2 --build-arg KUSTOMIZE_VERSION=5.3.0 -t homelab-launcher:v0.1.2
+docker build ./launcher/. --build-arg TARGETOS=linux --build-arg TARGETARCH=amd64 --build-arg KUBECTL_VERSION=1.28.2 --build-arg KUSTOMIZE_VERSION=5.3.0 -t homelab-launcher:v0.1.3
 ```
 
 ### How to use image:

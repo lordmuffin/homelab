@@ -1,0 +1,66 @@
+{
+  "apiVersion": "v1",
+  "kind": "Namespace",
+  "metadata": {
+    "annotations": {
+      "argocd.argoproj.io/sync-options": "ServerSideApply=true",
+      "argocd.argoproj.io/tracking-id": "networking:/Namespace:networking/argocd",
+      "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"networking:/Namespace:networking/argocd\"},\"labels\":{\"app.kubernetes.io/category\":\"networking\",\"app.kubernetes.io/instance\":\"networking\",\"name\":\"metallb-system\"},\"name\":\"argocd\"}}\n"
+    },
+    "creationTimestamp": "2024-01-13T20:58:31Z",
+    "deletionTimestamp": "2024-01-29T03:29:03Z",
+    "labels": {
+      "app.kubernetes.io/category": "networking",
+      "app.kubernetes.io/instance": "networking",
+      "kubernetes.io/metadata.name": "argocd",
+      "name": "metallb-system",
+      "prometheus": "enabled"
+    },
+    "name": "argocd",
+    "resourceVersion": "12306390",
+    "uid": "feb04ebc-ad1a-4c7c-b8b1-ebef7602c281"
+  },
+  "spec": {
+    "finalizers": []
+  },
+  "status": {
+    "conditions": [
+      {
+        "lastTransitionTime": "2024-01-29T03:29:16Z",
+        "message": "All resources successfully discovered",
+        "reason": "ResourcesDiscovered",
+        "status": "False",
+        "type": "NamespaceDeletionDiscoveryFailure"
+      },
+      {
+        "lastTransitionTime": "2024-01-29T03:29:16Z",
+        "message": "All legacy kube types successfully parsed",
+        "reason": "ParsedGroupVersions",
+        "status": "False",
+        "type": "NamespaceDeletionGroupVersionParsingFailure"
+      },
+      {
+        "lastTransitionTime": "2024-01-29T03:29:16Z",
+        "message": "All content successfully deleted, may be waiting on finalization",
+        "reason": "ContentDeleted",
+        "status": "False",
+        "type": "NamespaceDeletionContentFailure"
+      },
+      {
+        "lastTransitionTime": "2024-01-29T03:29:16Z",
+        "message": "Some resources are remaining: applications.argoproj.io has 14 resource instances",
+        "reason": "SomeResourcesRemain",
+        "status": "True",
+        "type": "NamespaceContentRemaining"
+      },
+      {
+        "lastTransitionTime": "2024-01-29T03:29:16Z",
+        "message": "Some content in the namespace has finalizers remaining: resources-finalizer.argocd.argoproj.io in 14 resource instances",
+        "reason": "SomeFinalizersRemain",
+        "status": "True",
+        "type": "NamespaceFinalizersRemaining"
+      }
+    ],
+    "phase": "Terminating"
+  }
+}

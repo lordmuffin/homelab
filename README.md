@@ -106,7 +106,7 @@ docker run --rm -v ~/.kube/:/root/.kube:ro -v ${PWD}:/launcher -e TOKEN=<TOKEN> 
 
 #### 3. Install ArgoCD
 ```
-docker run --rm -v ~/.kube/:/root/.kube:ro -v ${PWD}:/launcher -e GH_USER=lordmuffin -e GH_PASS=<PASSWORD> -ti homelab-launcher:v0.1.3 task argocd:install
+docker run --rm -v ~/.kube/:/root/.kube:ro -v ${PWD}:/launcher -e GH_USER=lordmuffin -e GH_PASS=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 -ti homelab-launcher:v0.1.3 task argocd:install
 ```
 
 #### 4. Secrets democratic-csi-driver-config
