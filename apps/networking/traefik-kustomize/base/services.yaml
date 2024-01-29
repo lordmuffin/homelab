@@ -19,8 +19,8 @@ spec:
   selector:
     app: traefik
   type: LoadBalancer
-  loadBalancerIP: "192.168.1.40"
-  externalTrafficPolicy: Local
+  # loadBalancerIP: "192.168.1.40"
+  # externalTrafficPolicy: Local
   # externalIPs: ["192.168.1.40"]
 ---
 apiVersion: v1
