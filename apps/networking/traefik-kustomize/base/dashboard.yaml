@@ -10,8 +10,8 @@ spec:
     - kind: Rule
       match: Host(`traefik.labs.andrewpjackson.com`)
       services:
-        - kind: TraefikService
-          name: api@internal
+        - kind: Service
+          name: traefik
       middlewares:
         - name: default-test-auth@kubernetescrd
   tls:
