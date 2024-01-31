@@ -3,13 +3,16 @@ apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute
 metadata:
   name: dashboard
-  namespace: traefik
 spec:
   entryPoints:
-    - websecure           # <-- using the web entrypoint, not the traefik (9000) one
-  routes:           # v-- adding a host rule
-    - match: Host(`traefik.labs.andrewpjackson.com`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`))
-      kind: Rule
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`traefik.labs.andrewpjackson.com`)
       services:
-        - name: api@internal
-          kind: TraefikService
+        - kind: TraefikService
+          name: api@internal
+      middlewares:
+        - name: default-test-auth@kubernetescrd
+  tls:
+    certResolver: myresolver
