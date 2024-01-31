@@ -166,9 +166,9 @@ spec:
           dashboard:
             enabled: true
             matchRule: PathPrefix(`/dashboard`) || PathPrefix(`/api`)
-            entryPoints: ["traefik"]
+            entryPoints: ["websecure"]
         service:
-          externalIPs: ["192.168.1.40", "192.168.1.41"]
+          externalIPs: ["192.168.1.40"]
   destination:
     namespace: kube-system
     name: in-cluster
