@@ -12,6 +12,7 @@ spec:
       services:
         - kind: Service
           name: traefik
+          port: 9000
       middlewares:
         - name: default-test-auth@kubernetescrd
   tls:
