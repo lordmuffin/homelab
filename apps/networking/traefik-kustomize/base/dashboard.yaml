@@ -5,14 +5,13 @@ metadata:
   name: dashboard
 spec:
   entryPoints:
-    - websecure
+    - traefik
   routes:
     - kind: Rule
       match: Host(`traefik.labs.andrewpjackson.com`)
       services:
         - kind: Service
-          name: traefik
-          port: 9000
+          name: api@internal
       middlewares:
         - name: default-test-auth@kubernetescrd
   tls:
