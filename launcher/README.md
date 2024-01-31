@@ -20,6 +20,14 @@ The purpose of the `Dockerfile` is to build a launcher image that can be used to
 ```
 docker build ./launcher/. --build-arg TARGETOS=linux --build-arg TARGETARCH=amd64 --build-arg KUBECTL_VERSION=1.28.2 --build-arg KUSTOMIZE_VERSION=5.3.0 -t homelab-launcher:v0.1.3
 ```
+```
+docker build ./launcher/. --build-arg TARGETOS=linux --build-arg TARGETARCH=amd64 --build-arg KUBECTL_VERSION=1.28.2 --build-arg KUSTOMIZE_VERSION=5.3.0 -t ghcr.io/lordmuffin/homelab-launcher:v0.1.3
+```
+
+### How to push image to ghcr
+```
+docker push ghcr.io/lordmuffin/homelab-launcher:latest
+```
 
 ### How to use image:
 ```

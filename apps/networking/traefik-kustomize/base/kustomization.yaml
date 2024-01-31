@@ -7,8 +7,8 @@ resources:
 
 # - services.yaml
 # - deployment.yaml
-- ingressroutes.yaml
-- dashboard.yaml
+# - ingressroutes.yaml
+# - dashboard.yaml
 
 patches:
 - target:

@@ -162,11 +162,11 @@ spec:
           - "--global.checknewversion=false"
           - "--global.sendanonymoususage=false"
           - "--entrypoints.kuma.address=:3001/tcp"
-        # ingressRoute:
-        #   dashboard:
-        #     enabled: true
-        #     matchRule: PathPrefix(`/dashboard`) || PathPrefix(`/api`)
-        #     entryPoints: ["traefik"]
+        ingressRoute:
+          dashboard:
+            enabled: true
+            matchRule: PathPrefix(`/dashboard`) || PathPrefix(`/api`)
+            entryPoints: ["traefik"]
         service:
           externalIPs: ["192.168.1.40"]
   destination:
