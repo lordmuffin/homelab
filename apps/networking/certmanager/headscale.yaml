@@ -12,7 +12,7 @@ metadata:
   name: headscale-certificate
   namespace: headscale
 spec:
-  secretName: headscale-certificate-tls
+  secretName: headscale-certificate
   usages:
     - server auth
     - client auth
