@@ -58,7 +58,7 @@ spec:
 
         ingress:
           ui:
-            enabled: true
+            enabled: false
             hosts:
               - host: ui.hs.labs.andrewpjackson.com
                 paths:
