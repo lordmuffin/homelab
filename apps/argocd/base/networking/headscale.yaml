@@ -64,7 +64,7 @@ spec:
                 paths:
                   - path: /web
                     service:
-                      name: ui
+                      name: headscale
                       port: 80          # -- Enable and configure ingress settings for the chart under this key.
           # @default -- See [values.yaml](./values.yaml)
           main:
