@@ -36,7 +36,7 @@ spec:
           # The FQDN of the hosts will be
           # `hostname.user.base_domain` (e.g., _myhost.myuser.example.com_).
           HEADSCALE_DNS_CONFIG_BASE_DOMAIN: labs.andrewpjackson.com
-          HEADSCALE_SERVER_URL: http://hs.labs.andrewpjackson.com
+          HEADSCALE_SERVER_URL: https://hs.labs.andrewpjackson.com
           HEADSCALE_DISABLE_CHECK_UPDATES: "true"
           HEADSCALE_LOG_LEVEL: "warn"
           # HEADSCALE_OIDC_ISSUER: ""
