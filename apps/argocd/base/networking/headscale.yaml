@@ -115,6 +115,29 @@ spec:
                 path: /metrics
                 interval: 30s
                 scrapeTimeout: 10s
+
+        sidecars:
+          ui:
+            image: ghcr.io/gurucomputing/headscale-ui:latest
+            ports:
+              - name: http
+                containerPort: 80
+
+        service:
+          main:
+            ports:
+              ui:
+                port: 80
+
+        ingress:
+          ui:
+            enabled: true
+            hosts:
+              - host: ui.hs.labs.andrewpjackson.com
+                paths:
+                  - path: /web
+                    service:
+                      port: 80
   destination:
     namespace: headscale
     name: in-cluster
