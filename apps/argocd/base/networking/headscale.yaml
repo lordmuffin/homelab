@@ -57,18 +57,25 @@ spec:
                 port: 50443
 
         ingress:
-          # -- Enable and configure ingress settings for the chart under this key.
+          ui:
+            enabled: true
+            hosts:
+              - host: ui.hs.labs.andrewpjackson.com
+                paths:
+                  - path: /web
+                    service:
+                      port: 80          # -- Enable and configure ingress settings for the chart under this key.
           # @default -- See [values.yaml](./values.yaml)
           main:
             enabled: false
-            # hosts:
-            #   - host: chart-example.local
-            #     paths:
-            #       - path: /
-            # tls:
-            #   - secretName: chart-example.local-tls
-            #     hosts:
-            #       - chart-example.local
+            hosts:
+              - host: hs.labs.andrewpjackson.com
+                paths:
+                  - path: /
+            tls:
+              - secretName: headscale-certificate-tls
+                hosts:
+                  - hs.labs.andrewpjackson.com
 
         configMaps:
           acl:
@@ -129,15 +136,6 @@ spec:
               ui:
                 port: 80
 
-        ingress:
-          ui:
-            enabled: true
-            hosts:
-              - host: ui.hs.labs.andrewpjackson.com
-                paths:
-                  - path: /web
-                    service:
-                      port: 80
   destination:
     namespace: headscale
     name: in-cluster

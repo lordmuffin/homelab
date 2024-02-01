@@ -60,6 +60,8 @@ spec:
         - dashboard.labs.andrewpjackson.com
         - dash.labs.andrewpjackson.com
         - hajimari.labs.andrewpjackson.com
+        - hs.labs.andrewpjackson.com
+        - ui.hs.labs.andrewpjackson.com
       # dns01:
       #   cloudflare:
       #     email: rpg.gruber@gmail.com
