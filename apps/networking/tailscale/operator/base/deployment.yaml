@@ -18,7 +18,7 @@ spec:
       volumes:
       - name: oauth
         secret:
-          secretName: operator-oauth
+          secretName: tailscale-operator-oauth-1password
       containers:
       - name: operator
         image: docker.io/grubertech/tailscale-operator:latest
