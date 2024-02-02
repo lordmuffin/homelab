@@ -9,7 +9,7 @@ resources:
 - reflector.yaml
 - reloader.yaml
 - snapshot.yaml
-- wavy.yaml
+# - wavy.yaml
 - sealed.yaml
 - crossplane.yaml
 

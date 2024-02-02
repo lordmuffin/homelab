@@ -9,6 +9,9 @@ TODO LIST:
 [] Deploy Tailscale Mesh - https://headscale.net/running-headscale-linux/#goal
 [] Deploy Headscale (For non-cloud tailscale)
 
+[] Fix ArgoCD Init creds
+[] Fix ArgoCD Install Creds for GH
+[] Fix all pre-req passwords with 1pass?
 
 run task argocd:secret & repo with variables for user and pass
 Find a way to access Argo with no ingress.
@@ -110,6 +113,7 @@ docker run --rm -v ~/.kube/:/root/.kube:ro -v ${PWD}:/launcher -e GH_USER=lordmu
 ```
 
 #### 4. Secrets democratic-csi-driver-config
+```
 docker run --rm -v ~/.kube/:/root/.kube:ro -v ${PWD}:/launcher -e APITOKEN=<PASSWORD> -ti homelab-launcher:v0.1.3 task secrets:democratic-csi-driver-config
 ```
 
