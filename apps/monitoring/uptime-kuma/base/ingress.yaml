@@ -11,17 +11,11 @@ metadata:
   labels:
     app: kuma-internal
 spec:
-  rules:
-  - host: kuma.labs.andrewpjackson.com
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: kuma-internal
-            port:
-              name: web
+  defaultBackend:
+    service:
+      name: kuma-internal
+      port:
+        name: web
   ingressClassName: tailscale
   tls:
   - hosts:
