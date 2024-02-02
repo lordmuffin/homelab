@@ -17,10 +17,6 @@ spec:
       port:
         name: web
   ingressClassName: tailscale
-  tls:
-  - hosts:
-    - "kuma.labs.andrewpjackson.com"
-    secretName: kuma-tls
 data:
   resource.customizations: |
     extensions/Ingress:
