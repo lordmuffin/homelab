@@ -41,7 +41,7 @@ spec:
             value: "true"
           - name: TS_ROUTES
             value: "true"
-          - name: TS_DEBUG_FIREWALL_MODE
+          - name: PROXY_FIREWALL_MODE
             value: nftables
           - name: OPERATOR_NAMESPACE
             valueFrom:
