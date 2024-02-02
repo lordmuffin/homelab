@@ -8,9 +8,6 @@ metadata:
     external-dns.alpha.kubernetes.io/ttl: "120"
     cert-manager.io/cluster-issuer: letsencrypt-production
     acme.cert-manager.io/http01-edit-in-place: "true"
-    traefik.ingress.kubernetes.io/router.entrypoints: websecure
-    traefik.ingress.kubernetes.io/router.tls: true
-    kubernetes.io/ingress.class: traefik-internal
   labels:
     app: kuma-internal
 spec:
