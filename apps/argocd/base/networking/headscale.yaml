@@ -73,9 +73,6 @@ spec:
               - host: hs.labs.andrewpjackson.com
                 paths:
                   - path: /
-                    service:
-                      name: headscale
-                      port: 8080
             tls:
               - secretName: headscale-certificate-tls
                 hosts:
