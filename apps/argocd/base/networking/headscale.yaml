@@ -73,10 +73,10 @@ spec:
               - host: hs.labs.andrewpjackson.com
                 paths:
                   - path: /
-            # tls:
-            #   - secretName: headscale-certificate-tls
-            #     hosts:
-            #       - hs.labs.andrewpjackson.com
+            tls:
+              - secretName: headscale-certificate-tls
+                hosts:
+                  - hs.labs.andrewpjackson.com
 
         configMaps:
           acl:
