@@ -4,6 +4,8 @@ metadata:
   name: kuma-internal
   labels:
     app: kuma-internal
+  annotations:
+    tailscale.com/expose: "true"
 spec:
   ports:
     - name: web

@@ -21,7 +21,7 @@ spec:
           secretName: tailscale-operator-oauth-1password
       containers:
       - name: operator
-        image: docker.io/grubertech/tailscale-operator:latest
+        image: tailscale/tailscale:latest
         imagePullPolicy: Always
         resources:
           requests:
@@ -41,6 +41,8 @@ spec:
             value: "true"
           - name: TS_ROUTES
             value: "true"
+          - name: TS_KUBE_SECRET
+            name: tailscale-operator-oauth-1password
           - name: OPERATOR_NAMESPACE
             valueFrom:
               fieldRef:
