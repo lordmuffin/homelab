@@ -291,7 +291,7 @@ spec:
                     - name: OPERATOR_SECRET
                       value: operator
                     - name: OPERATOR_LOGGING
-                      value: info
+                      value: debug
                     - name: OPERATOR_NAMESPACE
                       valueFrom:
                         fieldRef:
@@ -308,7 +308,7 @@ spec:
                       value: "false"
                     - name: PROXY_FIREWALL_MODE
                       value: nftables
-                  image: tailscale/k8s-operator:stable
+                  image: tailscale/k8s-operator:unstable
                   imagePullPolicy: Always
                   name: operator
                   volumeMounts:
