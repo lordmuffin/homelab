@@ -46,7 +46,7 @@ Run this on a linux server to serve AuroraBoot
 
 cat <<EOF | sudo docker run --rm -i --net host quay.io/kairos/auroraboot \
                     --cloud-config - \
-                    --set "container_image=quay.io/kairos/ubuntu:22.04-standard-amd64-generic-v2.4.3-k3sv1.28.2-k3s1"
+                    --set "container_image=ghcr.io/lordmuffin/custom-ubuntu-22.04-standard-amd64-generic-v2.4.3-k3sv1.28.2-k3s1:v0.0.4"
 #cloud-config
 
 # https://github.com/kairos-io/kairos/issues/885
