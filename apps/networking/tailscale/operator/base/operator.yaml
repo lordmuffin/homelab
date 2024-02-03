@@ -307,7 +307,7 @@ spec:
                     - name: APISERVER_PROXY
                       value: "false"
                     - name: PROXY_FIREWALL_MODE
-                      value: auto
+                      value: nftables
                   image: tailscale/k8s-operator:unstable
                   imagePullPolicy: Always
                   name: operator
