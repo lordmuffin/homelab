@@ -9,7 +9,7 @@ resources:
 - nginx-ingress.yaml
 - headscale.yaml
 - tailscale-operator.yaml
-- tailscale.yaml
+# - tailscale.yaml
 - issuer.yaml
 # - kube-vip.yaml
 - metallb-system.yaml
