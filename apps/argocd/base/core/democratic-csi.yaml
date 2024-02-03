@@ -62,7 +62,7 @@ spec:
         #    snapshotter-secret:
 
         driver:
-          localtimeHostPath: null
+          localtimeHostPath: ""
           existingConfigSecret: democratic-csi-driver-config
           config:
             driver: freenas-api-iscsi
