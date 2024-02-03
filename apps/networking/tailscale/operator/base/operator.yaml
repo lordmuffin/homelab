@@ -308,7 +308,7 @@ spec:
                       value: "false"
                     - name: PROXY_FIREWALL_MODE
                       value: nftables
-                  image: tailscale/k8s-operator:unstable
+                  image: tailscale/k8s-operator:stable
                   imagePullPolicy: Always
                   name: operator
                   volumeMounts:
