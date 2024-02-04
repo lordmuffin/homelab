@@ -1,0 +1,19 @@
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: labs-andrewpjackson-com
+  namespace: cert-manager
+spec:
+  secretName: labs-andrewpjackson-com-tls
+  secretTemplate:
+    annotations:
+      reflector.v1.k8s.emberstack.com/reflection-allowed: "true"
+      reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces: "traefik"
+  issuerRef:
+    name: letsencrypt-production
+    kind: ClusterIssuer
+  commonName: "*.labs.andrewpjackson.com"
+  dnsNames:
+  - "labs.andrewpjackson.com"
+  - "*.labs.andrewpjackson.com"
