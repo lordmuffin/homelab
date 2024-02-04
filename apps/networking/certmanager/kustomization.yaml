@@ -3,5 +3,5 @@ kind: Kustomization
 resources:
 - clusterIssuer.yaml
 - postgres.yaml
-- headscale.yaml
+- labs-andrewpjackson-com.yaml
 # - secret.yaml
