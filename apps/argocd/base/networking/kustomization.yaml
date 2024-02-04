@@ -3,8 +3,9 @@ kind: Kustomization
 
 resources:
 # - ./external-dns
+- metallb-system.yaml
 - traefik.yaml
-- traefik-kustomize.yaml
+# - traefik-kustomize.yaml
 - cert-manager.yaml
 - nginx-ingress.yaml
 - headscale.yaml
@@ -12,7 +13,7 @@ resources:
 # - tailscale.yaml
 - issuer.yaml
 # - kube-vip.yaml
-- metallb-system.yaml
+
 
 namespace: argocd
 
