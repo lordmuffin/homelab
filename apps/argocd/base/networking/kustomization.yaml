@@ -5,7 +5,7 @@ resources:
 # - ./external-dns
 - metallb-system.yaml
 - traefik.yaml
-# - traefik-kustomize.yaml
+- traefik-kustomize.yaml
 - cert-manager.yaml
 - nginx-ingress.yaml
 - headscale.yaml
