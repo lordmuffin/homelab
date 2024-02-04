@@ -7,7 +7,7 @@ metadata:
 spec:
   project: networking
   source:
-    repoURL: https://helm.traefik.io/traefik
+    repoURL: https://github.com/traefik/traefik-helm-chart.git
     path: traefik
     targetRevision: v26.0.0
     helm:
