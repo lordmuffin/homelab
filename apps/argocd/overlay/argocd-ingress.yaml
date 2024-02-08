@@ -1,0 +1,26 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: argocd.labs.andrewpjackson.com
+    external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
+    external-dns.alpha.kubernetes.io/ttl: "120"
+    cert-manager.io/cluster-issuer: letsencrypt-production
+    acme.cert-manager.io/http01-edit-in-place: "true"
+  labels:
+    app: argocd-server
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`argocd.labs.andrewpjackson.com`)
+      kind: Rule
+      middlewares:
+        - name: argocd-dashboard-basicauth
+          namespace: monitoring
+      services:
+        - name: argocd-server
+          port: 8080
+ tls:
+   secretName: labs-andrewpjackson-com-tls
