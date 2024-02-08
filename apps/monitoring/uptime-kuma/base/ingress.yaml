@@ -11,12 +11,19 @@ metadata:
   labels:
     app: kuma-internal
 spec:
-  defaultBackend:
-    service:
-      name: kuma-internal
-      port:
-        name: web
-  ingressClassName: tailscale
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`kuma.labs.andrewpjackson.com`)
+      kind: Rule
+      middlewares:
+        - name: kuma-dashboard-basicauth
+          namespace: monitoring
+      services:
+        - name: kuma-internal
+          port: 3001
+ tls:
+   secretName: labs-andrewpjackson-com-tls
 data:
   resource.customizations: |
     extensions/Ingress:
