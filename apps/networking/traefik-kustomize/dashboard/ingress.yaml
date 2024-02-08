@@ -17,5 +17,5 @@ spec:
       services:
         - name: api@internal
           kind: TraefikService
- tls:
-   secretName: labs-andrewpjackson-com-tls
+  tls:
+    secretName: labs-andrewpjackson-com-tls
