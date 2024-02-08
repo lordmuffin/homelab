@@ -47,6 +47,7 @@ resources:
   # - base/cmp-plugin.yaml
   - base/repo-role.yaml
   - base/repo-rb.yaml
+  - base/argocd-ingress.yaml
 
   - https://github.com/lordmuffin/homelab/apps/networking/tailscale
   # - https://github.com/lordmuffin/homelab/apps/networking/cloudflared
@@ -117,7 +118,6 @@ patches:
   # - path: overlay/cloudflared-cm.yaml
   - path: overlay/argocd-rbac.yaml
   - path: overlay/argocd-cr.yaml
-  - path: overlay/argocd-ingress.yaml
 commonAnnotations:
   reloader.stakater.com/auto: "true"
 # Core Applications
