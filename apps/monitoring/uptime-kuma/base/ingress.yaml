@@ -20,8 +20,8 @@ spec:
         - name: kuma-dashboard-basicauth
           namespace: monitoring
       services:
-        - name: kuma-internal
-          port: 3001
+        - kind: Service
+          name: kuma-internal
   tls:
     secretName: labs-andrewpjackson-com-tls
 data:

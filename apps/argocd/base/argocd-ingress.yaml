@@ -20,7 +20,7 @@ spec:
         - name: argocd-dashboard-basicauth
           namespace: monitoring
       services:
-        - name: argocd-server
-          port: 80
+        - kind: Service
+          name: argocd-server
   tls:
     secretName: labs-andrewpjackson-com-tls
