@@ -20,6 +20,6 @@ spec:
         - name: argocd-dashboard-basicauth
           namespace: monitoring
       services:
-        - kind: argocd-server
+        - name: argocd-server
   tls:
     secretName: labs-andrewpjackson-com-tls
