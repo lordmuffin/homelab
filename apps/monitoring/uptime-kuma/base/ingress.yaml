@@ -22,8 +22,8 @@ spec:
       services:
         - name: kuma-internal
           port: 3001
- tls:
-   secretName: labs-andrewpjackson-com-tls
+  tls:
+    secretName: labs-andrewpjackson-com-tls
 data:
   resource.customizations: |
     extensions/Ingress:
