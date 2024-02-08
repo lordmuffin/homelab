@@ -117,6 +117,7 @@ patches:
   # - path: overlay/cloudflared-cm.yaml
   - path: overlay/argocd-rbac.yaml
   - path: overlay/argocd-cr.yaml
+  - path: overlay/argocd-ingress.yaml
 commonAnnotations:
   reloader.stakater.com/auto: "true"
 # Core Applications
