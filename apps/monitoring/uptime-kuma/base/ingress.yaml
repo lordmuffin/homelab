@@ -20,8 +20,7 @@ spec:
         - name: kuma-dashboard-basicauth
           namespace: monitoring
       services:
-        - kind: Service
-          name: kuma-internal
+        - name: kuma-internal
   tls:
     secretName: labs-andrewpjackson-com-tls
 data:
