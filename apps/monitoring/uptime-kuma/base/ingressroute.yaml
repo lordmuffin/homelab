@@ -5,7 +5,7 @@ metadata:
 
 spec:
   entryPoints:
-    - kuma
+    - websecure
 
   routes:
   - match: Host(`kuma.labs.andrewpjackson.com`)

@@ -17,8 +17,8 @@ spec:
     - match: Host(`argocd.labs.andrewpjackson.com`)
       kind: Rule
       middlewares:
-        - name: argocd-dashboard-basicauth
-          namespace: monitoring
+        - name: traefik-dashboard-basicauth
+          namespace: traefik
       services:
         - name: argocd-server
           port: 80
