@@ -40,7 +40,9 @@ spec:
             forwardedHeaders:
               trustedIPs: [174.20.35.82]
               insecure: true
-              
+            middlewares:
+              - traefik-forward-auth
+
         ingressRoute:
           dashboard:
             enabled: false
