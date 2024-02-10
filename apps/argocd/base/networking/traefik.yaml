@@ -39,7 +39,7 @@ spec:
               enabled: true
             forwardedHeaders:
               trustedIPs: [174.20.35.82]
-              insecure: true
+              insecure: false
             middlewares:
               - traefik-traefik-forward-auth
 
