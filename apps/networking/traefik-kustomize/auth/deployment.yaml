@@ -24,6 +24,12 @@ spec:
         - containerPort: 4181
           protocol: TCP
         env:
+        - name: DOMAIN
+          value: "healingorganics.org"
+        - name: COOKIE_DOMAIN
+          value: "labs.andrewpjackson.com"
+        - name: AUTH_HOST
+          value: "auth.labs.andrewpjackson.com"
         - name: DEFAULT_PROVIDER
           value: "oidc"
         - name: PROVIDERS_OIDC_ISSUER_URL
