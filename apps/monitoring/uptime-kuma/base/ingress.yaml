@@ -18,8 +18,8 @@ spec:
     - match: Host(`kuma.labs.andrewpjackson.com`)
       kind: Rule
       middlewares:
-        - name: kuma-dashboard-basicauth
-          namespace: monitoring
+        - name: traefik-dashboard-basicauth
+          namespace: traefik
       services:
         - name: kuma-internal
   tls:
