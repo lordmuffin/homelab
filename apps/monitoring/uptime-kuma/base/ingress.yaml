@@ -24,10 +24,10 @@ spec:
         - name: kuma-internal
   tls:
     secretName: labs-andrewpjackson-com-tls
-data:
-  resource.customizations: |
-    extensions/Ingress:
-        health.lua: |
-          hs = {}
-          hs.status = "Healthy"
-          return hs
+# data:
+#   resource.customizations: |
+#     extensions/Ingress:
+#         health.lua: |
+#           hs = {}
+#           hs.status = "Healthy"
+#           return hs
