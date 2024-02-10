@@ -40,6 +40,8 @@ spec:
             forwardedHeaders:
               trustedIPs: [174.20.35.82]
               insecure: true
+          traefik:
+            port: 9000
 
         ingressRoute:
           dashboard:
