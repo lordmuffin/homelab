@@ -37,6 +37,9 @@ spec:
           websecure:
             tls:
               enabled: true
+            forwardedHeaders:
+              trustedIPs: [174.20.35.82]
+              insecure: true
               
         ingressRoute:
           dashboard:
