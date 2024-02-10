@@ -12,7 +12,7 @@ spec:
     - match: Host(`traefik.labs.andrewpjackson.com`)
       kind: Rule
       middlewares:
-        - name: traefik-dashboard-basicauth
+        - name: auth
           namespace: traefik
       services:
         - name: api@internal
