@@ -16,8 +16,4 @@ spec:
         - name: traefikauth
           port: 80
   tls:
-    certResolver: le
-    domains:
-      - main: labs.andrewpjackson.com
-        sans:
-          - "*.labs.andrewpjackson.com"
+    secretName: labs-andrewpjackson-com-tls
