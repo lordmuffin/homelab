@@ -18,7 +18,7 @@ spec:
     - match: Host(`argocd.labs.andrewpjackson.com`)
       kind: Rule
       middlewares:
-        - name: traefik-dashboard-basicauth
+        - name: traefik-forward-auth
           namespace: traefik
       services:
         - name: argocd-server
