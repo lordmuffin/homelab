@@ -41,7 +41,7 @@ spec:
               trustedIPs: [174.20.35.82]
               insecure: true
             middlewares:
-              - traefik-forward-auth
+              - traefik-traefik-forward-auth
 
         ingressRoute:
           dashboard:
