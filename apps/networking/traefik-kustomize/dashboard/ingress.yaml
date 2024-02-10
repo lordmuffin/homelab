@@ -12,7 +12,8 @@ spec:
     - match: Host(`traefik.labs.andrewpjackson.com`)
       kind: Rule
       middlewares:
-        - name: auth
+        - name: traefik-dashboard-basicauth
+          namespace: traefik
       services:
         - name: api@internal
           kind: TraefikService
