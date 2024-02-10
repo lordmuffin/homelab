@@ -28,8 +28,6 @@ spec:
           value: "healingorganics.org"
         - name: COOKIE_DOMAIN
           value: "labs.andrewpjackson.com"
-        - name: INSECURE_COOKIE
-          value: "true"
         - name: AUTH_HOST
           value: "auth.labs.andrewpjackson.com"
         - name: DEFAULT_PROVIDER
