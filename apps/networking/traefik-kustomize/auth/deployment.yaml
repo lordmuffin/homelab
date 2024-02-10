@@ -1,55 +1,54 @@
-kind: Deployment
 apiVersion: apps/v1
+kind: Deployment
 metadata:
-  name: traefikauth
-  namespace: default
+  name: traefik-forward-auth
   labels:
-    app: containous
-    name: traefikauth
+    app: traefik-forward-auth
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: containous
-      task: traefikauth
+      app: traefik-forward-auth
+  strategy:
+    type: Recreate
   template:
     metadata:
       labels:
-        app: containous
-        task: traefikauth
+        app: traefik-forward-auth
     spec:
+      terminationGracePeriodSeconds: 60
       containers:
-        - name: traefikauth
-          image: thomseddon/traefik-forward-auth:2
-          ports:
-            - containerPort: 4181
-              protocol: TCP
-          env:
-            - name: DEFAULT_PROVIDER
-              value: "oidc"
-            - name: PROVIDERS_OIDC_ISSUER_URL
-              valueFrom:
-                secretKeyRef:
-                  name: auth-labs-andrewpjackson-com-apptoken-1password
-                  key: issuerurl
-            - name: PROVIDERS_OIDC_CLIENT_ID
-              valueFrom:
-                secretKeyRef:
-                  name: auth-labs-andrewpjackson-com-apptoken-1password
-                  key: clientid
-            - name: PROVIDERS_OIDC_CLIENT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: auth-labs-andrewpjackson-com-apptoken-1password
-                  key: clientsecret
-            - name: SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: auth-labs-andrewpjackson-com-apptoken-1password
-                  key: jwtsecret
-            - name: LOG_LEVEL
-              value: trace
-          resources:
-            limits:
-              memory: "512Mi"
-              cpu: "500m"
+      - image: thomseddon/traefik-forward-auth:2
+        name: traefik-forward-auth
+        ports:
+        - containerPort: 4181
+          protocol: TCP
+        env:
+        - name: DEFAULT_PROVIDER
+          value: "oidc"
+        - name: PROVIDERS_OIDC_ISSUER_URL
+          valueFrom:
+            secretKeyRef:
+              name: auth-labs-andrewpjackson-com-apptoken-1password
+              key: issuerurl
+        - name: PROVIDERS_OIDC_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: auth-labs-andrewpjackson-com-apptoken-1password
+              key: clientid
+        - name: PROVIDERS_OIDC_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: auth-labs-andrewpjackson-com-apptoken-1password
+              key: clientsecret
+        - name: SECRET
+          valueFrom:
+            secretKeyRef:
+              name: auth-labs-andrewpjackson-com-apptoken-1password
+              key: jwtsecret
+        - name: LOG_LEVEL
+          value: trace
+      resources:
+        limits:
+          memory: "512Mi"
+          cpu: "500m"

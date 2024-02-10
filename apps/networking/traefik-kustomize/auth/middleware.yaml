@@ -1,7 +1,7 @@
 apiVersion: traefik.containo.us/v1alpha1
 kind: Middleware
 metadata:
-  name: auth
+  name: traefik-forward-auth
 spec:
   forwardAuth:
     address: https://auth.labs.andrewpjackson.com/_oauth

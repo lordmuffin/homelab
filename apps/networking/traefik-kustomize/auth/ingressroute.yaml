@@ -13,7 +13,7 @@ spec:
     - match: Host(`auth.labs.andrewpjackson.com`)
       kind: Rule
       services:
-        - name: traefikauth
-          port: 80
+        - name: traefik-forward-auth
+          port: 4181
   tls:
     secretName: labs-andrewpjackson-com-tls
