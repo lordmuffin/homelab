@@ -78,4 +78,4 @@ spec:
             name: headscale-etc
         - name: secret
           secret:
-            secretName: headscale
+            secretName: hs-postgres-pw-1password
