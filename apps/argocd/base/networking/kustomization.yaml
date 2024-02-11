@@ -8,8 +8,8 @@ resources:
 - traefik-kustomize.yaml
 - cert-manager.yaml
 - nginx-ingress.yaml
-# - headscale.yaml
-- tailscale-operator.yaml
+- headscale.yaml
+# - tailscale-operator.yaml
 # - tailscale.yaml
 - issuer.yaml
 # - kube-vip.yaml
