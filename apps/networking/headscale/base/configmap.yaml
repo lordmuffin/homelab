@@ -13,7 +13,7 @@ data:
   derp.server.region_name: "Headscale Embedded DERP"
   derp.server.stun_listen_addr: "0.0.0.0:3478"
   derp.server.private_key_path: /var/lib/headscale/derp_server_private.key
-  derp.urls: ["https://controlplane.tailscale.com/derpmap/default"]
-  derp.paths: []
+  derp.urls: "https://controlplane.tailscale.com/derpmap/default"
+  derp.paths: ""
   derp.auto_update_enabled: "true"
   derp.update_frequency: "24h"
