@@ -8,7 +8,7 @@ data:
   metrics_listen_addr: "127.0.0.1:9090"
   ephemeral_node_inactivity_timeout: "30m"
   derp.server.enabled: "true"
-  derp.server.region_id: 999
+  derp.server.region_id: "999"
   derp.server.region_code: "headscale"
   derp.server.region_name: "Headscale Embedded DERP"
   derp.server.stun_listen_addr: "0.0.0.0:3478"
