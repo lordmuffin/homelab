@@ -1,6 +1,4 @@
 namespace: headscale
-bases:
-  - ../base
 resources:
   - deployment.yaml
   - postgres-service.yaml
