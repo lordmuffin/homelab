@@ -20,7 +20,7 @@ spec:
           command: ["headscale", "serve"]
           env:
             - name: SERVER_URL
-              value: $(PUBLIC_PROTO)://$(PUBLIC_HOSTNAME)
+              value: "https://hs.labs.andrewpjackson.com"
             - name: LISTEN_ADDR
               valueFrom:
                 configMapKeyRef:
