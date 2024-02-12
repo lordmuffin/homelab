@@ -16,7 +16,7 @@ spec:
         - name: headscale
           image: "ghcr.io/lordmuffin/homelab-headscale:latest"
           imagePullPolicy: IfNotPresent
-          command: ["/go/bin/headscale", "serve"]
+          command: ["/bin/headscale", "serve"]
           env:
             - name: SERVER_URL
               value: $(PUBLIC_PROTO)://$(PUBLIC_HOSTNAME)
