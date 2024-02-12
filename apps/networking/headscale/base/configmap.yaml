@@ -17,3 +17,4 @@ data:
   derp.paths: ""
   derp.auto_update_enabled: "true"
   derp.update_frequency: "24h"
+  noise.private_key_path: /var/lib/headscale/noise_private.key
