@@ -14,7 +14,8 @@ spec:
     spec:
       containers:
         - name: headscale
-          image: "ghcr.io/lordmuffin/homelab-headscale:latest"
+          # image: "ghcr.io/lordmuffin/homelab-headscale:latest"
+          image: "headscale/headscale:v0.22.3"
           imagePullPolicy: IfNotPresent
           command: ["headscale", "serve"]
           env:
