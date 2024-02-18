@@ -7,5 +7,5 @@ configMapGenerator:
   - name: kube-dns-autoscaler
     behavior: merge
     literals:
-      - linear: '{"coresPerReplica":256,"min":3,"includeUnschedulableNodes":true,"nodesPerReplica":16,"preventSinglePointFailure":true}'
+      - linear={"coresPerReplica":256,"min":3,"includeUnschedulableNodes":true,"nodesPerReplica":16,"preventSinglePointFailure":true}
     namespace: kube-system
