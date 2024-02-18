@@ -20,7 +20,10 @@ spec:
           command: ["headscale", "serve"]
           env:
             - name: SERVER_URL
-              value: "https://hs.labs.andrewpjackson.com:443"
+              valueFrom:
+                configMapKeyRef:
+                  name: headscale-config
+                  key: server_url
             - name: LISTEN_ADDR
               valueFrom:
                 configMapKeyRef:
