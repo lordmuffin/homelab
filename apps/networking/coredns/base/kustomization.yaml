@@ -8,3 +8,4 @@ configMapGenerator:
     behavior: merge
     literals:
       - linear='{"coresPerReplica":256,"min":3,"includeUnschedulableNodes":true,"nodesPerReplica":16,"preventSinglePointFailure":true}'
+    namespace: kube-system
