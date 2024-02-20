@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: radarr
+  namespace: radarr
+  labels:
+    servarr.app: radarr
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      servarr.app: radarr
+  template:
+    metadata:
+      labels:
+        servarr.app: radarr
+    spec:
+      containers:
+        - name: radarr
+          image: lscr.io/linuxserver/radarr:4.2.4
+          env:
+            - name: PUID
+              value: "1000"
+            - name: PGID
+              value: "1000"
+          envFrom:
+            - configMapRef:
+                name: radarr_env
+          ports:
+            - containerPort: 7878
+          volumeMounts:
+            - name: data
+              mountPath: "/config"
+            - name: movies
+              mountPath: "/movies"
+            - name: import
+              mountPath: "/import"
+            - name: downloads
+              mountPath: "/downloads"
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: radarr-data
+        - name: movies
+          hostPath:
+            path: "/mnt/media/library/movies"
+            type: Directory
+        - name: import
+          hostPath:
+            path: "/mnt/media/library/import/movies"
+            type: Directory
+        - name: downloads
+          hostPath:
+            path: "/mnt/media/torrents/downloads"
+            type: Directory

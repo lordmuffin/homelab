@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: radarr-env
+  namespace: radarr
+data:
+  TZ: "America/Chicago"

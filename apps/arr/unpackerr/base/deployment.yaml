@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: unpackerr
+  namespace: unpackerr
+  labels:
+    servarr.app: unpackerr
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      servarr.app: unpackerr
+  template:
+    metadata:
+      labels:
+        servarr.app: unpackerr
+      annotations:
+        ravianand.me/config-hash: <computed-sha1-hash>
+    spec:
+      initContainers:
+        - name: copy-config
+          image: busybox
+          command: ["sh", "-c", "cp /tmp/unpackerr.conf /config/unpackerr.conf"]
+          volumeMounts:
+            - name: config
+              mountPath: /tmp
+            - name: data
+              mountPath: /config
+      containers:
+        - name: unpackerr
+          image: golift/unpackerr
+          volumeMounts:
+            - name: data
+              mountPath: /config
+            - name: downloads
+              mountPath: /downloads
+          resources:
+            limits:
+              cpu: "2"
+      volumes:
+        - name: downloads
+          hostPath:
+            path: /mnt/media/torrents/downloads
+            type: Directory
+        - name: data
+          persistentVolumeClaim:
+            claimName: unpackerr-data
+        - name: config
+          configMap:
+            name: unpackerr-conf
+            items:
+              - key: unpackerr.conf
+                path: unpackerr.conf

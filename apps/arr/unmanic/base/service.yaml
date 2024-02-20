@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: unmanic
+  namespace: unmanic
+spec:
+  type: LoadBalancer
+  selector:
+    servarr.app: unmanic
+  ports:
+    - port: 8888

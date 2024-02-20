@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: unmanic
+  namespace: unmanic
+  labels:
+    servarr.app: unmanic
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      servarr.app: unmanic
+  template:
+    metadata:
+      labels:
+        servarr.app: unmanic
+    spec:
+      containers:
+        - name: unmanic
+          image: josh5/unmanic:latest
+          envFrom:
+            - configMapRef:
+                name: unmanic-env
+          ports:
+            - containerPort: 8888
+          volumeMounts:
+            - name: data
+              mountPath: /config
+            - name: cache
+              mountPath: /tmp/unmanic
+            - name: movies
+              mountPath: /movies
+            - name: tv
+              mountPath: /tv
+          resources:
+            requests:
+              cpu: "2"
+            limits:
+              cpu: "4"
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: unmanic-data
+        - name: cache
+          persistentVolumeClaim:
+            claimName: unmanic-cache
+        - name: movies
+          hostPath:
+            path: "/mnt/media/library/movies"
+            type: Directory
+        - name: tv
+          hostPath:
+            path: "/mnt/media/library/tv"
+            type: Directory

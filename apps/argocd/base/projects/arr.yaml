@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: arr
+spec:
+  description: Arr Apps General Project
+  sourceRepos:
+  - '*'
+  destinations:
+  - namespace: jellyfin
+    server: https://kubernetes.default.svc
+  - namespace: jellyseerr
+    server: https://kubernetes.default.svc
+  - namespace: prowlarr
+    server: https://kubernetes.default.svc
+  - namespace: qflood
+    server: https://kubernetes.default.svc
+  - namespace: radarr
+    server: https://kubernetes.default.svc
+  - namespace: sonarr
+    server: https://kubernetes.default.svc
+  - namespace: unmanic
+    server: https://kubernetes.default.svc
+  - namespace: unpackerr
+    server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+  - group: '*'
+    kind: '*'
+  orphanedResources:
+    warn: false

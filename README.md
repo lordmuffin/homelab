@@ -1,13 +1,15 @@
 TODO LIST:
 - Fix Task's preconditions with a docker image to run this in... PLEASEEEE
 [] Fix secrets in democratic-csi.yaml
-[] Add Ingress through Traefik, Kube-VIP(Done?) - https://computingforgeeks.com/install-configure-traefik-ingress-controller-on-kubernetes/#:~:text=Install%20and%20Configure%20Traefik%20Ingress%20Controller%20on%20Kubernetes,6%20%E2%80%93%20Test%20Traefik%20Ingress%20on%20Kubernetes%20
+[X] Add Ingress through Traefik, Kube-VIP(Done?) - https://computingforgeeks.com/install-configure-traefik-ingress-controller-on-kubernetes/#:~:text=Install%20and%20Configure%20Traefik%20Ingress%20Controller%20on%20Kubernetes,6%20%E2%80%93%20Test%20Traefik%20Ingress%20on%20Kubernetes%20
   - Adding annotations for LB
   - Enable dashboard proxy?
 [] Decide on DNS registrar and setup auto dns. - https://kubernetes-sigs.github.io/external-dns
-[] Enable cert manager & letsencrypt
+[X] Enable cert manager & letsencrypt
 [] Deploy Tailscale Mesh - https://headscale.net/running-headscale-linux/#goal
 [] Deploy Headscale (For non-cloud tailscale)
+[] Auto Update Pipelines for kairos
+[] PIPELINES - Solve pipelines, this might just be easiest to run GH Runners in kubernetes 
 
 [] Fix ArgoCD Init creds
 [] Fix ArgoCD Install Creds for GH

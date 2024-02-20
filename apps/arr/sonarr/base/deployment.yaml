@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sonarr
+  namespace: sonarr
+  labels:
+    servarr.app: sonarr
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      servarr.app: sonarr
+  template:
+    metadata:
+      labels:
+        servarr.app: sonarr
+    spec:
+      containers:
+        - name: sonarr
+          image: lscr.io/linuxserver/sonarr:latest
+          ports:
+            - containerPort: 8989
+          volumeMounts:
+            - name: data
+              mountPath: /config
+            - name: tv
+              mountPath: /tv
+            - name: import
+              mountPath: /import
+            - name: downloads
+              mountPath: /downloads

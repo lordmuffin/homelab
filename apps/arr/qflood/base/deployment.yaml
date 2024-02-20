@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qflood
+  namespace: unpackerr
+  labels:
+    servarr.app: qflood
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      servarr.app: qflood
+  template:
+    metadata:
+      labels:
+        servarr.app: qflood
+    spec:
+      containers:
+        - name: qflood
+          image: cr.hotio.dev/hotio/qflood:release-4.3.9--4.7.0
+          envFrom:
+            - configMapRef:
+                name: qflood-env
+          ports:
+            - containerPort: 8080
+              name: qbittorrent
+            - containerPort: 3000
+              name: floodui
+          volumeMounts:
+            - name: data
+              mountPath: /config
+            - name: downloads
+              mountPath: /downloads
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: qflood-data
+        - name: downloads
+          hostPath:
+            path: /mnt/media/torrents/downloads
+            type: Directory
