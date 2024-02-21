@@ -21,8 +21,10 @@ spec:
   selector:
     servarr.app: jellyfin
   ports:
-    - port: 7359
+    - name: local-discovery
+      port: 7359
       targetPort: local-discovery
-    - port: 1900
+    - name: dlna
+      port: 1900
       targetPort: dlna
   type: LoadBalancer
