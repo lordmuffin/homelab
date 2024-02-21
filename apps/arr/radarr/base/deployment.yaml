@@ -42,14 +42,11 @@ spec:
           persistentVolumeClaim:
             claimName: radarr-data
         - name: movies
-          hostPath:
-            path: "/mnt/media/library/movies"
-            type: DirectoryOrCreate
+          persistentVolumeClaim:
+            claimName: jellyfin-movies-pvc
         - name: import
-          hostPath:
-            path: "/mnt/media/library/import/movies"
-            type: DirectoryOrCreate
+          persistentVolumeClaim:
+            claimName: radarr-import-movies
         - name: downloads
-          hostPath:
-            path: "/mnt/media/torrents/downloads"
-            type: DirectoryOrCreate
+          persistentVolumeClaim:
+            claimName: radarr-downloads

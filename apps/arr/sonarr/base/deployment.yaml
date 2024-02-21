@@ -34,14 +34,11 @@ spec:
           persistentVolumeClaim:
             claimName: sonarr-data
         - name: tv
-          hostPath:
-            path: /mnt/media/library/tv
-            type: DirectoryOrCreate
+          persistentVolumeClaim:
+            claimName: jellyfin-tv-pvc
         - name: import
-          hostPath:
-            path: /mnt/media/library/import/tv
-            type: DirectoryOrCreate
+          persistentVolumeClaim:
+            claimName: radarr-import-movies
         - name: downloads
-          hostPath:
-            path: /mnt/media/torrents/downloads
-            type: DirectoryOrCreate
+          persistentVolumeClaim:
+            claimName: radarr-downloads

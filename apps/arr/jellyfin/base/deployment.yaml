@@ -44,10 +44,8 @@ spec:
           persistentVolumeClaim:
             claimName: jellyfin-data-pvc
         - name: movies
-          hostPath:
-            path: /mnt/media/library/movies
-            type: DirectoryOrCreate
+          persistentVolumeClaim:
+            claimName: jellyfin-movies-pvc
         - name: tv
-          hostPath:
-            path: /mnt/media/library/tv
-            type: DirectoryOrCreate
+          persistentVolumeClaim:
+            claimName: jellyfin-tv-pvc
