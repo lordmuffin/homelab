@@ -38,4 +38,4 @@ spec:
         - name: downloads
           hostPath:
             path: /mnt/media/torrents/downloads
-            type: Directory
+            type: DirectoryOrCreate

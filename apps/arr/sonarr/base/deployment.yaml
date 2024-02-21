@@ -36,12 +36,12 @@ spec:
         - name: tv
           hostPath:
             path: /mnt/media/library/tv
-            type: Directory
+            type: DirectoryOrCreate
         - name: import
           hostPath:
             path: /mnt/media/library/import/tv
-            type: Directory
+            type: DirectoryOrCreate
         - name: downloads
           hostPath:
             path: /mnt/media/torrents/downloads
-            type: Directory
+            type: DirectoryOrCreate

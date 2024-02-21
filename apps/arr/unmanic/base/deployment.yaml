@@ -47,8 +47,8 @@ spec:
         - name: movies
           hostPath:
             path: "/mnt/media/library/movies"
-            type: Directory
+            type: DirectoryOrCreate
         - name: tv
           hostPath:
             path: "/mnt/media/library/tv"
-            type: Directory
+            type: DirectoryOrCreate

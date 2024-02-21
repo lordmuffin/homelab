@@ -44,12 +44,12 @@ spec:
         - name: movies
           hostPath:
             path: "/mnt/media/library/movies"
-            type: Directory
+            type: DirectoryOrCreate
         - name: import
           hostPath:
             path: "/mnt/media/library/import/movies"
-            type: Directory
+            type: DirectoryOrCreate
         - name: downloads
           hostPath:
             path: "/mnt/media/torrents/downloads"
-            type: Directory
+            type: DirectoryOrCreate

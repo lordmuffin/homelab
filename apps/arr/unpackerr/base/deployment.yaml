@@ -41,7 +41,7 @@ spec:
         - name: downloads
           hostPath:
             path: /mnt/media/torrents/downloads
-            type: Directory
+            type: DirectoryOrCreate
         - name: data
           persistentVolumeClaim:
             claimName: unpackerr-data
