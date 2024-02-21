@@ -10,7 +10,7 @@ spec:
     annotations:
       reflector.v1.k8s.emberstack.com/reflection-allowed: "true"
       reflector.v1.k8s.emberstack.com/reflection-auto-enabled: "true"
-      reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces: "argocd, monitoring, traefik"
+      reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces: "argocd, jellyfin, jellyseerr, prowlarr, qflood, radarr, monitoring, traefik"
   issuerRef:
     name: letsencrypt-production
     kind: ClusterIssuer
