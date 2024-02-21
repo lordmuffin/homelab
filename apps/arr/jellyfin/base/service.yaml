@@ -19,7 +19,7 @@ metadata:
   namespace: jellyfin
 spec:
   selector:
-    servarr.app: jellyfin-local-discovery
+    servarr.app: jellyfin
   ports:
     - port: 7359
       targetPort: local-discovery
