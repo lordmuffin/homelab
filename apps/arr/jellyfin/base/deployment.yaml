@@ -39,3 +39,15 @@ spec:
             limits:
               cpu: "4"
               nvidia.com/gpu: 1
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: jellyfin-data-pvc
+        - name: movies
+          hostPath:
+            path: /mnt/media/library/movies
+            type: Directory
+        - name: tv
+          hostPath:
+            path: /mnt/media/library/tv
+            type: Directory

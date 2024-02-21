@@ -29,3 +29,19 @@ spec:
               mountPath: /import
             - name: downloads
               mountPath: /downloads
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: sonarr-data
+        - name: tv
+          hostPath:
+            path: /mnt/media/library/tv
+            type: Directory
+        - name: import
+          hostPath:
+            path: /mnt/media/library/import/tv
+            type: Directory
+        - name: downloads
+          hostPath:
+            path: /mnt/media/torrents/downloads
+            type: Directory

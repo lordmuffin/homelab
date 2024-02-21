@@ -24,3 +24,7 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /app/config
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: jellyseerr-data-pvc
