@@ -6,8 +6,9 @@ metadata:
 data:
   log.override: |
     log
-  custom.server: |
-    example.io:8053 {
-      forward . 8.8.8.8
-    } 
- 
+  # custom.server: |
+  #   example.io:8053 {
+  #     forward . 8.8.8.8
+  #   } 
+  andrewpjackson.db: |
+    jellyfin.labs.andrewpjackson.com.    IN    A    192.168.1.40
