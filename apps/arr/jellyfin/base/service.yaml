@@ -5,7 +5,7 @@ metadata:
   namespace: jellyfin
 spec:
   selector:
-    servarr.app: jellyfin
+    app: jellyfin
   ports:
     - port: 8096
       targetPort: web
@@ -19,7 +19,7 @@ metadata:
   namespace: jellyfin
 spec:
   selector:
-    servarr.app: jellyfin
+    app: jellyfin
   ports:
     - name: local-discovery
       port: 7359
