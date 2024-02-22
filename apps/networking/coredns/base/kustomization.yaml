@@ -4,4 +4,4 @@ resources:
 - kube-dns-autoscaler.yaml
 
 patchesStrategicMerge:
-- configmap.yml
+- configmap.yaml
