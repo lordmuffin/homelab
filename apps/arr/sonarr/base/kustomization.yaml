@@ -5,3 +5,4 @@ resources:
 - pvc.yaml
 - cm.yaml
 - service.yaml
+- ingress.yaml
