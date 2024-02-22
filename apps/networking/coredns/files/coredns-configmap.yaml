@@ -1,0 +1,32 @@
+apiVersion: v1
+data:
+  Corefile: |
+    .:53 {
+        errors
+        health
+        ready
+        kubernetes cluster.local in-addr.arpa ip6.arpa {
+          pods insecure
+          fallthrough in-addr.arpa ip6.arpa
+        }
+        hosts /etc/coredns/NodeHosts {
+          ttl 60
+          reload 15s
+          fallthrough
+        }
+        prometheus :9153
+        forward . /etc/resolv.conf
+        cache 30
+        loop
+        reload
+        loadbalance
+        import /etc/coredns/custom/*.override
+    }
+    import /etc/coredns/custom/*.server
+  NodeHosts: |
+    10.1.0.5 kairoslab-69f9-63052297
+    10.1.0.4 kairoslab-86a1-a220ecfe
+    192.168.1.145 kairoslab-c023
+    192.168.1.140 kairoslab-f9af
+    192.168.1.146 kairoslab-b849
+kind: ConfigMap
