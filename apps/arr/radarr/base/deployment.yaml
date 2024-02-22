@@ -25,7 +25,7 @@ spec:
               value: "1000"
           envFrom:
             - configMapRef:
-                name: radarr_env
+                name: radarr-env
           ports:
             - containerPort: 7878
           volumeMounts:

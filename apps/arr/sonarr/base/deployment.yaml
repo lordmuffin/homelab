@@ -20,6 +20,9 @@ spec:
           image: lscr.io/linuxserver/sonarr:latest
           ports:
             - containerPort: 8989
+          envFrom:
+            - configMapRef:
+                name: sonarr-env
           volumeMounts:
             - name: data
               mountPath: /config
