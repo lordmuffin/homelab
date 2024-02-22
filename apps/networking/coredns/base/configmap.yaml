@@ -30,3 +30,6 @@ data:
     192.168.1.140 kairoslab-f9af
     192.168.1.146 kairoslab-b849
 kind: ConfigMap
+metadata:
+  name: coredns
+  namespace: kube-system
