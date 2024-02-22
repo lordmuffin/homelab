@@ -5,7 +5,7 @@ metadata:
   namespace: jellyfin
 spec:
   selector:
-    servarr.app: jellyfin-web
+    servarr.app: jellyfin
   ports:
     - port: 8096
       targetPort: web
