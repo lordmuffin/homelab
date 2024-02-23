@@ -14,6 +14,7 @@ TODO LIST:
 [] Fix ArgoCD Init creds
 [] Fix ArgoCD Install Creds for GH
 [] Fix all pre-req passwords with 1pass?
+[] Fix democratic-csi secrets (Currently has to be managed as a task)
 
 run task argocd:secret & repo with variables for user and pass
 Find a way to access Argo with no ingress.

@@ -9,7 +9,7 @@ spec:
     targetRevision: democratic-csi-0.14.3
     path: stable/democratic-csi
     helm:
-      releaseName: democratic-csi
+      releaseName: democratic-csi-nfs
       values: |
         csiDriver:
           # should be globally unique for a given cluster
