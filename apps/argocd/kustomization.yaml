@@ -18,6 +18,7 @@ resources:
   - base/core/1password.yaml
   - base/core/data.yaml
   - base/core/democratic-csi.yaml
+  - base/core/democratic-csi-nfs.yaml
   - base/core/nvidia.yaml
   - base/core/nvidia-extra.yaml
   - base/core/networking.yaml
