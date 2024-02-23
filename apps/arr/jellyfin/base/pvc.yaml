@@ -23,7 +23,7 @@ spec:
   resources:
     requests:
       storage: 10Gi
-  storageClassName: freenas-iscsi-csi
+  storageClassName: freenas-nfs-csi
 
 ---
 apiVersion: v1
@@ -37,4 +37,4 @@ spec:
   resources:
     requests:
       storage: 10Gi
-  storageClassName: freenas-iscsi-csi
+  storageClassName: freenas-nfs-csi
