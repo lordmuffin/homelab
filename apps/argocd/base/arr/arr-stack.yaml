@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: arr-stack
+spec:
+  project: arr
+  source:
+    repoURL: 'https://github.com/lordmuffin/homelab.git'
+    path: apps/arr/arr-stack
+    targetRevision: main
+  destination:
+    namespace: arr-stack
+    name: in-cluster
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: true
+    syncOptions:
+    - Validate=false
+    - CreateNamespace=true
+    - PrunePropagationPolicy=foreground
+    - PruneLast=false
+    - Prune=false
+    retry:
+      limit: 10
+      backoff:
+        duration: 20s
+        factor: 2
+        maxDuration: 15m
