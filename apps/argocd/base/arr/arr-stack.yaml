@@ -6,7 +6,7 @@ spec:
   project: arr
   source:
     repoURL: 'https://github.com/lordmuffin/homelab.git'
-    path: apps/arr/arr-stack
+    path: apps/arr-stack
     targetRevision: main
   destination:
     namespace: arr-stack
