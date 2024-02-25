@@ -23,15 +23,15 @@ spec:
             value: 1
           - name: "net.ipv6.conf.all.disable_ipv6"
             value: 1
-      init_container:
-        image: busybox
-        name: copy-wireguard-config
-        command: ["sh", "-c", "mkdir -p /config/wireguard && cp /wireguard/wg0.conf /config/wireguard/wg0.conf"]
-        volume_mounts:
-          - name: data
-            mount_path: "/config"
-          - name: wireguard
-            mount_path: "/wireguard"
+      initContainers:
+        - image: busybox
+          name: copy-wireguard-config
+          command: ["sh", "-c", "mkdir -p /config/wireguard && cp /wireguard/wg0.conf /config/wireguard/wg0.conf"]
+          volume_mounts:
+            - name: data
+              mount_path: "/config"
+            - name: wireguard
+              mount_path: "/wireguard"
       containers:
         - name: qflood
           image: ghcr.io/hotio/qflood:release-42f253d
