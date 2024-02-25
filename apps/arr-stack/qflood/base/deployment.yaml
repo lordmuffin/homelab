@@ -15,6 +15,24 @@ spec:
       labels:
         servarr.app: qflood
     spec:
+      security_context:
+        capabilities:
+          - add: ["NET_ADMIN"]
+        sysctl:
+          - name: "net.ipv4.conf.all.src_valid_mark"
+            value: 1
+          - name: "net.ipv6.conf.all.disable_ipv6"
+            value: 1
+      init_container:
+        image:
+        name: copy-wireguard-config
+        command: ["sh", "-c", "mkdir -p /config/wireguard && cp /wireguard/wg0.conf /config/wireguard/wg0.conf"]
+        volume_mount:
+          name: data
+          mount_path: "/config"
+        volume_mount:
+          name: wireguard
+          mount_path: "/wireguard"
       containers:
         - name: qflood
           image: ghcr.io/hotio/qflood:release-42f253d
@@ -38,3 +56,6 @@ spec:
         - name: downloads
           persistentVolumeClaim:
             claimName: qflood-downloads
+        - name: wireguard
+          secret:
+            secretName: qflood-wireguard-vpn-1password
