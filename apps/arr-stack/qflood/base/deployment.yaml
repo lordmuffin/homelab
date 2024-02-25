@@ -36,7 +36,7 @@ spec:
           command: ["sh", "-c", "mkdir -p /config/wireguard && ls -l /config/wireguard"]
           volumeMounts:
             - name: data
-              mount_path: "/config"
+              mountPath: "/config"
       containers:
         - name: qflood
           image: ghcr.io/hotio/qflood:release-42f253d
