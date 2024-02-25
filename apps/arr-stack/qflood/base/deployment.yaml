@@ -32,8 +32,8 @@ spec:
               secretKeyRef:
                 name: qflood-wireguard-vpn-1password
                 key: password
-          # command: ["sh", "-c", "mkdir -p /config/wireguard && cp /wireguard/password /config/wireguard/wg0.conf"]
-          command: ["sh", "-c", "echo $WIREGUARD_CONFIG"]
+          command: ["sh", "-c", "mkdir -p /config/wireguard && echo $WIREGUARD_CONFIG > /config/wireguard/wg0.conf"]
+          # command: ["sh", "-c", "echo $WIREGUARD_CONFIG"]
           volume_mounts:
             - name: data
               mount_path: "/config"
