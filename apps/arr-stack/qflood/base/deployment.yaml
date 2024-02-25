@@ -32,13 +32,11 @@ spec:
               secretKeyRef:
                 name: qflood-wireguard-vpn-1password
                 key: password
-          command: ["sh", "-c", "mkdir -p /config/wireguard && echo $WIREGUARD_CONFIG > /config/wireguard/wg0.conf"]
-          # command: ["sh", "-c", "echo $WIREGUARD_CONFIG"]
+          # command: ["sh", "-c", "mkdir -p /config/wireguard && echo $WIREGUARD_CONFIG > /config/wireguard/wg0.conf"]
+          command: ["sh", "-c", "mkdir -p /config/wireguard && ls -l /config/wireguard"]
           volume_mounts:
             - name: data
               mount_path: "/config"
-            - name: wireguard
-              mount_path: "/wireguard"
       containers:
         - name: qflood
           image: ghcr.io/hotio/qflood:release-42f253d
