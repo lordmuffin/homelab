@@ -27,7 +27,7 @@ spec:
         - image: busybox
           name: copy-wireguard-config
           # command: ["sh", "-c", "mkdir -p /config/wireguard && cp /wireguard/password /config/wireguard/wg0.conf"]
-          command: ["sh", "-c", "ls -l /wireguard"]
+          command: ["sh", "-c", "echo $WIREGUARD"]
           volume_mounts:
             - name: data
               mount_path: "/config"
@@ -39,6 +39,12 @@ spec:
           envFrom:
             - configMapRef:
                 name: qflood-env
+          env:
+          - name: WIREGUARD_CONFIG
+            valueFrom:
+              secretKeyRef:
+                name: qflood-wireguard-vpn-1password
+                key: password
           ports:
             - containerPort: 8080
               name: qbittorrent
@@ -49,9 +55,6 @@ spec:
               mountPath: /config
             - name: downloads
               mountPath: /downloads
-            - name: wireguard
-              readOnly: true
-              mountPath: "/wireguard"
       volumes:
         - name: data
           persistentVolumeClaim:
@@ -59,6 +62,3 @@ spec:
         - name: downloads
           persistentVolumeClaim:
             claimName: qflood-downloads
-        - name: wireguard
-          secret:
-            secretName: qflood-wireguard-vpn-1password
