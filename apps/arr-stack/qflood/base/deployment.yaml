@@ -49,6 +49,9 @@ spec:
               mountPath: /config
             - name: downloads
               mountPath: /downloads
+            - name: wireguard
+              readOnly: true
+              mountPath: "/wireguard"
       volumes:
         - name: data
           persistentVolumeClaim:
