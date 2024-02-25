@@ -8,3 +8,4 @@ data:
   PGID: "1000"
   TZ: "America/Chicago"
   FLOOD_AUTH: "true"
+  VPN_ENABLED: "true"
