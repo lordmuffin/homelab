@@ -27,12 +27,11 @@ spec:
         image:
         name: copy-wireguard-config
         command: ["sh", "-c", "mkdir -p /config/wireguard && cp /wireguard/wg0.conf /config/wireguard/wg0.conf"]
-        volume_mount:
-          name: data
-          mount_path: "/config"
-        volume_mount:
-          name: wireguard
-          mount_path: "/wireguard"
+        volume_mounts:
+          - name: data
+            mount_path: "/config"
+          - name: wireguard
+            mount_path: "/wireguard"
       containers:
         - name: qflood
           image: ghcr.io/hotio/qflood:release-42f253d
