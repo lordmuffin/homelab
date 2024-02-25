@@ -27,7 +27,7 @@ spec:
         - image: busybox
           name: copy-wireguard-config
           # command: ["sh", "-c", "mkdir -p /config/wireguard && cp /wireguard/password /config/wireguard/wg0.conf"]
-          command: ["sh", "-c", "echo $WIREGUARD"]
+          command: ["sh", "-c", "echo $WIREGUARD_CONFIG"]
           volume_mounts:
             - name: data
               mount_path: "/config"
