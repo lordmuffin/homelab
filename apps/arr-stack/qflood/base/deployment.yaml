@@ -15,14 +15,14 @@ spec:
       labels:
         servarr.app: qflood
     spec:
-      security_context:
+      securityContext:
         capabilities:
           - add: ["NET_ADMIN"]
-        sysctl:
+        sysctls:
           - name: "net.ipv4.conf.all.src_valid_mark"
-            value: 1
+            value: "1"
           - name: "net.ipv6.conf.all.disable_ipv6"
-            value: 1
+            value: "1"
       initContainers:
         - image: busybox
           name: copy-wireguard-config
