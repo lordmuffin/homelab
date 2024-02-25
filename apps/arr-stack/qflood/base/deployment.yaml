@@ -36,6 +36,5 @@ spec:
           persistentVolumeClaim:
             claimName: qflood-data
         - name: downloads
-          hostPath:
-            path: /mnt/media/torrents/downloads
-            type: DirectoryOrCreate
+          persistentVolumeClaim:
+            claimName: qflood-downloads

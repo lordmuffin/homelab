@@ -10,3 +10,17 @@ spec:
     requests:
       storage: 10Gi
   storageClassName: freenas-nfs-csi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: qflood-downloads
+  namespace: qflood
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 25Gi
+  storageClassName: freenas-nfs-csi
