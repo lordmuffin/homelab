@@ -34,7 +34,7 @@ spec:
                 key: password
           # command: ["sh", "-c", "mkdir -p /config/wireguard && echo $WIREGUARD_CONFIG > /config/wireguard/wg0.conf"]
           command: ["sh", "-c", "mkdir -p /config/wireguard && ls -l /config/wireguard"]
-          volume_mounts:
+          volumeMounts:
             - name: data
               mount_path: "/config"
       containers:
