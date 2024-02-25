@@ -24,7 +24,7 @@ spec:
           - name: "net.ipv6.conf.all.disable_ipv6"
             value: 1
       init_container:
-        image:
+        image: busybox
         name: copy-wireguard-config
         command: ["sh", "-c", "mkdir -p /config/wireguard && cp /wireguard/wg0.conf /config/wireguard/wg0.conf"]
         volume_mounts:
