@@ -1,28 +1,28 @@
 apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute
 metadata:
-  name: qflood
+  name: qbittorrent
   annotations:
-    external-dns.alpha.kubernetes.io/hostname: qflood.labs.andrewpjackson.com
+    external-dns.alpha.kubernetes.io/hostname: qbittorrent.labs.andrewpjackson.com
     external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
     external-dns.alpha.kubernetes.io/ttl: "120"
     cert-manager.io/cluster-issuer: letsencrypt-production
     acme.cert-manager.io/http01-edit-in-place: "true"
     kubernetes.io/ingress.class: traefik-external
   labels:
-    app: qflood
+    app: qbittorrent
 spec:
   entryPoints:
     - websecure
   routes:
-    - match: Host(`qflood.labs.andrewpjackson.com`)
+    - match: Host(`qbittorrent.labs.andrewpjackson.com`)
       kind: Rule
       middlewares:
         - name: traefik-forward-auth
           namespace: traefik
       services:
-        - name: qflood
-          port: 7878
+        - name: qbittorrent
+          port: 8080
   tls:
     secretName: labs-andrewpjackson-com-tls
 # data:

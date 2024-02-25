@@ -5,4 +5,5 @@ resources:
 - pvc.yaml
 - cm.yaml
 - service.yaml
-- ingress.yaml
+- floodui-ingress.yaml
+- qbittorrent-ingress.yaml
