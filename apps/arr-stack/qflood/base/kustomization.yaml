@@ -7,4 +7,3 @@ resources:
 - service.yaml
 - floodui-ingress.yaml
 - qbittorrent-ingress.yaml
-- qflood-wireguard-vpn-1password.yaml
