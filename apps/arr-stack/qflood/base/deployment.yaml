@@ -15,6 +15,9 @@ spec:
       labels:
         servarr.app: qflood
     spec:
+      securityContext:
+        runAsUser: 1000
+        fsGroup: 1000
       containers:
         - name: qflood
           image: ghcr.io/hotio/qflood:release-42f253d

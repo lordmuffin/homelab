@@ -15,6 +15,9 @@ spec:
       labels:
         servarr.app: unmanic
     spec:
+      securityContext:
+        runAsUser: 1000
+        fsGroup: 1000
       containers:
         - name: unmanic
           image: josh5/unmanic:latest

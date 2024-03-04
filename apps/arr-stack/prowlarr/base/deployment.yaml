@@ -15,6 +15,9 @@ spec:
       labels:
         servarr.app: prowlarr
     spec:
+      securityContext:
+        runAsUser: 1000
+        fsGroup: 1000
       containers:
         - name: prowlarr
           image: lscr.io/linuxserver/prowlarr:develop

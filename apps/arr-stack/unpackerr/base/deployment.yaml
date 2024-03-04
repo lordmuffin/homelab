@@ -17,6 +17,9 @@ spec:
       annotations:
         ravianand.me/config-hash: <computed-sha1-hash>
     spec:
+      securityContext:
+        runAsUser: 1000
+        fsGroup: 1000
       initContainers:
         - name: copy-config
           image: busybox
