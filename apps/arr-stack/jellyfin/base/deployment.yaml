@@ -15,37 +15,33 @@ spec:
       labels:
         app: jellyfin
     spec:
-      template:
-        metadata:
-          labels:
-            app: jellyfin
-        securityContext:
-          runAsUser: 2775
-          fsGroup: 2775
-        containers:
-          - name: jellyfin
-            image: lscr.io/linuxserver/jellyfin:latest
-            ports:
-              - name: web
-                containerPort: 8096
-              - name: local-discovery
-                containerPort: 7359
-              - name: dlna
-                containerPort: 1900
-            volumeMounts:
-              - name: data
-                mountPath: /config
-              - name: movies
-                mountPath: /data/movies
-              - name: tv
-                mountPath: /data/tv
-            resources:
-              requests:
-                cpu: "2"
-                # nvidia.com/gpu: 1
-              limits:
-                cpu: "4"
-                # nvidia.com/gpu: 1
+      securityContext:
+        runAsUser: 2775
+        fsGroup: 2775
+      containers:
+        - name: jellyfin
+          image: lscr.io/linuxserver/jellyfin:latest
+          ports:
+            - name: web
+              containerPort: 8096
+            - name: local-discovery
+              containerPort: 7359
+            - name: dlna
+              containerPort: 1900
+          volumeMounts:
+            - name: data
+              mountPath: /config
+            - name: movies
+              mountPath: /data/movies
+            - name: tv
+              mountPath: /data/tv
+          resources:
+            requests:
+              cpu: "2"
+              # nvidia.com/gpu: 1
+            limits:
+              cpu: "4"
+              # nvidia.com/gpu: 1
       volumes:
         - name: data
           persistentVolumeClaim:
