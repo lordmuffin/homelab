@@ -18,8 +18,8 @@ spec:
         ravianand.me/config-hash: <computed-sha1-hash>
     spec:
       securityContext:
-        runAsUser: 1000
-        fsGroup: 1000
+        runAsUser: 2775
+        fsGroup: 2775
       initContainers:
         - name: copy-config
           image: busybox

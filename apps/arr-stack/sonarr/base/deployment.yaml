@@ -16,8 +16,8 @@ spec:
         servarr.app: sonarr
     spec:
       securityContext:
-        runAsUser: 1000
-        fsGroup: 1000
+        runAsUser: 2775
+        fsGroup: 2775
       containers:
         - name: sonarr
           image: lscr.io/linuxserver/sonarr:latest
