@@ -16,8 +16,9 @@ spec:
         app: jellyfin
     spec:
       securityContext:
-        runAsUser: 1000
-        fsGroup: 1000
+        runAsUser: 911
+        runAsGroup: 1000
+        fsGroup: 2000
       containers:
         - name: jellyfin
           image: lscr.io/linuxserver/jellyfin:latest
