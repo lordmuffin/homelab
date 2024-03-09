@@ -16,8 +16,9 @@ spec:
         servarr.app: prowlarr
     spec:
       securityContext:
-        runAsUser: 2775
-        fsGroup: 2775
+        runAsUser: 0
+        runAsGroup: 0
+        fsGroup: 0
       containers:
         - name: prowlarr
           image: lscr.io/linuxserver/prowlarr:develop

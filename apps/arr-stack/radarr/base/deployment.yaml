@@ -16,8 +16,9 @@ spec:
         servarr.app: radarr
     spec:
       securityContext:
-        runAsUser: 2775
-        fsGroup: 2775
+        runAsUser: 0
+        runAsGroup: 0
+        fsGroup: 0
       containers:
         - name: radarr
           image: lscr.io/linuxserver/radarr:4.2.4
