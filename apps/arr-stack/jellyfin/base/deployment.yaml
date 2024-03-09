@@ -16,7 +16,7 @@ spec:
         app: jellyfin
     spec:
       securityContext:
-        runAsUser: 911
+        runAsUser: 1000
         runAsGroup: 1000
         fsGroup: 1000
       containers:
