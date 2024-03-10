@@ -32,8 +32,8 @@ spec:
               mountPath: /config
             - name: tv
               mountPath: /tv
-            - name: import
-              mountPath: /import
+            # - name: import
+            #   mountPath: /import
             - name: downloads
               mountPath: /downloads
       volumes:
@@ -43,9 +43,9 @@ spec:
         - name: tv
           persistentVolumeClaim:
             claimName: jellyfin-tv-pvc
-        - name: import
-          persistentVolumeClaim:
-            claimName: radarr-import-movies
+        # - name: import
+        #   persistentVolumeClaim:
+        #     claimName: radarr-import-movies
         - name: downloads
           persistentVolumeClaim:
             claimName: qflood-downloads
