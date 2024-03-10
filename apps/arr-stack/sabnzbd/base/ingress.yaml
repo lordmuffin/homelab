@@ -22,7 +22,7 @@ spec:
           namespace: traefik
       services:
         - name: sabnzbd
-          port: 7878
+          port: 8989
   tls:
     secretName: labs-andrewpjackson-com-tls
 # data:
