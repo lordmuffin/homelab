@@ -1,0 +1,40 @@
+---
+ apiVersion: apps/v1
+ kind: Deployment
+ metadata:
+   name: sabnzbd-deployment
+   labels:
+     app: sabnzbd
+ spec:
+   replicas: 1
+   selector:
+      matchLabels:
+        app: sabnzbd
+   template:
+     metadata:
+       labels:
+         app: sabnzbd
+ 
+     spec:
+      containers:
+         - name: sabnzbd
+           image: linuxserver/sabnzbd
+           ports:
+             - containerPort: 6789
+           volumeMounts:
+             - mountPath: /config
+               name: sabnzbd-config
+             - mountPath: /downloads
+               name: sabnzbd-downloads
+             - mountPath: /incomplete-downloads
+               name: sabnzbd-incomplete
+      volumes:
+        - name: sabnzbd-config
+          persistentVolumeClaim:
+            claimName: sabnzbd-config
+        - name: sabnzbd-incomplete
+          persistentVolumeClaim:
+            claimName: sabnzbd-incomplete
+        - name: sabnzbd-downloads
+          persistentVolumeClaim:
+            claimName: sabnzbd-downloads

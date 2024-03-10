@@ -4,6 +4,7 @@ bases:
 - ./jellyfin/base
 - ./jellyseerr/base
 - ./prowlarr/base
+- ./sabnzbd/base
 - ./qflood/base
 - ./radarr/base
 - ./sonarr/base
