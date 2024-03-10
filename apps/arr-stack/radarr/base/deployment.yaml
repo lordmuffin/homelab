@@ -53,4 +53,4 @@ spec:
             claimName: radarr-import-movies
         - name: downloads
           persistentVolumeClaim:
-            claimName: radarr-downloads
+            claimName: qflood-downloads

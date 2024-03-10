@@ -42,9 +42,8 @@ spec:
               cpu: "2"
       volumes:
         - name: downloads
-          hostPath:
-            path: /mnt/media/torrents/downloads
-            type: DirectoryOrCreate
+          persistentVolumeClaim:
+            claimName: qflood-downloads
         - name: data
           persistentVolumeClaim:
             claimName: unpackerr-data
