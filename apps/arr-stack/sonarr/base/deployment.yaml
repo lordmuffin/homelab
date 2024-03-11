@@ -34,8 +34,10 @@ spec:
               mountPath: /tv
             # - name: import
             #   mountPath: /import
-            - name: downloads
-              mountPath: /downloads
+            - name: qflood-downloads
+              mountPath: "/qflood-downloads"
+            - name: sabnzbd-downloads
+              mountPath: "/sabnzbd-downloads"
       volumes:
         - name: data
           persistentVolumeClaim:
@@ -46,6 +48,9 @@ spec:
         # - name: import
         #   persistentVolumeClaim:
         #     claimName: radarr-import-movies
-        - name: downloads
+        - name: qflood-downloads
           persistentVolumeClaim:
             claimName: qflood-downloads
+        - name: sabnzbd-downloads
+          persistentVolumeClaim:
+            claimName: sabnzbd-downloads

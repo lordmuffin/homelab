@@ -33,12 +33,12 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /config
-            - name: downloads
-              mountPath: /downloads
+            - name: qflood-downloads
+              mountPath: /qflood-downloads
       volumes:
         - name: data
           persistentVolumeClaim:
             claimName: qflood-data
-        - name: downloads
+        - name: qflood-downloads
           persistentVolumeClaim:
             claimName: qflood-downloads
