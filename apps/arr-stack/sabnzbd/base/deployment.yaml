@@ -14,30 +14,30 @@ spec:
     metadata:
       labels:
         app: sabnzbd
-  spec:
-    securityContext:
-      runAsUser: 0
-      runAsGroup: 0
-      fsGroup: 0
-    containers:
-        - name: sabnzbd
-          image: linuxserver/sabnzbd
-          ports:
-            - containerPort: 6789
-          volumeMounts:
-            - mountPath: /config
-              name: sabnzbd-config
-            - mountPath: /sabnzbd-downloads
-              name: sabnzbd-downloads
-            - mountPath: /sabnzbd-incomplete-downloads
-              name: sabnzbd-incomplete
-    volumes:
-      - name: sabnzbd-config
-        persistentVolumeClaim:
-          claimName: sabnzbd-config
-      - name: sabnzbd-incomplete
-        persistentVolumeClaim:
-          claimName: sabnzbd-incomplete
-      - name: sabnzbd-downloads
-        persistentVolumeClaim:
-          claimName: sabnzbd-downloads
+    spec:
+      securityContext:
+        runAsUser: 0
+        runAsGroup: 0
+        fsGroup: 0
+      containers:
+          - name: sabnzbd
+            image: linuxserver/sabnzbd
+            ports:
+              - containerPort: 6789
+            volumeMounts:
+              - mountPath: /config
+                name: sabnzbd-config
+              - mountPath: /sabnzbd-downloads
+                name: sabnzbd-downloads
+              - mountPath: /sabnzbd-incomplete-downloads
+                name: sabnzbd-incomplete
+      volumes:
+        - name: sabnzbd-config
+          persistentVolumeClaim:
+            claimName: sabnzbd-config
+        - name: sabnzbd-incomplete
+          persistentVolumeClaim:
+            claimName: sabnzbd-incomplete
+        - name: sabnzbd-downloads
+          persistentVolumeClaim:
+            claimName: sabnzbd-downloads
