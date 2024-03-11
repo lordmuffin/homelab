@@ -22,11 +22,11 @@ spec:
       containers:
         - name: radarr
           image: lscr.io/linuxserver/radarr:4.2.4
-          # env:
-          #   - name: PUID
-          #     value: "911"
-          #   - name: PGID
-          #     value: "911"
+          env:
+            - name: PUID
+              value: "911"
+            - name: PGID
+              value: "911"
           envFrom:
             - configMapRef:
                 name: radarr-env

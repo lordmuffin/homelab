@@ -22,11 +22,11 @@ spec:
       containers:
         - name: sonarr
           image: lscr.io/linuxserver/sonarr:latest
-          # env:
-          #   - name: PUID
-          #     value: "911"
-          #   - name: PGID
-          #     value: "911"
+          env:
+            - name: PUID
+              value: "911"
+            - name: PGID
+              value: "911"
           ports:
             - containerPort: 8989
           envFrom:
