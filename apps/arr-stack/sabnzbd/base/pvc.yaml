@@ -17,10 +17,10 @@ metadata:
   name: sabnzbd-incomplete
 spec:
   accessModes:
-    - ReadWriteOnce
+    - ReadWriteMany
   resources:
     requests:
-      storage: 25Gi
+      storage: 100Gi
   storageClassName: freenas-nfs-csi
 
 ---
@@ -30,8 +30,8 @@ metadata:
   name: sabnzbd-downloads
 spec:
   accessModes:
-    - ReadWriteOnce
+    - ReadWriteMany
   resources:
     requests:
-      storage: 50Gi
+      storage: 100Gi
   storageClassName: freenas-nfs-csi
