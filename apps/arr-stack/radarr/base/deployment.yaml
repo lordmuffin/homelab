@@ -24,9 +24,9 @@ spec:
           image: lscr.io/linuxserver/radarr:4.2.4
           env:
             - name: PUID
-              value: "1000"
+              value: "911"
             - name: PGID
-              value: "1000"
+              value: "911"
           envFrom:
             - configMapRef:
                 name: radarr-env
