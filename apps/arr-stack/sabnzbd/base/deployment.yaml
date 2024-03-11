@@ -24,9 +24,9 @@
            volumeMounts:
              - mountPath: /config
                name: sabnzbd-config
-             - mountPath: /downloads
+             - mountPath: /sabnzbd-downloads
                name: sabnzbd-downloads
-             - mountPath: /incomplete-downloads
+             - mountPath: /sabnzbd-incomplete-downloads
                name: sabnzbd-incomplete
       volumes:
         - name: sabnzbd-config
