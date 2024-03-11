@@ -1,19 +1,19 @@
 ---
- apiVersion: apps/v1
- kind: Deployment
- metadata:
-   name: sabnzbd-deployment
-   labels:
-     app: sabnzbd
- spec:
-   replicas: 1
-   selector:
-      matchLabels:
-        app: sabnzbd
-   template:
-     metadata:
-       labels:
-         app: sabnzbd
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: sabnzbd-deployment
+    labels:
+      app: sabnzbd
+  spec:
+    replicas: 1
+    selector:
+        matchLabels:
+          app: sabnzbd
+    template:
+      metadata:
+        labels:
+          app: sabnzbd
     spec:
       securityContext:
         runAsUser: 0
