@@ -15,10 +15,10 @@ spec:
       labels:
         servarr.app: sonarr
     spec:
-      securityContext:
-        runAsUser: 911
-        runAsGroup: 911
-        fsGroup: 911
+      # securityContext:
+      #   runAsUser: 911
+      #   runAsGroup: 911
+      #   fsGroup: 911
       containers:
         - name: sonarr
           image: lscr.io/linuxserver/sonarr:latest
@@ -26,7 +26,7 @@ spec:
             - name: PUID
               value: "911"
             - name: PGID
-              value: "911"
+              value: "1000"
           ports:
             - containerPort: 8989
           envFrom:
