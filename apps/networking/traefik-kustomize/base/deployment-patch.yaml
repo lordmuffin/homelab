@@ -12,5 +12,5 @@ spec:
               containerPort: 8080
               protocol: TCP
             - name: web-int-tls
-              containerPort: 8443
+              containerPort: 8043
               protocol: TCP
