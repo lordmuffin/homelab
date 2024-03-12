@@ -32,3 +32,29 @@ spec:
 #           hs = {}
 #           hs.status = "Healthy"
 #           return hs
+
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: jellyseerr-internal
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: jellyseerr.labs.andrewpjackson.com
+    external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
+    external-dns.alpha.kubernetes.io/ttl: "120"
+    cert-manager.io/cluster-issuer: letsencrypt-production
+    acme.cert-manager.io/http01-edit-in-place: "true"
+    kubernetes.io/ingress.class: traefik-external
+  labels:
+    app: jellyseerr
+spec:
+  entryPoints:
+    - web-int-tls
+  routes:
+    - match: Host(`jellyseerr.labs.andrewpjackson.com`)
+      kind: Rule
+      services:
+        - name: jellyseerr
+          port: 5055
+  tls:
+    secretName: labs-andrewpjackson-com-tls

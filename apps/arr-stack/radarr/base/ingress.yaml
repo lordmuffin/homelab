@@ -1,7 +1,7 @@
 apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute
 metadata:
-  name: radarr
+  name: radarr-internal
   annotations:
     external-dns.alpha.kubernetes.io/hostname: radarr.labs.andrewpjackson.com
     external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
@@ -13,13 +13,10 @@ metadata:
     app: radarr
 spec:
   entryPoints:
-    - websecure
+    - web-int-tls
   routes:
     - match: Host(`radarr.labs.andrewpjackson.com`)
       kind: Rule
-      middlewares:
-        - name: traefik-forward-auth
-          namespace: traefik
       services:
         - name: radarr
           port: 7878

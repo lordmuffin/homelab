@@ -1,7 +1,7 @@
 apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute
 metadata:
-  name: sonarr
+  name: sonarr-internal
   annotations:
     external-dns.alpha.kubernetes.io/hostname: sonarr.labs.andrewpjackson.com
     external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
@@ -13,13 +13,10 @@ metadata:
     app: sonarr
 spec:
   entryPoints:
-    - websecure
+    - web-int-tls
   routes:
     - match: Host(`sonarr.labs.andrewpjackson.com`)
       kind: Rule
-      middlewares:
-        - name: traefik-forward-auth
-          namespace: traefik
       services:
         - name: sonarr
           port: 8989

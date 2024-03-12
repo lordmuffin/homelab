@@ -1,7 +1,7 @@
 apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute
 metadata:
-  name: qbittorrent
+  name: qbittorrent-internal
   annotations:
     external-dns.alpha.kubernetes.io/hostname: qbittorrent.labs.andrewpjackson.com
     external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
@@ -13,13 +13,10 @@ metadata:
     app: qbittorrent
 spec:
   entryPoints:
-    - websecure
+    - web-int-tls
   routes:
     - match: Host(`qbittorrent.labs.andrewpjackson.com`)
       kind: Rule
-      middlewares:
-        - name: traefik-forward-auth
-          namespace: traefik
       services:
         - name: qbittorrent
           port: 8080

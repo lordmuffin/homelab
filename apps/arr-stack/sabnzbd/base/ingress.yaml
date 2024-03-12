@@ -1,7 +1,7 @@
 apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute
 metadata:
-  name: sabnzbd
+  name: sabnzbd-internal
   annotations:
     external-dns.alpha.kubernetes.io/hostname: sabnzbd.labs.andrewpjackson.com
     external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
@@ -13,13 +13,10 @@ metadata:
     app: sabnzbd
 spec:
   entryPoints:
-    - websecure
+    - web-int-tls
   routes:
     - match: Host(`sabnzbd.labs.andrewpjackson.com`)
       kind: Rule
-      middlewares:
-        - name: traefik-forward-auth
-          namespace: traefik
       services:
         - name: sabnzbd
           port: 8080
