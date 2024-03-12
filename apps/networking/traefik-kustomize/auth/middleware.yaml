@@ -7,7 +7,7 @@ spec:
   chain:
     middlewares:
     # - name: https-only
-    - name: whitelist-auth
+    # - name: whitelist-auth
     - name: traefik-forward-auth
 
 ---
