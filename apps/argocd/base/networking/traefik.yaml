@@ -47,7 +47,7 @@ spec:
             redirectTo:
               port: web-int-tls
           web-int-tls: 
-            port: 8443
+            port: 8043
             tls:
               enabled: true
         ingressRoute:
