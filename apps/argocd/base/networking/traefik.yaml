@@ -42,7 +42,14 @@ spec:
               insecure: false
             middlewares:
               - traefik-traefik-forward-auth-chain
-
+          web-int: 
+            port: 8080
+            redirectTo:
+              port: web-int-tls
+          web-int-tls: 
+            port: 8443
+            tls:
+              enabled: true
         ingressRoute:
           dashboard:
             enabled: false
