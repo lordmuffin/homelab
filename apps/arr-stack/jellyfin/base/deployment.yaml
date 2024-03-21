@@ -15,10 +15,10 @@ spec:
       labels:
         app: jellyfin
     spec:
-      securityContext:
-        runAsUser: 0
-        runAsGroup: 0
-        fsGroup: 0
+      # securityContext:
+      #   runAsUser: 0
+      #   runAsGroup: 0
+      #   fsGroup: 0
       containers:
         - name: jellyfin
           image: lscr.io/linuxserver/jellyfin:latest

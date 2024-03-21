@@ -20,7 +20,7 @@ spec:
     - ReadWriteMany
   resources:
     requests:
-      storage: 250Gi
+      storage: 500Gi
   storageClassName: freenas-nfs-csi
 
 ---
@@ -33,5 +33,5 @@ spec:
     - ReadWriteMany
   resources:
     requests:
-      storage: 250Gi
+      storage: 500Gi
   storageClassName: freenas-nfs-csi
