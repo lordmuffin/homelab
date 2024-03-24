@@ -594,10 +594,9 @@ spec:
               runAsGroup: 2000
               runAsNonRoot: true
               runAsUser: 1000
-            serviceMonitorNamespaceSelector:
-              matchLabels:
-                prometheus: enabled
-            serviceMonitorSelectorNilUsesHelmValues: false
+            serviceMonitorSelectorNilUsesHelmValues: true
+            serviceMonitorSelector: {}
+            serviceMonitorNamespaceSelector: {}
             shards: 1
             storageSpec:
               volumeClaimTemplate:
