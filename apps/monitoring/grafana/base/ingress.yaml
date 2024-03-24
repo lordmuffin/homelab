@@ -1,26 +1,25 @@
-apiVersion: networking.k8s.io/v1
-kind: Ingress
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
 metadata:
-  name: grafana-ingress-internal
+  name: grafana-internal
   annotations:
-    external-dns.alpha.kubernetes.io/hostname: grafana.gruber.dev.br
+    external-dns.alpha.kubernetes.io/hostname: grafana.labs.andrewpjackson.com
     external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
     external-dns.alpha.kubernetes.io/ttl: "120"
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: letsencrypt-production
+    acme.cert-manager.io/http01-edit-in-place: "true"
+    kubernetes.io/ingress.class: traefik-external
+  labels:
+    app: grafana
 spec:
-  ingressClassName: nginx
-  rules:
-  - host: grafana.gruber.dev.br
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: grafana-internal
-            port:
-              name: service
+  entryPoints:
+    - web-int-tls
+  routes:
+    - match: Host(`grafana.labs.andrewpjackson.com`)
+      kind: Rule
+      services:
+        - name: grafana-internal
+          port: 8081
   tls:
-  - hosts:
-    - grafana.gruber.dev.br
-    secretName: grafana-tls
+    secretName: labs-andrewpjackson-com-tls

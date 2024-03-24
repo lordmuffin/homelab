@@ -328,7 +328,7 @@ spec:
                 gnetId: 11312
                 revision: 9
           defaultDashboardsEnabled: true
-          defaultDashboardsTimezone: America/Sao_Paulo
+          defaultDashboardsTimezone: America/Chicago
           enabled: true
           env:
             GF_RENDERING_CALLBACK_URL: http://kube-prometheus-grafana.monitoring.svc.cluster.local

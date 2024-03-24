@@ -34,14 +34,6 @@ resources:
 
   # Arr Apps
   - base/arr/arr-stack.yaml
-  # - base/arr/jellyfin.yaml
-  # - base/arr/jellyseerr.yaml
-  # - base/arr/prowlarr.yaml
-  # - base/arr/qflood.yaml
-  # - base/arr/radarr.yaml
-  # - base/arr/sonarr.yaml
-  # - base/arr/unmanic.yaml
-  # - base/arr/unpackerr.yaml
 
   # Applications
   # - base/apps/vault.yaml
