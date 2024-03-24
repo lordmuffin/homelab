@@ -594,7 +594,7 @@ spec:
               runAsGroup: 2000
               runAsNonRoot: true
               runAsUser: 1000
-            serviceMonitorSelectorNilUsesHelmValues: true
+            serviceMonitorSelectorNilUsesHelmValues: false
             serviceMonitorSelector: {}
             serviceMonitorNamespaceSelector: {}
             shards: 1
