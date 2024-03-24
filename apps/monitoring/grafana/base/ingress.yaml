@@ -19,7 +19,7 @@ spec:
     - match: Host(`grafana.labs.andrewpjackson.com`)
       kind: Rule
       services:
-        - name: grafana-internal
-          port: 8081
+        - name: grafana
+          port: 3000
   tls:
     secretName: labs-andrewpjackson-com-tls
