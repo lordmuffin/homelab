@@ -15,15 +15,9 @@ spec:
       labels:
         app: prometheus-server
     spec:
-      initContainers:
-          - name: "init-datapath"
-            image: debian:stable
-            command: ["chown", "-R", "65534:65534", "/data"]
-            command: ["/bin/chmod","-R","777","/data"]
-            volumeMounts:
-            - name: prometheus-storage-volume
-              mountPath: /data
-              subPath: ""
+      securityContext:
+        privileged: true
+        runAsUser: 0
       containers:
         - name: prometheus
           image: prom/prometheus
@@ -44,7 +38,7 @@ spec:
             - name: prometheus-config-volume
               mountPath: /etc/prometheus/
             - name: prometheus-storage-volume
-              mountPath: /data
+              mountPath: /prometheus/
       volumes:
         - name: prometheus-config-volume
           configMap:
