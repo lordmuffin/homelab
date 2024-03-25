@@ -3,6 +3,9 @@ kind: Service
 apiVersion: v1
 metadata:
   name: sabnzbd
+  annotations:
+      prometheus.io/scrape: 'true'
+      prometheus.io/port:   '9090'
 spec:
   selector:
     app: sabnzbd

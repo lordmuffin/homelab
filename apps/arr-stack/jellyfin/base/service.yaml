@@ -3,6 +3,9 @@ kind: Service
 metadata:
   name: jellyfin-web
   namespace: jellyfin
+  annotations:
+      prometheus.io/scrape: 'true'
+      prometheus.io/port:   '9090'
 spec:
   selector:
     app: jellyfin
@@ -17,6 +20,9 @@ kind: Service
 metadata:
   name: jellyfin-local-discovery
   namespace: jellyfin
+  annotations:
+      prometheus.io/scrape: 'true'
+      prometheus.io/port:   '9090'
 spec:
   selector:
     app: jellyfin

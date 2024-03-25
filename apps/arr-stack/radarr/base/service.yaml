@@ -3,6 +3,9 @@ kind: Service
 metadata:
   name: radarr
   namespace: radarr
+  annotations:
+      prometheus.io/scrape: 'true'
+      prometheus.io/port:   '9090'
 spec:
   type: LoadBalancer
   selector:

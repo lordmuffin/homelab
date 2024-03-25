@@ -1,0 +1,25 @@
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: prometheus-internal
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: prometheus.labs.andrewpjackson.com
+    external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
+    external-dns.alpha.kubernetes.io/ttl: "120"
+    cert-manager.io/cluster-issuer: letsencrypt-production
+    acme.cert-manager.io/http01-edit-in-place: "true"
+    kubernetes.io/ingress.class: traefik-external
+  labels:
+    app: prometheus
+spec:
+  entryPoints:
+    - web-int-tls
+  routes:
+    - match: Host(`prometheus.labs.andrewpjackson.com`)
+      kind: Rule
+      services:
+        - name: prometheus-service
+          port: 8080
+  tls:
+    secretName: labs-andrewpjackson-com-tls
