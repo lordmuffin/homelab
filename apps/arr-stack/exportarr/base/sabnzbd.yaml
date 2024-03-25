@@ -67,9 +67,9 @@ spec:
             - sabnzbd
           env:
             - name: PORT
-              value: "8080"
+              value: "9710"
             - name: URL
-              value: "http://sabnzbd.arr-stack.svc.cluster.local:7878"
+              value: "http://sabnzbd.arr-stack.svc.cluster.local:8080"
             - name: APIKEY
               valueFrom:
                 secretKeyRef:

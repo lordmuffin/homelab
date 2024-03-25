@@ -67,9 +67,9 @@ spec:
             - prowlarr
           env:
             - name: PORT
-              value: "9696"
+              value: "9709"
             - name: URL
-              value: "http://prowlarr.arr-stack.svc.cluster.local:7878"
+              value: "http://prowlarr.arr-stack.svc.cluster.local:9696"
             - name: APIKEY
               valueFrom:
                 secretKeyRef:
