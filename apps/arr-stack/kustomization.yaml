@@ -10,5 +10,6 @@ bases:
 - ./sonarr/base
 - ./unmanic/base
 - ./unpackerr/base
+- ./exportarr/base
 
 namespace: arr-stack
