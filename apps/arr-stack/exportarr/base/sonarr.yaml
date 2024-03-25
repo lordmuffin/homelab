@@ -71,7 +71,7 @@ spec:
             - sonarr
           env:
             - name: PORT
-              value: "9707"
+              value: "8989"
             - name: URL
               value: "http://sonarr.arr-stack.svc.cluster.local:7878"
             - name: APIKEY

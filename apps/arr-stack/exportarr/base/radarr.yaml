@@ -67,7 +67,7 @@ spec:
             - radarr
           env:
             - name: PORT
-              value: "9707"
+              value: "7878"
             - name: URL
               value: "http://radarr.arr-stack.svc.cluster.local:7878"
             - name: APIKEY
