@@ -16,7 +16,7 @@ spec:
         app: prometheus-server
     spec:
       securityContext:
-        privileged: true
+        # privileged: true
         runAsUser: 0
       containers:
         - name: prometheus
