@@ -1,6 +1,10 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
+- radarr-api-key-1password.yaml
+- sonarr-api-key-1password.yaml
+- prowlarr-api-key-1password.yaml
+- sabnzbd-api-key-1password.yaml
 - sonarr.yaml
 - radarr.yaml
 - sabnzbd.yaml
