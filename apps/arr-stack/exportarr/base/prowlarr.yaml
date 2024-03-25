@@ -69,7 +69,7 @@ spec:
             - name: PORT
               value: "9709"
             - name: URL
-              value: "http://prowlarr.monitoring.svc.cluster.local:7878"
+              value: "http://prowlarr.arr-stack.svc.cluster.local:7878"
             - name: APIKEY
               valueFrom:
                 secretKeyRef:
