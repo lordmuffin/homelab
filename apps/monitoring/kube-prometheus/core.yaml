@@ -328,7 +328,7 @@ spec:
                 gnetId: 11312
                 revision: 9
           defaultDashboardsEnabled: true
-          defaultDashboardsTimezone: America/Chicago
+          defaultDashboardsTimezone: America/Sao_Paulo
           enabled: true
           env:
             GF_RENDERING_CALLBACK_URL: http://kube-prometheus-grafana.monitoring.svc.cluster.local
@@ -594,9 +594,10 @@ spec:
               runAsGroup: 2000
               runAsNonRoot: true
               runAsUser: 1000
+            serviceMonitorNamespaceSelector:
+              matchLabels:
+                prometheus: enabled
             serviceMonitorSelectorNilUsesHelmValues: false
-            serviceMonitorSelector: {}
-            serviceMonitorNamespaceSelector: {}
             shards: 1
             storageSpec:
               volumeClaimTemplate:
