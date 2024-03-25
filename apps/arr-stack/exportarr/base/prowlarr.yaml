@@ -73,8 +73,8 @@ spec:
             - name: APIKEY
               valueFrom:
                 secretKeyRef:
-                  name: prowlarr-exporter
-                  key: api-key
+                  name: prowlarr-api-key-1password
+                  key: password
           ports:
             - name: monitoring
               containerPort: 9709

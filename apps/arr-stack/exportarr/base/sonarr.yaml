@@ -77,8 +77,8 @@ spec:
             - name: APIKEY
               valueFrom:
                 secretKeyRef:
-                  name: sonarr-exporter
-                  key: api-key
+                  name: sonarr-api-key-1password
+                  key: password
           ports:
             - name: monitoring
               containerPort: 9707

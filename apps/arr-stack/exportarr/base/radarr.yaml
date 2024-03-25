@@ -73,8 +73,8 @@ spec:
             - name: APIKEY
               valueFrom:
                 secretKeyRef:
-                  name: radarr-exporter
-                  key: api-key
+                  name: radarr-api-key-1password
+                  key: password
           ports:
             - name: monitoring
               containerPort: 9707
