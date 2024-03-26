@@ -36,5 +36,5 @@ spec:
     - ReadWriteMany
   resources:
     requests:
-      storage: 2000Gi
+      storage: 4000Gi
   storageClassName: freenas-nfs-csi
