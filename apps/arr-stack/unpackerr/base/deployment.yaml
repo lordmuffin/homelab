@@ -54,7 +54,7 @@ spec:
       volumes:
         - name: downloads
           persistentVolumeClaim:
-            claimName: qflood-downloads
+            claimName: sabnzbd-downloads
         - name: data
           persistentVolumeClaim:
             claimName: unpackerr-data
