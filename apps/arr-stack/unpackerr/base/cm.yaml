@@ -62,12 +62,12 @@ data:
     ################################################################################
 
     [[sonarr]]
-      url = "http://sonarr.servarr:8989"
+      url = "http://sonarr.arr-stack.svc.cluster.local:8989"
       api_key = "${var.sonarr_api_key}"
     # File system path where downloaded Sonarr items are located.
       paths = ['/downloads']
     # Default protocols is torrent. Alternative: "torrent,usenet"
-      protocols = "torrent"
+      protocols = "usenet"
     # How long to wait for a reply from the backend.
       timeout = "10s"
     # If you use this app with NZB you may wish to delete archives after extraction.
@@ -78,12 +78,12 @@ data:
      syncthing = false
 
     [[radarr]]
-      url = "http://radarr.servarr:7878"
+      url = "http://radarr.arr-stack.svc.cluster.local:7878"
       api_key = "${var.radarr_api_key}"
     # File system path where downloaded Radarr items are located.
       paths = ['/downloads']
     # Default protocols is torrents. Alternative: "torrent,usenet"
-      protocols = "torrent"
+      protocols = "usenet"
     # How long to wait for a reply from the backend.
       timeout = "10s"
     # If you use this app with NZB you may wish to delete archives after extraction.
