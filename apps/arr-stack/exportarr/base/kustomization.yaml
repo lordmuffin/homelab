@@ -5,3 +5,4 @@ resources:
 - radarr.yaml
 - sabnzbd.yaml
 - prowlarr.yaml
+- jellyfin.yaml
