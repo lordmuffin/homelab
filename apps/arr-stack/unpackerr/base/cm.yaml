@@ -92,4 +92,3 @@ data:
       delete_orig = false
     # If you use Syncthing, setting this to true will make unpackerr wait for syncs to finish.
      syncthing = false
-    EOT
