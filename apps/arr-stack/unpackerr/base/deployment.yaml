@@ -43,7 +43,7 @@ spec:
           env:
           - name: UN_SONARR_0_API_KEY
             valueFrom:
-              configMapKeyRef:
+              secretKeyRef:
                 name: sonarr-api-key-1password
                 key: password
           - name: UN_RADARR_0_API_KEY
