@@ -31,6 +31,7 @@ resources:
   - base/secrets/headscale.yaml
   - base/secrets/democratic-csi.yaml
   - base/secrets/certmanager.yaml
+  - base/secrets/monitoring.yaml
   - base/secrets/traefik.yaml
 
   # Arr Apps
