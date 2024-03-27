@@ -1,0 +1,57 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jellyfin-exporter
+  namespace: monitoring
+  labels:
+    k8s-app: jellyfin-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: jellyfin-exporter
+  template:
+    metadata:
+      labels:
+        k8s-app: jellyfin-exporter
+    spec:
+      restartPolicy: Always
+      containers:
+        - name: jellyfin-exporter
+          image: "drkhsh/jellyfin-exporter"
+          imagePullPolicy: IfNotPresent
+          # securityContext:
+          #   readOnlyRootFilesystem: true
+          #   runAsNonRoot: true
+          #   runAsUser: 1000
+          env:
+          - name: JELLYFIN_BASEURL
+            value: "https://jellyfin-web.arr-stack.svc.cluster.local:8096"
+          - name: JELLYFIN_APIKEY
+            valueFrom:
+              secretKeyRef:
+                name: jellyfin-api-key-1password
+                key: password
+          resources:
+            {}
+          ports:
+            - containerPort: 9027
+              name: http
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+          volumeMounts:
+            - mountPath: /data
+              name: data-volume
+      volumes:
+        - name: data-volume
+          emptyDir: {}
+        - name: config
+          configMap:
+            name: jellyfin-exporter-config
