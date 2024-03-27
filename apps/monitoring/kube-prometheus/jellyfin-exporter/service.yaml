@@ -2,15 +2,15 @@
 kind: Service
 apiVersion: v1
 metadata:
-  name: blackbox-exporter
+  name: jellyfin-exporter
   namespace: monitoring
   labels:
-    k8s-app: blackbox-exporter
+    k8s-app: jellyfin-exporter
 spec:
   type: ClusterIP
   ports:
     - name: http
-      port: 9115
+      port: 9027
       protocol: TCP
   selector:
-    k8s-app: blackbox-exporter
+    k8s-app: jellyfin-exporter
