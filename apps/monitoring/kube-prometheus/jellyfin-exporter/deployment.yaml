@@ -26,6 +26,8 @@ spec:
           #   runAsNonRoot: true
           #   runAsUser: 1000
           env:
+          - name: JELLYFIN_EXPORTER_PORT
+            value: 9027
           - name: JELLYFIN_BASEURL
             value: "http://jellyfin-web.arr-stack.svc.cluster.local:8096"
           - name: JELLYFIN_APIKEY
