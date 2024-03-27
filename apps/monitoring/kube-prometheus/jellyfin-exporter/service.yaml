@@ -9,8 +9,9 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-    - name: http
-      port: 9027
-      protocol: TCP
+  - name: http
+    protocol: TCP
+    port: 9027
+    targetPort: 9027
   selector:
     k8s-app: jellyfin-exporter
