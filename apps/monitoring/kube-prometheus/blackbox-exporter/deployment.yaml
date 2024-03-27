@@ -68,6 +68,7 @@ spec:
           securityContext:
             runAsNonRoot: true
             runAsUser: 65534
+          command: [ "/bin/bash", "-c", "--" ]
           args:
             - "while true; do sleep 30; done;"
             - --volume-dir=/data
