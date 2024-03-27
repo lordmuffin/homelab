@@ -21,7 +21,8 @@ spec:
       - args:
         - sh
         - -c
-        - cat /etc/config | envsubst > /data/config
+        - cat /config/blackbox.yaml | envsubst > /data/test
+        - cat /data/test
         image: bhgedigital/envsubst
         name: envsubst
         env:
@@ -31,11 +32,10 @@ spec:
                 name: jellyfin-api-key-1password
                 key: password
         volumeMounts:
-        - mountPath: /data
-          name: data-volume
-        - mountPath: /etc/config
-          subPath: config
-          name: config
+          - mountPath: /data
+            name: data-volume
+          - mountPath: /config
+            name: config
       containers:
         - name: blackbox-exporter
           image: "prom/blackbox-exporter"
