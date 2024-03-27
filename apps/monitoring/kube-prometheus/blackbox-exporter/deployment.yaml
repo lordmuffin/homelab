@@ -63,7 +63,7 @@ spec:
             - mountPath: /data
               name: data-volume
         - name: configmap-reload
-          image: "jimmidyson/configmap-reload:v0.2.2"
+          image: "bash"
           imagePullPolicy: "IfNotPresent"
           securityContext:
             runAsNonRoot: true
