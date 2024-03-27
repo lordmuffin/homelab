@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
 - ./server
 - ./node-exporter
-- ./blackbox-exporter
+- ./jellyfin-exporter
+# - ./blackbox-exporter
 # - components.yaml
 # - core.yaml
