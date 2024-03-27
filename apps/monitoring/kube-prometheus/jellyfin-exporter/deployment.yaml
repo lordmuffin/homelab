@@ -27,7 +27,7 @@ spec:
           #   runAsUser: 1000
           env:
           - name: JELLYFIN_BASEURL
-            value: "https://jellyfin-web.arr-stack.svc.cluster.local:8096"
+            value: "http://jellyfin-web.arr-stack.svc.cluster.local:8096"
           - name: JELLYFIN_APIKEY
             valueFrom:
               secretKeyRef:
