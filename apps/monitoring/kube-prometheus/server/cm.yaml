@@ -150,18 +150,6 @@ data:
       - job_name: "sabnzbd-exporter"  # Renamed job_name for clarity
         static_configs:
           - targets: ["sabnzbd-exporter:9710"]  # Use service name and port
-      - job_name: json
-        metrics_path: /probe
-        params:
-          module: [jellyfin]
+      - job_name: "jellyfin-exporter"  # Renamed job_name for clarity
         static_configs:
-          - targets:
-            # Change the target to point at the sessions endpoint
-            - http://jellyfin:8096/Sessions
-        relabel_configs:
-          - source_labels: [__address__]
-            target_label: __param_target
-          - source_labels: [__param_target]
-            target_label: instance
-          - target_label: __address__
-            replacement: blackbox-exporter:9115
+          - targets: ["jellyfin-exporter:9027"]  # Use service name and port
