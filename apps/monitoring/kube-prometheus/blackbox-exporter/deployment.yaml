@@ -69,7 +69,7 @@ spec:
             runAsNonRoot: true
             runAsUser: 65534
           args:
-            - tail -f /
+            - "while true; do sleep 30; done;"
             - --volume-dir=/data
             - --webhook-url=http://localhost:9115/-/reload
           resources:
