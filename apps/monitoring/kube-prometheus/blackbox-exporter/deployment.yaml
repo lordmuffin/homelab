@@ -69,13 +69,13 @@ spec:
             runAsNonRoot: true
             runAsUser: 65534
           args:
-            - --volume-dir=/etc/config
+            - --volume-dir=/data
             - --webhook-url=http://localhost:9115/-/reload
           resources:
             {}
           volumeMounts:
-            - mountPath: /etc/config
-              name: config
+            - mountPath: /data
+              name: data
               readOnly: true
       volumes:
         - name: data-volume
