@@ -38,20 +38,3 @@ spec:
           ports:
             - containerPort: 9027
               name: http
-          livenessProbe:
-            httpGet:
-              path: /health
-              port: http
-          readinessProbe:
-            httpGet:
-              path: /health
-              port: http
-          volumeMounts:
-            - mountPath: /data
-              name: data-volume
-      volumes:
-        - name: data-volume
-          emptyDir: {}
-        - name: config
-          configMap:
-            name: jellyfin-exporter-config
