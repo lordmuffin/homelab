@@ -37,4 +37,5 @@ spec:
             {}
           ports:
             - containerPort: 9027
-              name: http
+              protocol: TCP
+              name: base
