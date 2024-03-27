@@ -38,6 +38,6 @@ spec:
           resources:
             {}
           ports:
-            - containerPort: 9027
+            - name: http
+              containerPort: 9027
               protocol: TCP
-              name: http
