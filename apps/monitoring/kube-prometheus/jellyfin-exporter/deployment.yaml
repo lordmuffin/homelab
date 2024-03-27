@@ -15,6 +15,9 @@ spec:
     metadata:
       labels:
         k8s-app: jellyfin-exporter
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "monitoring"
     spec:
       restartPolicy: Always
       containers:
