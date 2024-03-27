@@ -71,8 +71,8 @@ spec:
           command: [ "sleep" ]
           args:
             - "infinitiy"
-            - --volume-dir=/data
-            - --webhook-url=http://localhost:9115/-/reload
+            # - --volume-dir=/data
+            # - --webhook-url=http://localhost:9115/-/reload
           resources:
             {}
           volumeMounts:
