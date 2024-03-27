@@ -21,8 +21,8 @@ spec:
       - args:
         - sh
         - -c
-        - cat /config/blackbox.yaml | envsubst > /data/test
-        - cat /data/test
+        - cat /config/blackbox.yaml | envsubst > /config/blackbox.yaml
+        - cat /config/blackbox.yaml
         image: bhgedigital/envsubst
         name: envsubst
         env:
@@ -74,8 +74,8 @@ spec:
           resources:
             {}
           volumeMounts:
-            - mountPath: /etc/config
-              name: config
+            - mountPath: /data
+              name: data-volume
               readOnly: true
       volumes:
         - name: data-volume
