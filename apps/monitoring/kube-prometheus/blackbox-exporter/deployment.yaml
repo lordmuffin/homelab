@@ -63,14 +63,14 @@ spec:
             - mountPath: /data
               name: data-volume
         - name: configmap-reload
-          image: busybox
+          image: ubuntu
           imagePullPolicy: "IfNotPresent"
           securityContext:
             runAsNonRoot: true
             runAsUser: 65534
-          command: [ "/bin/bash", "-c", "--" ]
+          command: [ "sleep" ]
           args:
-            - "while true; do sleep 30; done;"
+            - "infinitiy"
             - --volume-dir=/data
             - --webhook-url=http://localhost:9115/-/reload
           resources:
