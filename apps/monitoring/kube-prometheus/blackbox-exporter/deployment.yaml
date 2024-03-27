@@ -60,8 +60,8 @@ spec:
               path: /health
               port: http
           volumeMounts:
-            - mountPath: /config
-              name: config
+            - mountPath: /data
+              name: data-volume
         - name: configmap-reload
           image: "jimmidyson/configmap-reload:v0.2.2"
           imagePullPolicy: "IfNotPresent"
@@ -74,8 +74,9 @@ spec:
           resources:
             {}
           volumeMounts:
-            - mountPath: /data
-              name: data-volume
+            - mountPath: /etc/config
+              name: config
+              readOnly: true
       volumes:
         - name: data-volume
           emptyDir: {}
