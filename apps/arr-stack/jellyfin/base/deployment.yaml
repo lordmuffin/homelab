@@ -39,6 +39,18 @@ spec:
             limits:
               cpu: "4"
               # nvidia.com/gpu: 1
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: web
+            initialDelaySeconds: 3
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: web
+            initialDelaySeconds: 3
+            periodSeconds: 5
       volumes:
         - name: data
           persistentVolumeClaim:

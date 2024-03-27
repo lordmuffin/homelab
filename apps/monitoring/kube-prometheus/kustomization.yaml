@@ -3,5 +3,6 @@ kind: Kustomization
 resources:
 - ./server
 - ./node-exporter
+- ./blackbox-exporter
 # - components.yaml
 # - core.yaml

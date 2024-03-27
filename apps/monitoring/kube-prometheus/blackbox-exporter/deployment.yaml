@@ -1,0 +1,85 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: blackbox-exporter
+  namespace: monitoring
+  labels:
+    k8s-app: blackbox-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: blackbox-exporter
+  template:
+    metadata:
+      labels:
+        k8s-app: blackbox-exporter
+    spec:
+      restartPolicy: Always
+      initContainers:
+      - args:
+        - sh
+        - -c
+        - cat /etc/config | envsubst > /data/config
+        image: bhgedigital/envsubst
+        name: envsubst
+        env:
+          - name: JELLYFIN_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: jellyfin-api-key-1password
+                key: password
+        volumeMounts:
+        - mountPath: /data
+          name: data-volume
+        - mountPath: /etc/config
+          subPath: config
+          name: config-volume
+      containers:
+        - name: blackbox-exporter
+          image: "prom/blackbox-exporter"
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+          args:
+            - "--config.file=/config/blackbox.yaml"
+          resources:
+            {}
+          ports:
+            - containerPort: 9115
+              name: http
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+          volumeMounts:
+            - mountPath: /config
+              name: config
+        - name: configmap-reload
+          image: "jimmidyson/configmap-reload:v0.2.2"
+          imagePullPolicy: "IfNotPresent"
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+          args:
+            - --volume-dir=/etc/config
+            - --webhook-url=http://localhost:9115/-/reload
+          resources:
+            {}
+          volumeMounts:
+            - mountPath: /etc/config
+              name: config
+              readOnly: true
+      volumes:
+        - name: data-volume
+          emptyDir: {}
+        - name: config
+          configMap:
+            name: blackbox-exporter-config

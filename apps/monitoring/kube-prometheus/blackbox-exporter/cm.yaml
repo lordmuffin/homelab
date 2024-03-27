@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: blackbox-exporter-config
+  namespace: monitoring
+  labels:
+    k8s-app: blackbox-exporter
+data:
+  blackbox.yaml: |
+    modules:
+      jellyfin:
+        headers:
+          Authorization: MediaBrowser Token=$JELLYFIN_TOKEN
+          Content-Type: application/json
+          accept: application/json
+
+        # The body is no longer needed since this is now GET
+
+        # This will return all active sessions regardless of
+        # whether something is playing. You can use a combination
+        # of label and value filters in Grafana to only get actively
+        # playing sessions
+        metrics:
+        - name: jellyfin
+          type: object
+          help: User playback metrics from Jellyfin
+          path: '{ [*] }'
+          labels:
+            user_name: '{ .UserName }'
+            # User PromQL label_join and label_replace to concatenate
+            # these values into a nice item description
+            item_type: '{ .NowPlayingItem.Type }'
+            item_name: '{ .NowPlayingItem.Name }'
+            item_path: '{ .NowPlayingItem.Path }'
+            series_name: '{ .NowPlayingItem.SeriesName }'
+            episode_index: 'e{ .NowPlayingItem.IndexNumber }'
+            season_index: 's{ .NowPlayingItem.ParentIndexNumber }'
+            client_name: '{ .Client }'
+            device_name: '{ .DeviceName }'
+          values:
+            is_paused: '{ .PlayState.IsPaused }'
