@@ -21,8 +21,8 @@ spec:
       - args:
         - sh
         - -c
-        - cat /config/blackbox.yaml | envsubst > /config/blackbox.yaml
-        - cat /config/blackbox.yaml
+        - cat /config/blackbox.yaml | envsubst > /data/blackbox.yaml
+        - cat /data/blackbox.yaml
         image: bhgedigital/envsubst
         name: envsubst
         env:
@@ -45,7 +45,7 @@ spec:
             runAsNonRoot: true
             runAsUser: 1000
           args:
-            - "--config.file=/config/blackbox.yaml"
+            - "--config.file=/data/blackbox.yaml"
           resources:
             {}
           ports:
