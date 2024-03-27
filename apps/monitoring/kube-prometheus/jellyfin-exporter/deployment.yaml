@@ -27,7 +27,7 @@ spec:
           #   runAsUser: 1000
           env:
           - name: JELLYFIN_BASEURL
-            value: "http://jellyfin-web.arr-stack.svc.cluster.local:8096"
+            value: "https://jellyfin-web.arr-stack.svc.cluster.local:8096"
           - name: JELLYFIN_APIKEY
             valueFrom:
               secretKeyRef:
@@ -36,6 +36,5 @@ spec:
           resources:
             {}
           ports:
-            - name: http
-              containerPort: 9027
-              protocol: TCP
+            - containerPort: 9027
+              name: http
