@@ -70,7 +70,7 @@ spec:
             runAsUser: 65534
           command: [ "sleep" ]
           args:
-            - "infinitiy"
+            - "infinity"
             # - --volume-dir=/data
             # - --webhook-url=http://localhost:9115/-/reload
           resources:
