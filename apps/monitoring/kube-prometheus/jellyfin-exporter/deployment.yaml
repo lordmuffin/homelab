@@ -14,6 +14,8 @@ spec:
   template:
     metadata:
       labels:
+        app.kubernetes.io/component: exporter
+        app.kubernetes.io/name: jellyfin-exporter
         k8s-app: jellyfin-exporter
       annotations:
         prometheus.io/scrape: "true"
