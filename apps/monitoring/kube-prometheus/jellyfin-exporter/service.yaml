@@ -16,4 +16,3 @@ spec:
   - name: http
     protocol: TCP
     port: 9027
-    targetPort: 9027
