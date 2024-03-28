@@ -13,6 +13,12 @@ spec:
     server: https://kubernetes.default.svc
   - namespace: kube-system
     server: https://kubernetes.default.svc
+  - namespace: changedetection
+    server: https://kubernetes.default.svc
+  - namespace: wger
+    server: https://kubernetes.default.svc
+  - namespace: homepage
+    server: https://kubernetes.default.svc
   - namespace: databases
     server: https://kubernetes.default.svc
   - namespace: vault
@@ -41,7 +47,15 @@ spec:
     server: https://kubernetes.default.svc
   - namespace: gitea
     server: https://kubernetes.default.svc
+  - namespace: gitea-utils
+    server: https://kubernetes.default.svc
+  - namespace: n8n
+    server: https://kubernetes.default.svc
   - namespace: crossplane
+    server: https://kubernetes.default.svc
+  - namespace: actual
+    server: https://kubernetes.default.svc
+  - namespace: ofx-exporter
     server: https://kubernetes.default.svc
   clusterResourceWhitelist:
   - group: '*'
