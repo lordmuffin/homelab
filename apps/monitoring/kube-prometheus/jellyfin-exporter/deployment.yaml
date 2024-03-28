@@ -42,4 +42,4 @@ spec:
             {}
           ports:
             - containerPort: 9027
-              name: jellyfin-exporter
+              name: http
