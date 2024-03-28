@@ -3,7 +3,6 @@ kind: Kustomization
 resources:
 - svc.yaml
 - ingress.yaml
-- certificate.yaml
 - cm.yaml
 - db.yaml
 - redis.yaml

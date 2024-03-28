@@ -1,28 +1,67 @@
-apiVersion: networking.k8s.io/v1
-kind: Ingress
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
 metadata:
   name: gitea
-  labels:
-    app: gitea
   annotations:
     external-dns.alpha.kubernetes.io/hostname: git.labs.andrewpjackson.com
     external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
     external-dns.alpha.kubernetes.io/ttl: "120"
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: letsencrypt-production
+    acme.cert-manager.io/http01-edit-in-place: "true"
+    kubernetes.io/ingress.class: traefik-external
+  labels:
+    app: gitea
 spec:
-  ingressClassName: nginx
-  rules:
-  - host: git.labs.andrewpjackson.com
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: gitea-tailscale
-            port:
-              name: http
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`git.labs.andrewpjackson.com`)
+      kind: Rule
+      middlewares:
+        - name: traefik-forward-auth
+          namespace: traefik
+      services:
+        - name: gitea-internal
+          port: 80
   tls:
-  - hosts:
-    - git.labs.andrewpjackson.com
-    secretName: git-tls
+    secretName: labs-andrewpjackson-com-tls
+# data:
+#   resource.customizations: |
+#     extensions/Ingress:
+#         health.lua: |
+#           hs = {}
+#           hs.status = "Healthy"
+#           return hs
+
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: gitea-internal
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: git.labs.andrewpjackson.com
+    external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
+    external-dns.alpha.kubernetes.io/ttl: "120"
+    cert-manager.io/cluster-issuer: letsencrypt-production
+    acme.cert-manager.io/http01-edit-in-place: "true"
+    kubernetes.io/ingress.class: traefik-external
+  labels:
+    app: gitea
+spec:
+  entryPoints:
+    - web-int-tls
+  routes:
+    - match: Host(`git.labs.andrewpjackson.com`)
+      kind: Rule
+      services:
+        - name: gitea-internal
+          port: 80
+  tls:
+    secretName: labs-andrewpjackson-com-tls
+# data:
+#   resource.customizations: |
+#     extensions/Ingress:
+#         health.lua: |
+#           hs = {}
+#           hs.status = "Healthy"
+#           return hs
