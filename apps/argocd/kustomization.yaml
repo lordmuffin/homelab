@@ -33,6 +33,7 @@ resources:
   - base/secrets/certmanager.yaml
   - base/secrets/monitoring.yaml
   - base/secrets/traefik.yaml
+  - base/secrets/services.yaml
 
   # Arr Apps
   - base/arr/arr-stack.yaml
