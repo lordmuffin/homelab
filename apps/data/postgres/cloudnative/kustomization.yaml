@@ -9,7 +9,7 @@ helmCharts:
   releaseName: cnpg
   namespace: cnpg-system
   includeCRDs: true
-  version: cloudnative-pg-v0.20.2
+  version: v0.20.2
   repo: https://cloudnative-pg.github.io/charts
   valuesInline:
     replicaCount: 1
