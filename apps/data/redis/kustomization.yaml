@@ -35,3 +35,30 @@ helmCharts:
   releaseName: redis-operator
   version: 0.15.9
   repo: https://ot-container-kit.github.io/helm-charts
+
+
+patches:
+ - target:
+      group: apiextensions.k8s.io
+      version: v1
+      kind: CustomResourceDefinition
+      name: redis.redis.redis.opstreelabs.in
+   path: redis-patch.yaml
+ - target:
+      group: apiextensions.k8s.io
+      version: v1
+      kind: CustomResourceDefinition
+      name: redisclusters.redis.redis.opstreelabs.in
+   path: redis-patch.yaml
+ - target:
+      group: apiextensions.k8s.io
+      version: v1
+      kind: CustomResourceDefinition
+      name: redisreplications.redis.redis.opstreelabs.in
+   path: redis-patch.yaml
+ - target:
+      group: apiextensions.k8s.io
+      version: v1
+      kind: CustomResourceDefinition
+      name: redissentinels.redis.redis.opstreelabs.in
+   path: redis-patch.yaml
