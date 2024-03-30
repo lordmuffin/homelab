@@ -31,7 +31,7 @@ helmCharts:
     #   type: selfSigned
     #   name: redis-operator-issuer
     cert-manager:
-      enabled: true
+      enabled: false
   releaseName: redis-operator
   version: 0.15.9
   repo: https://ot-container-kit.github.io/helm-charts
