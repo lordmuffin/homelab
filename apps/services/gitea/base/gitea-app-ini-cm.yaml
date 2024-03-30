@@ -3,6 +3,8 @@ kind: ConfigMap
 metadata:
   name: gitea-app-ini
 data:
+  database: |
+    HOST=gitea-database-rw.gitea.svc.cluster.local:5432
   session: |
     PROVIDER=db
   cache: |
