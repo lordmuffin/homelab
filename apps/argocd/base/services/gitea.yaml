@@ -32,7 +32,7 @@ spec:
         gitea:
           additionalConfigFromEnvs:
             - name: GITEA__DATABASE__HOST
-              value: gitea-database-1.gitea.svc.cluster.local
+              value: gitea-database-rw.gitea.svc.cluster.local
             - name: GITEA__DATABASE__USER
               valueFrom:
                 secretKeyRef:
