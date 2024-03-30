@@ -5,6 +5,7 @@ metadata:
 data:
   database: |
     HOST=gitea-database-rw.gitea.svc.cluster.local:5432
+    NAME=gitea
   session: |
     PROVIDER=db
   cache: |
