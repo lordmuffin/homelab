@@ -1,4 +1,4 @@
 - op: add
   path: "/metadata/annotations"
   value:
-    cert-manager.io/inject-ca-from: redis-operator/svc-cluster-local
+    cert-manager.io/inject-ca-from: redis-operator/svc-cluster-local-tls
