@@ -5,4 +5,4 @@ resources:
 - ingress.yaml
 - gitea-app-ini-cm.yaml
 - db.yaml
-# - redis.yaml
+- redis.yaml
