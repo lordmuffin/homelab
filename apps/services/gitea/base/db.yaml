@@ -4,7 +4,7 @@ metadata:
   name: gitea-database
   namespace: gitea
 spec:
-  imageName: ghcr.io/cloudnative-pg/postgresql:0.20.2
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.2-10
   instances: 1
   startDelay: 35
   stopDelay: 35
