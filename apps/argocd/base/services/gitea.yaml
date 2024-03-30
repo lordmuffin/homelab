@@ -31,14 +31,14 @@ spec:
           type: "Recreate"
         gitea:
           additionalConfigFromEnvs:
-            - name: GITEA__CONFIG__DATABASE__HOST
+            - name: GITEA__DATABASE__HOST
               value: gitea-database-rw.gitea.svc.cluster.local
-            - name: GITEA__CONFIG__DATABASE__USER
+            - name: GITEA__DATABASE__USER
               valueFrom:
                 secretKeyRef:
                   name: gitea-db-postgres-creds-1password
                   key: username
-            - name: GITEA__CONFIG__DATABASE__PASSWD
+            - name: GITEA__DATABASE__PASSWD
               valueFrom:
                 secretKeyRef:
                   name: gitea-db-postgres-creds-1password
