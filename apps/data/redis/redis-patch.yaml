@@ -1,3 +1,3 @@
-- op: update #action 
+- op: add #action 
   path: /metadata/annotations/cert-manager.io/inject-ca-from #resouirce we want to change
   value: redis-operator/svc-cluster-local #value we want to use for patching 
