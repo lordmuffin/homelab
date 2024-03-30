@@ -26,3 +26,5 @@ spec:
             storage: 2Gi
   nodeSelector:
     kubernetes.io/arch: amd64
+  securityContext:
+    runAsUser: 1000
