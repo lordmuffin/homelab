@@ -17,4 +17,5 @@ spec:
   commonName: "*.svc.cluster.local"
   dnsNames:
   - "*.svc.cluster.local"
+  - "webhook-service.redis-operator.svc"
   - "*.svc"
