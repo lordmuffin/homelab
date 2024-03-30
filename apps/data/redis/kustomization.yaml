@@ -7,7 +7,7 @@ helmCharts:
     redisOperator:
       name: redis-operator
       imageName: quay.io/opstree/redis-operator
-      imageTag: v0.15.9
+      # imageTag: v0.15.1
       imagePullPolicy: IfNotPresent
     resources:
       limits:
@@ -31,5 +31,5 @@ helmCharts:
     cert-manager:
       enabled: true
   releaseName: redis-operator
-  version: 0.15.9
+  version: 0.15.1
   repo: https://ot-container-kit.github.io/helm-charts
