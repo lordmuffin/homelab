@@ -25,7 +25,7 @@ helmCharts:
       name: webhook-service
       namespace: redis-operator
     certificate:
-      name: redis-self-cert
+      name: svc-cluster-local
       secretName: svc-cluster-local-tls
     issuer:
       type: selfSigned
