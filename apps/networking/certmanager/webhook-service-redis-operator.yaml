@@ -2,19 +2,18 @@
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: labs-andrewpjackson-com
+  name: webhook-service-redis-operator
   namespace: cert-manager
 spec:
-  secretName: labs-andrewpjackson-com-tls
+  secretName: webhook-service-redis-operator-tls
   secretTemplate:
     annotations:
       reflector.v1.k8s.emberstack.com/reflection-allowed: "true"
       reflector.v1.k8s.emberstack.com/reflection-auto-enabled: "true"
-      reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces: "argocd, arr-stack, jellyfin, jellyseerr, prowlarr, qflood, radarr, monitoring, traefik"
+      reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces: "redis-operator"
   issuerRef:
     name: letsencrypt-production
     kind: ClusterIssuer
-  commonName: "*.labs.andrewpjackson.com"
+  commonName: "webhook-service.redis-operator.svc"
   dnsNames:
-  - "labs.andrewpjackson.com"
-  - "*.labs.andrewpjackson.com"
+  - "webhook-service.redis-operator.svc"

@@ -4,4 +4,4 @@ resources:
 - clusterIssuer.yaml
 # - postgres.yaml
 - labs-andrewpjackson-com.yaml
-# - secret.yaml
+- webhook-service-redis-operator.yaml
