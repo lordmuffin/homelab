@@ -10,6 +10,7 @@ helmCharts:
       imageName: quay.io/opstree/redis-operator
       imageTag: v0.15.1
       imagePullPolicy: IfNotPresent
+      webhook: true
     resources:
       limits:
         cpu: 300m
