@@ -24,9 +24,9 @@ helmCharts:
     service:
       name: webhook-service
       namespace: redis-operator
-    # certificate:
-    #   name: redis-self-cert
-    #   secretName: redis-webhook-cert
+    certificate:
+      name: redis-self-cert
+      # secretName: redis-webhook-cert
     # issuer:
     #   type: selfSigned
     #   name: redis-operator-issuer
