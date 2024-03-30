@@ -82,3 +82,12 @@ spec:
             key: secret-access-key
           # you can also assume a role with these credentials
           role: arn:aws:iam::375094129818:role/route53-cert-manager-andrewpjackson.com-role
+
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned-issuer
+  namespace: cert-manager
+spec:
+  selfSigned: {}
