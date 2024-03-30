@@ -10,7 +10,7 @@ helmCharts:
       imageName: quay.io/opstree/redis-operator
       # imageTag: v0.15.1
       imagePullPolicy: IfNotPresent
-      webhook: false
+      webhook: true
     resources:
       limits:
         cpu: 300m
@@ -31,7 +31,7 @@ helmCharts:
     #   type: selfSigned
     #   name: redis-operator-issuer
     cert-manager:
-      enabled: false
+      enabled: true
   releaseName: redis-operator
   version: 0.15.9
   repo: https://ot-container-kit.github.io/helm-charts
