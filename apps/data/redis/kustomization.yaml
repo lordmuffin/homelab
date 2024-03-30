@@ -26,7 +26,7 @@ helmCharts:
       namespace: redis-operator
     certificate:
       name: redis-self-cert
-      secretName: redis-webhook-cert
+      secretName: labs-andrewpjackson-com-tls
     issuer:
       type: selfSigned
       name: redis-operator-issuer
