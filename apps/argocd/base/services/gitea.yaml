@@ -51,9 +51,7 @@ spec:
             server:
               SSH_PORT: 22
           admin:
-            email: <path:kv/data/gitea#email>
-            password: <path:kv/data/gitea#password>
-            username: <path:kv/data/gitea#username>
+            existingSecret: gitea-admin-creds-1password
           livenessProbe:
             enabled: true
             failureThreshold: 10

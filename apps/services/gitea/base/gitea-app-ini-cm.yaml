@@ -5,10 +5,7 @@ metadata:
 data:
   database: |
     DB_TYPE=postgres
-    HOST=gitea-database-rw.gitea.svc.cluster.local:5432
     NAME=gitea
-    USER=gitea
-    PASSWD=gitea
   session: |
     PROVIDER=db
   cache: |
