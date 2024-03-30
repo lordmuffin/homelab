@@ -36,12 +36,12 @@ spec:
             - name: GITEA__DATABASE__USER
               valueFrom:
                 secretKeyRef:
-                  name: gitea-db-postgres-creds-1Password
+                  name: gitea-db-postgres-creds-1password
                   key: username
             - name: GITEA__DATABASE__PASSWD
               valueFrom:
                 secretKeyRef:
-                  name: gitea-db-postgres-creds-1Password
+                  name: gitea-db-postgres-creds-1password
                   key: password
           additionalConfigSources:
             - configMap:
