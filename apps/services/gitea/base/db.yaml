@@ -26,6 +26,8 @@ spec:
     initdb:
       database: gitea
       owner: gitea
+      secret:
+        name: gitea-db-postgres-creds-1password
   storage:
     storageClass: freenas-iscsi-csi
     size: 20Gi
