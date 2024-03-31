@@ -5,9 +5,9 @@ metadata:
 spec:
   project: core
   source:
-    repoURL: https://github.com/NVIDIA/gpu-operator.git
+    repoURL: https://helm.ngc.nvidia.com/nvidia
+    chart: nvidia/gpu-operator
     targetRevision: v23.9.2
-    path: deployments/gpu-operator
     helm:
       releaseName: gpu-operator
   destination:
