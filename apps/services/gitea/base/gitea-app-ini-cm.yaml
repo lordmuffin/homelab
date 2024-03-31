@@ -3,6 +3,8 @@ kind: ConfigMap
 metadata:
   name: gitea-app-ini
 data:
+  actions: |
+    ENABLED=true
   database: |
     DB_TYPE=postgres
     NAME=gitea
