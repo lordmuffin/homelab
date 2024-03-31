@@ -27,4 +27,5 @@ spec:
   nodeSelector:
     kubernetes.io/arch: amd64
   securityContext:
-    runAsUser: 1001
+    runAsUser: 1000
+    fsGroup: 1000
