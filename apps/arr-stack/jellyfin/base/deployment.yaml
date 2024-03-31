@@ -15,6 +15,7 @@ spec:
       labels:
         app: jellyfin
     spec:
+      runtimeClassName: nvidia
       containers:
         - name: jellyfin
           image: lscr.io/linuxserver/jellyfin:latest
