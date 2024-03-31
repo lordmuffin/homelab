@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: nvidia-operator
+  name: nvidia-gpu-operator
 spec:
   project: core
   source:
@@ -11,7 +11,7 @@ spec:
     helm:
       releaseName: gpu-operator
   destination:
-    namespace: gpu-operator
+    namespace: nvidia-gpu-operator
     name: in-cluster
   syncPolicy:
     automated:
