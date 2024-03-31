@@ -35,10 +35,10 @@ spec:
           resources:
             requests:
               cpu: "2"
-              # nvidia.com/gpu: 1
+              nvidia.com/gpu: 1
             limits:
               cpu: "4"
-              # nvidia.com/gpu: 1
+              nvidia.com/gpu: 1
           livenessProbe:
             httpGet:
               path: /health
