@@ -6,7 +6,7 @@ spec:
   project: core
   source:
     repoURL: https://helm.ngc.nvidia.com/nvidia
-    chart: nvidia/gpu-operator
+    chart: gpu-operator
     targetRevision: v23.9.2
     helm:
       releaseName: gpu-operator
