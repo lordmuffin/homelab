@@ -5,7 +5,7 @@ metadata:
   namespace: gitea
 spec:
   kubernetesConfig:
-    image: quay.io/opstree/redis:v7.2.3
+    image: quay.io/opstree/redis:v6.2.14
     imagePullPolicy: IfNotPresent
     updateStrategy:
       type: OnDelete
