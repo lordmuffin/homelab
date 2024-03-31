@@ -4,6 +4,9 @@ metadata:
   name: gitea-redis
   namespace: gitea
 spec:
+  podSecurityContext:
+    runAsUser: 1000
+    fsGroup: 1000
   kubernetesConfig:
     image: quay.io/opstree/redis:v6.2.14
     imagePullPolicy: IfNotPresent
