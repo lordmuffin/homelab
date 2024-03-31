@@ -1,0 +1,34 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nvidia-operator
+spec:
+  project: core
+  source:
+    repoURL: https://github.com/NVIDIA/gpu-operator.git
+    targetRevision: v23.9.2
+    path: deployments/gpu-operator
+    helm:
+      releaseName: gpu-operator
+  destination:
+    namespace: gpu-operator
+    name: in-cluster
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: true
+    syncOptions:
+    - Validate=false
+    - CreateNamespace=true
+    - PrunePropagationPolicy=foreground
+    - PruneLast=false
+    - ApplyOutOfSyncOnly=false
+    - Prune=true
+    - ServerSideApply=true
+    retry:
+      limit: 10
+      backoff:
+        duration: 20s
+        factor: 2
+        maxDuration: 15m
