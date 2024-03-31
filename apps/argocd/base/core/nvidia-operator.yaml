@@ -10,6 +10,17 @@ spec:
     targetRevision: v23.9.2
     helm:
       releaseName: gpu-operator
+      values: |
+        toolkit:
+          env:
+          - name: CONTAINERD_CONFIG
+            value: /etc/containerd/config.toml
+          - name: CONTAINERD_SOCKET
+            value: /run/containerd/containerd.sock
+          - name: CONTAINERD_RUNTIME_CLASS
+            value: nvidia
+          - name: CONTAINERD_SET_AS_DEFAULT
+            value: true
   destination:
     namespace: nvidia-gpu-operator
     name: in-cluster
