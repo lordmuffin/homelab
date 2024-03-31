@@ -17,6 +17,8 @@ spec:
     server: https://kubernetes.default.svc
   - namespace: democratic-csi
     server: https://kubernetes.default.svc
+  - namespace: nvidia-operator
+    server: https://kubernetes.default.svc
   - namespace: 1password
     server: https://kubernetes.default.svc
   clusterResourceWhitelist:
