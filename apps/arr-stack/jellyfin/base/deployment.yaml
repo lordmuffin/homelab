@@ -36,9 +36,11 @@ spec:
           resources:
             requests:
               cpu: "2"
+              memory: 2Gi
               nvidia.com/gpu: 1
             limits:
               cpu: "4"
+              memory: 4Gi
               nvidia.com/gpu: 1
           livenessProbe:
             httpGet:
