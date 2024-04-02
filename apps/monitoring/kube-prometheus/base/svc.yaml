@@ -4,7 +4,7 @@ metadata:
   name: k3s-metrics-service
   labels:
     app.kubernetes.io/name: kubelet
-  namespace: kube-system
+  namespace: monitoring
 spec:
   clusterIP: None
   ports:
