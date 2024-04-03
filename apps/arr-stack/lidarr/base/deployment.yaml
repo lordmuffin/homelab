@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lidarr
+  namespace: lidarr
+  labels:
+    servarr.app: lidarr
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      servarr.app: lidarr
+  template:
+    metadata:
+      labels:
+        servarr.app: lidarr
+    spec:
+      # securityContext:
+      #   runAsUser: 911
+      #   runAsGroup: 911
+      #   fsGroup: 911
+      containers:
+        - name: lidarr
+          image: lscr.io/linuxserver/lidarr:latest
+          env:
+            - name: PUID
+              value: "911"
+            - name: PGID
+              value: "911"
+          ports:
+            - containerPort: 8686
+          envFrom:
+            - configMapRef:
+                name: lidarr-env
+          volumeMounts:
+            - name: data
+              mountPath: /config
+            - name: sabnzbd-downloads
+              mountPath: "/sabnzbd-downloads"
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: lidarr-data
+        - name: sabnzbd-downloads
+          persistentVolumeClaim:
+            claimName: sabnzbd-downloads

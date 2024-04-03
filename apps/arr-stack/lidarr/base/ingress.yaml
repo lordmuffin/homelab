@@ -1,0 +1,31 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: lidarr-internal
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: lidarr.labs.andrewpjackson.com
+    external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
+    external-dns.alpha.kubernetes.io/ttl: "120"
+    cert-manager.io/cluster-issuer: letsencrypt-production
+    acme.cert-manager.io/http01-edit-in-place: "true"
+    kubernetes.io/ingress.class: traefik-external
+  labels:
+    app: lidarr
+spec:
+  entryPoints:
+    - web-int-tls
+  routes:
+    - match: Host(`lidarr.labs.andrewpjackson.com`)
+      kind: Rule
+      services:
+        - name: lidarr
+          port: 8686
+  tls:
+    secretName: labs-andrewpjackson-com-tls
+# data:
+#   resource.customizations: |
+#     extensions/Ingress:
+#         health.lua: |
+#           hs = {}
+#           hs.status = "Healthy"
+#           return hs

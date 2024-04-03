@@ -5,5 +5,5 @@ resources:
 - ./node-exporter
 - ./jellyfin-exporter
 # - ./blackbox-exporter
-- components.yaml
-- core.yaml
+# - components.yaml
+# - core.yaml
