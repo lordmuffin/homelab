@@ -35,12 +35,17 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /config
+            - name: music
+              mountPath: /music
             - name: sabnzbd-downloads
               mountPath: "/sabnzbd-downloads"
       volumes:
         - name: data
           persistentVolumeClaim:
             claimName: lidarr-data
+        - name: music
+          persistentVolumeClaim:
+            claimName: jellyfin-music-pvc
         - name: sabnzbd-downloads
           persistentVolumeClaim:
             claimName: sabnzbd-downloads
