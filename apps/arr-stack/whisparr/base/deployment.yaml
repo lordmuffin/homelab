@@ -35,6 +35,8 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /config
+            - name: xxx
+              mountPath: "/xxx"
             - name: sabnzbd-downloads
               mountPath: "/sabnzbd-downloads"
       volumes:
@@ -44,3 +46,6 @@ spec:
         - name: sabnzbd-downloads
           persistentVolumeClaim:
             claimName: sabnzbd-downloads
+        - name: xxx
+          persistentVolumeClaim:
+            claimName: jellyfin-xxx-pvc

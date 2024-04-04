@@ -35,6 +35,8 @@ spec:
               mountPath: /data/tv
             - name: music
               mountPath: /data/music
+            - name: xxx
+              mountPath: /data/xxx
           resources:
             requests:
               cpu: "2"
@@ -69,3 +71,6 @@ spec:
         - name: music
           persistentVolumeClaim:
             claimName: jellyfin-music-pvc
+        - name: xxx
+          persistentVolumeClaim:
+            claimName: jellyfin-xxx-pvc

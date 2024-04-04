@@ -52,3 +52,17 @@ spec:
     requests:
       storage: 1000Gi
   storageClassName: freenas-nfs-csi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jellyfin-xxx-pvc
+  namespace: jellyfin
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1000Gi
+  storageClassName: freenas-nfs-csi
