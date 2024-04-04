@@ -1,0 +1,21 @@
+# kubectl create -f ./apps/templates/station.yaml
+# kubectl cp arr-stack/station:/data/sabnzbd.ini.bak /tmp/sabnzbd.ini.bak
+
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: station
+  namespace: arr-stack
+spec:
+  containers:
+  - name: alpine
+    image: alpine:latest
+    command: ['sleep', 'infinity']
+    volumeMounts:
+    - name: data
+      mountPath: /data
+  volumes:
+  - name: data
+    persistentVolumeClaim:
+      claimName: sabnzbd-config
