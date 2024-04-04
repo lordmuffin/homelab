@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: whisparr
+  namespace: whisparr
+  annotations:
+      prometheus.io/scrape: 'true'
+      prometheus.io/port:   '9090'
+spec:
+  selector:
+    servarr.app: whisparr
+  ports:
+    - port: 6969
+      targetPort: 6969
+  type: ClusterIP
