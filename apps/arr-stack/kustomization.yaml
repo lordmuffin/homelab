@@ -12,5 +12,6 @@ bases:
 - ./unpackerr/base
 - ./exportarr/base
 - ./lidarr/base
+- ./whisparr/base
 
 namespace: arr-stack
