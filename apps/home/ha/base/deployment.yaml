@@ -45,8 +45,8 @@ spec:
               valueFrom: { secretKeyRef: { name: ha-db-postgres-creds-1password, key: password } }
             - name: DB_STRING
               value: "postgresql://${DB_USERNAME}:${DB_PASSWORD}@home-database-rw.homeassistant.svc.cluster.local:5432/home?client_encoding=utf8&sslmode=require"
-            - name: GIT_SYNC_SSH_KEY_FILE
-              valueFrom: { secretKeyRef: { name: ha-ssh-key-1password, key: private-key } }
+            # - name: GIT_SYNC_SSH_KEY_FILE
+            #   valueFrom: { secretKeyRef: { name: ha-ssh-key-1password, key: private-key } }
           volumeMounts:
           - name: temp-config
             mountPath: /tmp/git
