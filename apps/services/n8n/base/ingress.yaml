@@ -1,26 +1,31 @@
-apiVersion: networking.k8s.io/v1
-kind: Ingress
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
 metadata:
-  name: n8n
+  name: n8n-internal
   annotations:
-    external-dns.alpha.kubernetes.io/hostname: n8n.gruber.dev.br
-    external-dns.alpha.kubernetes.io/target: 192.168.1.153
+    external-dns.alpha.kubernetes.io/hostname: n8n.labs.andrewpjackson.com
+    external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
+    external-dns.alpha.kubernetes.io/ttl: "120"
     cert-manager.io/cluster-issuer: letsencrypt-production
-    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    acme.cert-manager.io/http01-edit-in-place: "true"
+    kubernetes.io/ingress.class: traefik-external
+  labels:
+    app: n8n
 spec:
-  ingressClassName: nginx
-  rules:
-    - host: n8n.gruber.dev.br
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: n8n-internal
-                port:
-                  name: web
+  entryPoints:
+    - web-int-tls
+  routes:
+    - match: Host(`n8n.labs.andrewpjackson.com`)
+      kind: Rule
+      services:
+        - name: web
+          port: 80
   tls:
-    - hosts:
-        - n8n.gruber.dev.br
-      secretName: nitter-tls
+    secretName: labs-andrewpjackson-com-tls
+# data:
+#   resource.customizations: |
+#     extensions/Ingress:
+#         health.lua: |
+#           hs = {}
+#           hs.status = "Healthy"
+#           return hs

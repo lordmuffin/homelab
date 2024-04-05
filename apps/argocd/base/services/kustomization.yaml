@@ -5,7 +5,7 @@ resources:
 # - actual.yaml
 - gitea.yaml
 # - mlops.yaml
-# - n8n.yaml
+- n8n.yaml
 # - ofx-exporter.yaml
 # - wger.yaml
 # - onchange.yaml

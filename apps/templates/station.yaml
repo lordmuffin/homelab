@@ -1,6 +1,6 @@
 # kubectl create -f ./apps/templates/station.yaml
 # kubectl cp arr-stack/station:/data/sabnzbd.ini.bak /tmp/sabnzbd.ini.bak
-
+# kubectl cp "/Users/andrewjackson/Music/Teddy Aspra" arr-stack/station:"/data/Teddy Aspra"
 
 apiVersion: v1
 kind: Pod
@@ -18,4 +18,4 @@ spec:
   volumes:
   - name: data
     persistentVolumeClaim:
-      claimName: sabnzbd-config
+      claimName: jellyfin-music-pvc

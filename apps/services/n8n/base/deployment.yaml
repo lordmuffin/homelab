@@ -5,7 +5,7 @@ metadata:
   labels:
     app: n8n-server
   annotations:
-    link.argocd.argoproj.io/external-link: https://n8n.gruber.dev.br
+    link.argocd.argoproj.io/external-link: https://n8n.labs.andrewpjackson.com
 spec:
   replicas: 1
   strategy:
@@ -23,9 +23,15 @@ spec:
         image: n8nio/n8n:0.230.3
         env:
         - name: DB_POSTGRESDB_USER
-          valueFrom: {secretKeyRef: {name: n8n-database-app, key: username}}
+          valueFrom: {secretKeyRef: {name: n8n-db-postgres-creds-1password, key: username}}
         - name: DB_POSTGRESDB_PASSWORD
-          valueFrom: {secretKeyRef: {name: n8n-database-app, key: password}}
+          valueFrom: {secretKeyRef: {name: n8n-db-postgres-creds-1password, key: password}}
+        - name: N8N_BASIC_AUTH_USER
+          valueFrom: {secretKeyRef: {name: n8n-creds-1password, key: username}}
+        - name: N8N_BASIC_AUTH_PASSWORD
+          valueFrom: {secretKeyRef: {name: n8n-creds-1password, key: password}}
+        - name: N8N_ENCRYPTION_KEY
+          valueFrom: {secretKeyRef: {name: n8n-encryption-key-1password, key: password}}
         envFrom:
         - configMapRef:
             name: n8n-cm

@@ -6,4 +6,3 @@ resources:
 - cm.yaml
 - db.yaml
 - ingress.yaml
-- secret.yaml

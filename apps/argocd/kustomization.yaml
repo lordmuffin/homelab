@@ -35,6 +35,7 @@ resources:
   - base/secrets/monitoring.yaml
   - base/secrets/traefik.yaml
   - base/secrets/gitea.yaml
+  - base/secrets/services.yaml
 
   # Arr Apps
   - base/arr/arr-stack.yaml
