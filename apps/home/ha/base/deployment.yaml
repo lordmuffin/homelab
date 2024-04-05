@@ -50,8 +50,9 @@ spec:
           volumeMounts:
           - name: temp-config
             mountPath: /tmp/git
-          # - name: ssh-key
-          #   mountPath: /etc/git-secret/ssh
+          - name: ssh-key
+            mountPath: /etc/git-secret/ssh
+            readOnly: true
           # - name: known-hosts
           #   mountPath: /etc/git-secret/known_hosts
           envFrom:
@@ -129,6 +130,12 @@ spec:
       dnsPolicy: ClusterFirstWithHostNet
       hostNetwork: true
       volumes:
+        - name: ssh-key
+          secret:
+            secretName: ha-ssh-key-1password
+            items:
+            - key: private-key
+              path: ssh
         # - name: ssh-key
         #   secret:
         #     secretName: ssh-key
