@@ -34,7 +34,7 @@ spec:
             - mountPath: /config
               name: config-volume
         - name: git-sync
-          image: k8s.gcr.io/git-sync/git-sync:v4.2.1
+          image: k8s.gcr.io/git-sync/git-sync:v3.6.1
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsUser: 65533
@@ -45,7 +45,7 @@ spec:
               valueFrom: { secretKeyRef: { name: ha-db-postgres-creds-1password, key: password } }
             - name: DB_STRING
               value: "postgresql://${DB_USERNAME}:${DB_PASSWORD}@home-database-rw.homeassistant.svc.cluster.local:5432/home?client_encoding=utf8&sslmode=require"
-            - name: GITSYNC_SSH_KEY_FILE
+            - name: GIT_SYNC_SSH_KEY_FILE
               valueFrom: { secretKeyRef: { name: ha-ssh-key-1password, key: private-key } }
           volumeMounts:
           - name: temp-config
