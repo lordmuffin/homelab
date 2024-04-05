@@ -29,6 +29,9 @@ spec:
               value: "RunnerTest"
             - name: GITEA_RUNNER_LABELS
               value: "TestRunner"
+          securityContext:
+            privileged: true
+            runAsUser: 0
           # ports:
           #   - name: web
           #     containerPort: 8096
