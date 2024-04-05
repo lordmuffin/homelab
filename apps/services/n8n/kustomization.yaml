@@ -9,10 +9,9 @@ patches:
     - op: replace
       path: "/metadata"
       value:
-        name: name
-        value: n8n-postgres-exporter
+        name: n8n-postgres-exporter
   target:
-    kind: Deployment
+    kind: Service
     name: postgres-exporter
 - patch: |-
     - op: replace
