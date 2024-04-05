@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitea
+  namespace: gitea
+  labels:
+    app: gitea
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gitea
+  template:
+    metadata:
+      labels:
+        app: gitea
+    spec:
+      containers:
+        - name: gitea
+          image: gitea/act_runner:latest
+          command: ["./act_runner register --no-interactive --instance $instance_url --token $registration_token --name $runner_name --labels $runner_labels"]
+          env:
+            - name: instance_url
+              value: "https://git.labs.andrewpjackson.com"
+            - name: registration_token
+              valueFrom: { secretKeyRef: { name: gitea-runner-token-1password, key: password } }
+            - name: runner_name
+              value: "Runner 1 Test"
+            - name: runner_labels
+              value: "TestRunner"
+          # ports:
+          #   - name: web
+          #     containerPort: 8096
+          #   - name: local-discovery
+          #     containerPort: 7359
+          #   - name: dlna
+          #     containerPort: 1900
+          volumeMounts:
+            - mountPath: /
+              name: giteagittea-runner-cm
+              readOnly: false
+      volumes:
+        - name: giteagittea-runner-cm
+          configMap:
+              defaultMode: 420
+              name: giteagittea-runner-cm
