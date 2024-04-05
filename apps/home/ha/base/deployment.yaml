@@ -45,19 +45,18 @@ spec:
               valueFrom: { secretKeyRef: { name: ha-db-postgres-creds-1password, key: password } }
             - name: DB_STRING
               value: "postgresql://${DB_USERNAME}:${DB_PASSWORD}@home-database-rw.homeassistant.svc.cluster.local:5432/home?client_encoding=utf8&sslmode=require"
+            - name: GIT_SYNC_SSH_KEY_FILE
+              valueFrom: { secretKeyRef: { name: ha-ssh-key-1password, key: "private key" } }
           volumeMounts:
           - name: temp-config
             mountPath: /tmp/git
-          - name: ssh-key
-            mountPath: /etc/git-secret/ssh
-          - name: known-hosts
-            mountPath: /etc/git-secret/known_hosts
+          # - name: ssh-key
+          #   mountPath: /etc/git-secret/ssh
+          # - name: known-hosts
+          #   mountPath: /etc/git-secret/known_hosts
           envFrom:
             - configMapRef:
                 name: git-ha-cm
-            - secretRef:
-                name: git-vars
-                optional: true
       containers:
         - env:
           - name: TZ
@@ -110,9 +109,9 @@ spec:
           securityContext:
             privileged: true
           volumeMounts:
-            - name: ha-secrets
-              mountPath: /config/secrets.yaml
-              subPath: secrets.yaml
+            # - name: ha-secrets
+            #   mountPath: /config/secrets.yaml
+            #   subPath: secrets.yaml
             - name: config-volume
               mountPath: /config
             - name: temp-config
@@ -130,17 +129,17 @@ spec:
       dnsPolicy: ClusterFirstWithHostNet
       hostNetwork: true
       volumes:
-        - name: ssh-key
-          secret:
-            secretName: ssh-key
-            defaultMode: 256
-        - name: known-hosts
-          secret:
-            secretName: known-hosts
-            defaultMode: 256
-        - name: ha-secrets
-          secret:
-            secretName: ha-secrets
+        # - name: ssh-key
+        #   secret:
+        #     secretName: ssh-key
+        #     defaultMode: 256
+        # - name: known-hosts
+        #   secret:
+        #     secretName: known-hosts
+        #     defaultMode: 256
+        # - name: ha-secrets
+        #   secret:
+        #     secretName: ha-secrets
         - name: config-volume
           persistentVolumeClaim:
             claimName: ha-storage
