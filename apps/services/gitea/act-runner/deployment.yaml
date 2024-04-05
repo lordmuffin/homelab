@@ -37,10 +37,10 @@ spec:
           #     containerPort: 1900
           volumeMounts:
             - mountPath: /
-              name: giteagittea-runner-cm
+              name: gittea-runner-cm
               readOnly: false
       volumes:
-        - name: giteagittea-runner-cm
+        - name: gittea-runner-cm
           configMap:
               defaultMode: 420
-              name: giteagittea-runner-cm
+              name: gittea-runner-cm
