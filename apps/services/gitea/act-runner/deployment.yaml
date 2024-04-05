@@ -18,15 +18,16 @@ spec:
       containers:
         - name: gitea-runner
           image: gitea/act_runner:latest
-          args: ["./act_runner", "register", "--config /config.yaml", "--no-interactive", "--instance $instance_url", "--token $registration_token", "--name $runner_name", "--labels $runner_labels"]
           env:
-            - name: instance_url
+            - name: CONFIG_FILE
+              value: "/config.yaml"
+            - name: GITEA_INSTANCE_URL
               value: "https://git.labs.andrewpjackson.com"
-            - name: registration_token
+            - name: GITEA_RUNNER_REGISTRATION_TOKEN
               valueFrom: { secretKeyRef: { name: gitea-runner-token-1password, key: password } }
-            - name: runner_name
+            - name: GITEA_RUNNER_NAME
               value: "RunnerTest"
-            - name: runner_labels
+            - name: GITEA_RUNNER_LABELS
               value: "TestRunner"
           # ports:
           #   - name: web
