@@ -27,7 +27,7 @@ spec:
       database: n8n
       owner: n8n
   storage:
-    storageClass: iscsi
+    storageClass: freenas-iscsi-csi
     size: 40Gi
   monitoring:
     enablePodMonitor: true
