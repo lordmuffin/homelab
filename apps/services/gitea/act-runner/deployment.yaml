@@ -42,5 +42,5 @@ spec:
       volumes:
         - name: gittea-runner-cm
           configMap:
-              defaultMode: 420
+              # defaultMode: 420
               name: gittea-runner-cm
