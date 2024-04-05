@@ -153,3 +153,6 @@ data:
       - job_name: "jellyfin-exporter"  # Renamed job_name for clarity
         static_configs:
           - targets: ["jellyfin-exporter:9027"]  # Use service name and port
+      - job_name: "n8n-exporter"  # Renamed job_name for clarity
+        static_configs:
+          - targets: ["n8n-postgres-exporter:80"]  # Use service name and port

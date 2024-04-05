@@ -7,6 +7,15 @@ namespace: services
 patches:
 - patch: |-
     - op: replace
+      path: "/metadata"
+      value:
+        name: name
+        value: n8n-postgres-exporter
+  target:
+    kind: Deployment
+    name: postgres-exporter
+- patch: |-
+    - op: replace
       path: "/spec/template/spec/containers/0/env/0"
       value:
         name: DATA_SOURCE_URI
