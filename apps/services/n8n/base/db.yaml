@@ -25,7 +25,9 @@ spec:
   bootstrap:
     initdb:
       database: n8n
-      owner: n8n
+      owner: n8n-pg
+      secret:
+        name: n8n-db-postgres-creds-1password
   storage:
     storageClass: freenas-iscsi-csi
     size: 40Gi
