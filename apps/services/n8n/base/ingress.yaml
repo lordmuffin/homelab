@@ -18,8 +18,8 @@ spec:
     - match: Host(`n8n.labs.andrewpjackson.com`)
       kind: Rule
       services:
-        - name: web
-          port: 80
+        - name: n8n-server
+          port: 5678
   tls:
     secretName: labs-andrewpjackson-com-tls
 # data:

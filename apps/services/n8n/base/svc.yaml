@@ -9,7 +9,6 @@ spec:
     app: n8n-server
   ports:
     - name: web
-      port: 80
       targetPort: 5678
       protocol: TCP
   type: ClusterIP
