@@ -13,23 +13,3 @@ spec:
   selector:
     app: home-assistant
   type: ClusterIP
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: homeassistant
-  labels:
-    app: home-assistant
-  annotations:
-    kube-vip.io/vipHost: homeassistant
-spec:
-  ports:
-  - name: ha
-    port: 80
-    protocol: TCP
-    targetPort: 8123
-  selector:
-    app: home-assistant
-  type: LoadBalancer
-  loadBalancerIP: "192.168.1.137"
-  loadBalancerClass: kube-vip.io/kube-vip-class

@@ -5,7 +5,7 @@ metadata:
   labels:
     app: home-assistant
   annotations:
-    link.argocd.argoproj.io/external-link: https://home.gruber.dev.br
+    link.argocd.argoproj.io/external-link: https://home.labs.andrewpjackson.com
 spec:
   replicas: 1
   strategy:
@@ -40,9 +40,9 @@ spec:
             runAsUser: 65533
           env:
             - name: DB_USERNAME
-              valueFrom: { secretKeyRef: { name: home-database-app, key: username } }
+              valueFrom: { secretKeyRef: { name: ha-db-postgres-creds-1password, key: username } }
             - name: DB_PASSWORD
-              valueFrom: { secretKeyRef: { name: home-database-app, key: password } }
+              valueFrom: { secretKeyRef: { name: ha-db-postgres-creds-1password, key: password } }
             - name: DB_STRING
               value: "postgresql://${DB_USERNAME}:${DB_PASSWORD}@home-database-rw.homeassistant.svc.cluster.local:5432/home?client_encoding=utf8&sslmode=require"
           volumeMounts:
@@ -61,10 +61,10 @@ spec:
       containers:
         - env:
           - name: TZ
-            value: America/Sao_Paulo
+            value: America/Chicago
           - name: PYTHONWARNINGS
             value: ignore:Unverified HTTPS request
-          image: homeassistant/home-assistant:2022.9
+          image: homeassistant/home-assistant:2024.4
           imagePullPolicy: IfNotPresent
           name: home-assistant
           lifecycle:
@@ -117,14 +117,14 @@ spec:
               mountPath: /config
             - name: temp-config
               mountPath: /src
-            - name: dev-usb-00
-              mountPath: /dev/ttyUSB0
-            - name: dev-usb-01
-              mountPath: /dev/ttyUSB1
-            - name: zigbee-00
-              mountPath: /dev/serial/by-id/usb-Silicon_Labs_HubZ_Smart_Home_Controller_C130205F-if00-port0
-            - name: zigbee-01
-              mountPath: /dev/serial/by-id/usb-Silicon_Labs_HubZ_Smart_Home_Controller_C130205F-if01-port0
+            # - name: dev-usb-00
+            #   mountPath: /dev/ttyUSB0
+            # - name: dev-usb-01
+            #   mountPath: /dev/ttyUSB1
+            # - name: zigbee-00
+            #   mountPath: /dev/serial/by-id/usb-Silicon_Labs_HubZ_Smart_Home_Controller_C130205F-if00-port0
+            # - name: zigbee-01
+            #   mountPath: /dev/serial/by-id/usb-Silicon_Labs_HubZ_Smart_Home_Controller_C130205F-if01-port0
             - name: dbus
               mountPath: /var/run/dbus
       dnsPolicy: ClusterFirstWithHostNet
@@ -143,21 +143,21 @@ spec:
             secretName: ha-secrets
         - name: config-volume
           persistentVolumeClaim:
-            claimName: ha-storage-new
-        - name: zigbee-00
-          hostPath:
-            path: /dev/serial/by-id/usb-Silicon_Labs_HubZ_Smart_Home_Controller_C130205F-if00-port0
-        - name: zigbee-01
-          hostPath:
-            path: /dev/serial/by-id/usb-Silicon_Labs_HubZ_Smart_Home_Controller_C130205F-if01-port0
+            claimName: ha-storage
+        # - name: zigbee-00
+        #   hostPath:
+        #     path: /dev/serial/by-id/usb-Silicon_Labs_HubZ_Smart_Home_Controller_C130205F-if00-port0
+        # - name: zigbee-01
+        #   hostPath:
+        #     path: /dev/serial/by-id/usb-Silicon_Labs_HubZ_Smart_Home_Controller_C130205F-if01-port0
         - name: dbus
           hostPath:
             path: /var/run/dbus
-        - name: dev-usb-00
-          hostPath:
-            path: /dev/ttyUSB0
-        - name: dev-usb-01
-          hostPath:
-            path: /dev/ttyUSB1
+        # - name: dev-usb-00
+        #   hostPath:
+        #     path: /dev/ttyUSB0
+        # - name: dev-usb-01
+        #   hostPath:
+        #     path: /dev/ttyUSB1
         - name: temp-config
           emptyDir: {}

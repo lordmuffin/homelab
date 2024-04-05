@@ -27,15 +27,16 @@ resources:
   - base/core/utilities.yaml
 
   # 1Password Secrets
-  - base/secrets/arr-stack.yaml
-  - base/secrets/tailscale.yaml
-  - base/secrets/headscale.yaml
-  - base/secrets/democratic-csi.yaml
-  - base/secrets/certmanager.yaml
-  - base/secrets/monitoring.yaml
-  - base/secrets/traefik.yaml
-  - base/secrets/gitea.yaml
-  - base/secrets/services.yaml
+  - base/secrets/secrets.yaml
+  # - base/secrets/arr-stack.yaml
+  # - base/secrets/tailscale.yaml
+  # - base/secrets/headscale.yaml
+  # - base/secrets/democratic-csi.yaml
+  # - base/secrets/certmanager.yaml
+  # - base/secrets/monitoring.yaml
+  # - base/secrets/traefik.yaml
+  # - base/secrets/gitea.yaml
+  # - base/secrets/services.yaml
 
   # Arr Apps
   - base/arr/arr-stack.yaml

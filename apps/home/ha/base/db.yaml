@@ -18,7 +18,7 @@ spec:
   postgresql:
     parameters:
       shared_buffers: 256MB
-      timezone: "America/Sao_Paulo"
+      timezone: "America/Chicago"
       pg_stat_statements.max: '10000'
       pg_stat_statements.track: all
       auto_explain.log_min_duration: '10s'
@@ -26,17 +26,10 @@ spec:
     initdb:
       database: home
       owner: home
+      secret:
+        name: ha-db-postgres-creds-1password
   storage:
-    storageClass: iscsi
+    storageClass: freenas-iscsi-csi
     size: 40Gi
   monitoring:
     enablePodMonitor: true
-  affinity:
-    nodeAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        nodeSelectorTerms:
-          - matchExpressions:
-              - key: kubernetes.io/hostname
-                operator: In
-                values:
-                  - node-one

@@ -1,26 +1,67 @@
-apiVersion: networking.k8s.io/v1
-kind: Ingress
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
 metadata:
   name: homeassistant
   annotations:
-    external-dns.alpha.kubernetes.io/hostname: home.gruber.dev.br
+    external-dns.alpha.kubernetes.io/hostname: home.labs.andrewpjackson.com
     external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
     external-dns.alpha.kubernetes.io/ttl: "120"
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: letsencrypt-production
+    acme.cert-manager.io/http01-edit-in-place: "true"
+    kubernetes.io/ingress.class: traefik-external
+  labels:
+    app: homeassistant
 spec:
-  ingressClassName: nginx
-  rules:
-  - host: home.gruber.dev.br
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: homeassistant
-            port:
-              name: ha
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`home.labs.andrewpjackson.com`)
+      kind: Rule
+      middlewares:
+        - name: traefik-forward-auth
+          namespace: traefik
+      services:
+        - name: homeassistant-internal
+          port: 8123
   tls:
-  - hosts:
-    - home.gruber.dev.br
-    secretName: ha-tls
+    secretName: labs-andrewpjackson-com-tls
+# data:
+#   resource.customizations: |
+#     extensions/Ingress:
+#         health.lua: |
+#           hs = {}
+#           hs.status = "Healthy"
+#           return hs
+
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: homeassistant-internal
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: home.labs.andrewpjackson.com
+    external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
+    external-dns.alpha.kubernetes.io/ttl: "120"
+    cert-manager.io/cluster-issuer: letsencrypt-production
+    acme.cert-manager.io/http01-edit-in-place: "true"
+    kubernetes.io/ingress.class: traefik-external
+  labels:
+    app: homeassistant
+spec:
+  entryPoints:
+    - web-int-tls
+  routes:
+    - match: Host(`home.labs.andrewpjackson.com`)
+      kind: Rule
+      services:
+        - name: homeassistant-internal
+          port: 8123
+  tls:
+    secretName: labs-andrewpjackson-com-tls
+# data:
+#   resource.customizations: |
+#     extensions/Ingress:
+#         health.lua: |
+#           hs = {}
+#           hs.status = "Healthy"
+#           return hs
