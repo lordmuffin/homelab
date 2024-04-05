@@ -53,8 +53,8 @@ spec:
           - name: ssh-key
             mountPath: /etc/git-secret/ssh
             readOnly: true
-          # - name: known-hosts
-          #   mountPath: /etc/git-secret/known_hosts
+          - name: known-hosts
+            mountPath: /etc/git-secret/known_hosts
           envFrom:
             - configMapRef:
                 name: git-ha-cm
@@ -136,14 +136,12 @@ spec:
             items:
             - key: private-key
               path: ssh
-        # - name: ssh-key
-        #   secret:
-        #     secretName: ssh-key
-        #     defaultMode: 256
-        # - name: known-hosts
-        #   secret:
-        #     secretName: known-hosts
-        #     defaultMode: 256
+        - name: known-hosts
+          secret:
+            secretName: ha-known-hosts-ssh-key-1password
+            items:
+            - key: known_hosts
+              path: ssh
         # - name: ha-secrets
         #   secret:
         #     secretName: ha-secrets
