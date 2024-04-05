@@ -26,10 +26,10 @@ spec:
           valueFrom: {secretKeyRef: {name: n8n-db-postgres-creds-1password, key: username}}
         - name: DB_POSTGRESDB_PASSWORD
           valueFrom: {secretKeyRef: {name: n8n-db-postgres-creds-1password, key: password}}
-        - name: N8N_BASIC_AUTH_USER
-          valueFrom: {secretKeyRef: {name: n8n-creds-1password, key: username}}
-        - name: N8N_BASIC_AUTH_PASSWORD
-          valueFrom: {secretKeyRef: {name: n8n-creds-1password, key: password}}
+        # - name: N8N_BASIC_AUTH_USER
+        #   valueFrom: {secretKeyRef: {name: n8n-creds-1password, key: username}}
+        # - name: N8N_BASIC_AUTH_PASSWORD
+        #   valueFrom: {secretKeyRef: {name: n8n-creds-1password, key: password}}
         - name: N8N_ENCRYPTION_KEY
           valueFrom: {secretKeyRef: {name: n8n-encryption-key-1password, key: password}}
         envFrom:
