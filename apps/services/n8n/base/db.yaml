@@ -25,7 +25,7 @@ spec:
   bootstrap:
     initdb:
       database: n8n
-      owner: n8n-pg
+      owner: n8n
       secret:
         name: n8n-db-postgres-creds-1password
   storage:
