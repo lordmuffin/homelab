@@ -1,22 +1,22 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: gitea
+  name: gitea-runner
   namespace: gitea
   labels:
-    app: gitea
+    app: gitea-runner
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: gitea
+      app: gitea-runner
   template:
     metadata:
       labels:
-        app: gitea
+        app: gitea-runner
     spec:
       containers:
-        - name: gitea
+        - name: gitea-runner
           image: gitea/act_runner:latest
           command: ["./act_runner register --no-interactive --instance $instance_url --token $registration_token --name $runner_name --labels $runner_labels"]
           env:
