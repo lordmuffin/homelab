@@ -7,6 +7,8 @@ spec:
   sourceRepos:
   - '*'
   destinations:
+  - namespace: 1password
+    server: https://kubernetes.default.svc
   - namespace: services
     server: https://kubernetes.default.svc
   - namespace: apps
