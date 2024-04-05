@@ -19,7 +19,7 @@ patches:
       path: "/spec/template/spec/containers/0/env/1"
       value:
         name: DATA_SOURCE_USER
-        valueFrom: { secretKeyRef: { name: 8n-db-postgres-creds-1password, key: username } }
+        valueFrom: { secretKeyRef: { name: n8n-db-postgres-creds-1password, key: username } }
   target:
     kind: Deployment
     name: postgres-exporter
@@ -28,7 +28,7 @@ patches:
       path: "/spec/template/spec/containers/0/env/2"
       value:
         name: DATA_SOURCE_PASS
-        valueFrom: { secretKeyRef: { name: 8n-db-postgres-creds-1password, key: password } }
+        valueFrom: { secretKeyRef: { name: n8n-db-postgres-creds-1password, key: password } }
   target:
     kind: Deployment
     name: postgres-exporter

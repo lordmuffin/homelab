@@ -35,8 +35,6 @@ spec:
         envFrom:
         - configMapRef:
             name: n8n-cm
-        - secretRef:
-            name: n8n-vars
         ports:
         - name: web
           containerPort: 5678
