@@ -18,7 +18,7 @@ spec:
       containers:
         - name: gitea-runner
           image: gitea/act_runner:latest
-          command: ["./act_runner register --config /config.yaml --no-interactive --instance $instance_url --token $registration_token --name $runner_name --labels $runner_labels"]
+          command: ["./act_runner register --config /config.yaml --no-interactive --instance $instance_url --token $registration_token --name "$runner_name" --labels "$runner_labels""]
           env:
             - name: instance_url
               value: "https://git.labs.andrewpjackson.com"
