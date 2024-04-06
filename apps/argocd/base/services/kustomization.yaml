@@ -12,6 +12,7 @@ resources:
 - gitea-utils.yaml
 # - homepage.yaml
 - woodpecker.yaml
+- woodpecker-utils.yaml
 
 namespace: argocd
 
