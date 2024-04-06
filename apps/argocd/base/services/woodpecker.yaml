@@ -215,6 +215,7 @@ spec:
             # - woodpecker-github-client
             # - woodpecker-github-secret
             - woodpecker-secret
+            - gitea-oauth2-1password
 
           # -- Create a generic secret to store things in, e.g. env values
           secrets:
