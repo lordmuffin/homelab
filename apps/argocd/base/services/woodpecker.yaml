@@ -44,16 +44,19 @@ spec:
             WOODPECKER_SERVER: 'woodpecker-server:9000'
             WOODPECKER_BACKEND: kubernetes
             WOODPECKER_BACKEND_K8S_NAMESPACE: woodpecker
-            WOODPECKER_BACKEND_K8S_STORAGE_CLASS: ''
+            WOODPECKER_BACKEND_K8S_STORAGE_CLASS: 'freenas-iscsi-csi'
             WOODPECKER_BACKEND_K8S_VOLUME_SIZE: 10G
             WOODPECKER_BACKEND_K8S_STORAGE_RWX: true
             WOODPECKER_BACKEND_K8S_POD_LABELS: ''
             WOODPECKER_BACKEND_K8S_POD_ANNOTATIONS: ''
             WOODPECKER_CONNECT_RETRY_COUNT: '1'
+            WOODPECKER_GITEA=true
+            WOODPECKER_GITEA_URL=http://gitea-internal.gitea.svc.cluster.local
 
           # -- Add extra secret that is contains environment variables
           extraSecretNamesForEnvFrom:
             - woodpecker-secret
+            - gitea-oauth2-1password
 
           persistence:
             # -- Enable the creation of the persistent volume
