@@ -1,0 +1,44 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: woodpecker-database
+  namespace: woodpecker
+spec:
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.2-10
+  instances: 1
+  startDelay: 35
+  stopDelay: 35
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 300m
+    limits:
+      memory: 768Mi
+      cpu: 700m
+  postgresql:
+    parameters:
+      shared_buffers: 256MB
+      timezone: "America/Chicago"
+      pg_stat_statements.max: '10000'
+      pg_stat_statements.track: all
+      auto_explain.log_min_duration: '10s'
+  bootstrap:
+    initdb:
+      database: woodpecker
+      owner: woodpecker
+      secret:
+        name: woodpecker-db-postgres-creds-1password
+  storage:
+    storageClass: freenas-iscsi-csi
+    size: 20Gi
+  monitoring:
+    enablePodMonitor: true
+  # affinity:
+    # nodeAffinity:
+    #   requiredDuringSchedulingIgnoredDuringExecution:
+    #     nodeSelectorTerms:
+    #       - matchExpressions:
+    #           - key: kubernetes.io/hostname
+    #             operator: In
+    #             values:
+    #               - node-one

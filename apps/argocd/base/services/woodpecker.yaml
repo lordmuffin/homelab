@@ -208,7 +208,6 @@ spec:
           env:
             WOODPECKER_ADMIN: 'woodpecker,admin'
             WOODPECKER_HOST: 'https://woodpecker.labs.andrewpjackson.com'
-            # WOODPECKER_GITHUB: "true"
             WOODPECKER_GITEA: true
             WOODPECKER_GITEA_URL: 'http://gitea-internal.gitea.svc.cluster.local'
 
