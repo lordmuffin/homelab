@@ -25,13 +25,8 @@ helmCharts:
       name: webhook-service
       namespace: redis-operator
     certificate:
-      name: svc-cluster-local
-      secretName: svc-cluster-local-tls
-    issuer:
-      type: selfSigned
-      name: selfsigned-issuer
-    cert-manager:
-      enabled: true
+      name: labs-andrewpjackson-com
+      secretName: labs-andrewpjackson-com-tls
   releaseName: redis-operator
   version: 0.15.9
   repo: https://ot-container-kit.github.io/helm-charts
