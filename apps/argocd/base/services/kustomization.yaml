@@ -9,7 +9,7 @@ resources:
 # - ofx-exporter.yaml
 # - wger.yaml
 # - onchange.yaml
-# - gitea-utils.yaml
+- gitea-utils.yaml
 # - homepage.yaml
 - woodpecker.yaml
 - woodpecker-utils.yaml
