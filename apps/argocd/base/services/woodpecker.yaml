@@ -57,6 +57,7 @@ spec:
           extraSecretNamesForEnvFrom:
             - woodpecker-secret
             - gitea-oauth2-1password
+            - woodpecker-agent-token-1password
 
           persistence:
             # -- Enable the creation of the persistent volume
