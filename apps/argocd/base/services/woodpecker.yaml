@@ -210,6 +210,7 @@ spec:
             WOODPECKER_HOST: 'https://woodpecker.labs.andrewpjackson.com'
             WOODPECKER_GITEA: true
             WOODPECKER_GITEA_URL: 'http://gitea-internal.gitea.svc.cluster.local'
+            WOODPECKER_DATABASE_DRIVER: postgres
 
           # -- Add extra environment variables from the secrets list
           extraSecretNamesForEnvFrom:
@@ -217,6 +218,7 @@ spec:
             # - woodpecker-github-secret
             - woodpecker-secret
             - gitea-oauth2-1password
+            - woodpecker-db-postgres-creds-1password
 
           # -- Create a generic secret to store things in, e.g. env values
           secrets:
