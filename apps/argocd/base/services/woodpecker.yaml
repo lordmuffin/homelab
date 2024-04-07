@@ -220,6 +220,7 @@ spec:
             - woodpecker-secret
             - gitea-oauth2-1password
             - woodpecker-db-postgres-creds-1password
+            - woodpecker-agent-token-1password
 
           # -- Create a generic secret to store things in, e.g. env values
           secrets:
