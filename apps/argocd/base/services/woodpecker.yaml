@@ -52,6 +52,8 @@ spec:
             WOODPECKER_CONNECT_RETRY_COUNT: '1'
             WOODPECKER_GITEAL: true
             WOODPECKER_GITEA_URL: 'https://git.labs.andrewpjackson.com'
+            WOODPECKER_LOG_LEVEL: debug
+
 
           # -- Add extra secret that is contains environment variables
           extraSecretNamesForEnvFrom:
