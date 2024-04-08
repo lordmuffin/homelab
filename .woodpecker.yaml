@@ -1,18 +1,18 @@
-steps:
-  - name: backend
-    image: golang
-    commands:
-      - go get
-      - go build
-      - go test
+# steps:
+#   - name: backend
+#     image: golang
+#     commands:
+#       - go get
+#       - go build
+#       - go test
 
-  - name: frontend
-    image: node:6
-    commands:
-      - npm install
-      - npm test
+#   - name: frontend
+#     image: node:6
+#     commands:
+#       - npm install
+#       - npm test
 
-  - name: notify
-    image: plugins/slack
-    channel: developers
-    username: woodpecker
+#   - name: notify
+#     image: plugins/slack
+#     channel: developers
+#     username: woodpecker

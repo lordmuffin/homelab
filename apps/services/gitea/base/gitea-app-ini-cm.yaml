@@ -36,6 +36,8 @@ data:
     RETRY_BACKOFF=15
     ALLOW_LOCALNETWORKS=true
     SKIP_TLS_VERIFY=true
+  packages: |
+    ENABLED=true
   webhook: |
     ALLOWED_HOST_LIST=*.labs.andrewpjackson.com,private
   ui: |
