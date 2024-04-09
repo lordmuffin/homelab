@@ -24,6 +24,8 @@ spec:
             persistentVolume:
               enabled: false
         loki:
+          image:
+            tag: 2.9.3
           limits_config:
             reject_old_samples: false
           persistence:
