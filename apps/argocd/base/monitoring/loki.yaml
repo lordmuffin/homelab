@@ -1,0 +1,51 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: loki
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: apps
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    chart: grafana/loki-stack
+    targetRevision: 2.10.2
+    helm:
+      releaseName: loki
+      values: |
+        grafana:
+          enabled: false
+        prometheus:
+          enabled: false
+          alertmanager:
+            persistentVolume:
+              enabled: false
+          server:
+            persistentVolume:
+              enabled: false
+        loki:
+          persistence:
+            enabled: true
+            storageClassName: freenas-nfs-csi
+            size: 25Gi
+  destination:
+    namespace: monitoring
+    name: in-cluster
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+    - Validate=false
+    - CreateNamespace=true
+    - PrunePropagationPolicy=foreground
+    - PruneLast=true
+    - ApplyOutOfSyncOnly=false
+    - Prune=true
+    retry:
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 60m

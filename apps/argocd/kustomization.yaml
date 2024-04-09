@@ -52,6 +52,8 @@ resources:
   - base/monitoring/unifi-poller.yaml
   - base/monitoring/kube-prometheus.yaml
   - base/monitoring/grafana.yaml
+  - base/monitoring/loki.yaml
+
   # - base/monitoring/nvidia.yaml
 
   # ArgoCD
