@@ -21,7 +21,7 @@ spec:
       #   fsGroup: 911
       containers:
         - name: whisparr
-          image: hotio/whisparr:nightly
+          image: ghcr.io/hotio/whisparr:nightly
           env:
             - name: PUID
               value: "911"
