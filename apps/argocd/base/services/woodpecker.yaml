@@ -213,7 +213,7 @@ spec:
             WOODPECKER_ADMIN: 'woodpecker,admin,gitea-admin'
             WOODPECKER_HOST: 'https://woodpecker.labs.andrewpjackson.com'
             WOODPECKER_GITEA: true
-            WOODPECKER_GITEA_URL: 'https://git.labs.andrewpjackson.com'
+            WOODPECKER_GITEA_URL: 'http://gitea-internal.gitea.svc.cluster.local'
             WOODPECKER_DATABASE_DRIVER: postgres
 
           # -- Add extra environment variables from the secrets list
