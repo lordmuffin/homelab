@@ -9,10 +9,10 @@ spec:
   source:
     repoURL: https://kedacore.github.io/charts
     chart: kedacore/keda
-    targetRevision: 2.13.1
+    targetRevision: 2.13.2
     helm:
       releaseName: keda
-      # values:
+      values:
   destination:
     namespace: keda
     name: in-cluster
