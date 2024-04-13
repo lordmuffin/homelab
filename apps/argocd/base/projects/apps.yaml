@@ -73,7 +73,7 @@ spec:
     server: https://kubernetes.default.svc
   - namespace: 1password
     server: https://kubernetes.default.svc
-  - namespace: keda
+  - namespace: azure-pipelines
     server: https://kubernetes.default.svc
   - namespace: headscale
     server: https://kubernetes.default.svc
