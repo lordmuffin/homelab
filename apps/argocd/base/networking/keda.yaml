@@ -8,7 +8,7 @@ spec:
   project: networking
   source:
     repoURL: https://kedacore.github.io/charts
-    chart: kedacore/keda
+    chart: keda
     targetRevision: 2.13.2
     helm:
       releaseName: keda
