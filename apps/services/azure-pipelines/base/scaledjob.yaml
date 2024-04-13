@@ -1,0 +1,34 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledJob
+metadata:
+  name: ado-scaledjob
+spec:
+  jobTargetRef:
+    template:
+      spec:
+        containers:
+        - name: ado-agent-job
+          image: git.labs.andrewpjackson.com/healingorganics/azure-pipelines-images/adoagentkeda # replace with your value
+          imagePullPolicy: Always
+          env:
+          - name: AZP_URL
+            value: https://dev.azure.com/healingorganics # replace with your value
+          - name: AZP_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: homelab-agent-pool-PAT-1Password
+                key: password
+          - name: AZP_POOL
+            value: homelab # replace with your value
+  pollingInterval: 10
+  successfulJobsHistoryLimit: 5
+  failedJobsHistoryLimit: 5
+  maxReplicaCount: 10   
+  scalingStrategy:
+    strategy: "default"               
+  triggers:
+  - type: azure-pipelines
+    metadata:
+      poolID:  "10" # <azure-devops-pool-id> (must be a string) (https://dev.azure.com/{Organization}/_apis/distributedtask/pools?api-version=7.0)
+      organizationURLFromEnv: "AZP_URL"
+      personalAccessTokenFromEnv: "AZP_TOKEN"

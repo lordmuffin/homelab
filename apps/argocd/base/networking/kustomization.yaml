@@ -7,6 +7,7 @@ resources:
 - traefik.yaml
 - traefik-kustomize.yaml
 - cert-manager.yaml
+- keda.yaml
 - nginx-ingress.yaml
 # - headscale.yaml
 - coredns.yaml

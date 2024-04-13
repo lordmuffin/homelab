@@ -22,6 +22,7 @@ k3s:
   enabled: true
   args:
   - --disable=traefik,servicelb
+  - --node-taint dedicated=control:NoSchedule
 
 p2p:
   disable_dht: true #Enabled by default
