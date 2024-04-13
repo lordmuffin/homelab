@@ -3,13 +3,16 @@ kind: Application
 metadata:
   name: keda
   finalizers:
-    - resources-finalizer.argocd.argoproj.io
+  - resources-finalizer.argocd.argoproj.io
 spec:
-  project: networking
+  project: apps
   source:
-    repoURL: 'https://github.com/lordmuffin/homelab.git'
-    path: apps/networking/keda
-    targetRevision: main
+    repoURL: https://kedacore.github.io/charts
+    chart: kedacore/keda
+    targetRevision: 2.13.2
+    helm:
+      releaseName: keda
+      # values:
   destination:
     namespace: keda
     name: in-cluster
@@ -17,17 +20,17 @@ spec:
     automated:
       prune: true
       selfHeal: true
-      allowEmpty: true
+      allowEmpty: false
     syncOptions:
     - Validate=false
-    - CreateNamespace=false
+    - CreateNamespace=true
     - PrunePropagationPolicy=foreground
     - PruneLast=true
     - ApplyOutOfSyncOnly=false
     - Prune=true
     retry:
-      limit: 5
+      limit: 10
       backoff:
-        duration: 20s
+        duration: 30s
         factor: 2
-        maxDuration: 15m
+        maxDuration: 60m
