@@ -16,7 +16,7 @@ spec:
           - name: AZP_TOKEN
             valueFrom:
               secretKeyRef:
-                name: homelab-agent-pool-PAT-1Password
+                name: homelab-agent-pool-pat-1password
                 key: password
           - name: AZP_POOL
             value: homelab # replace with your value
