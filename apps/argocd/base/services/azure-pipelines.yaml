@@ -11,7 +11,7 @@ spec:
     path: apps/services/azure-pipelines
     targetRevision: main
   destination:
-    namespace: services
+    namespace: azure-pipelines
     name: in-cluster
   syncPolicy:
     automated:

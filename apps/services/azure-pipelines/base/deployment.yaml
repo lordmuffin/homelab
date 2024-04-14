@@ -19,7 +19,7 @@ spec:
         image: git.labs.andrewpjackson.com/healingorganics/azure-pipelines-images/adoagentkeda # replace with your value
         env:
           - name: AZP_URL
-            value: https://dev.azure.com/programmingwithwolfgang # replace with your value
+            value: https://dev.azure.com/healingorganics # replace with your value
           - name: AZP_POOL
             value: homelab # replace with your value
           - name: AZP_TOKEN
