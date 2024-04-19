@@ -8,7 +8,7 @@ spec:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 10Gi
+      storage: 25Gi
   storageClassName: freenas-iscsi-csi
 
 ---
@@ -22,7 +22,7 @@ spec:
     - ReadWriteMany
   resources:
     requests:
-      storage: 8000Gi
+      storage: 16000Gi
   storageClassName: freenas-nfs-csi
 
 ---
