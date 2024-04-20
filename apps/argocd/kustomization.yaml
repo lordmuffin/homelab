@@ -73,7 +73,7 @@ images:
   - name: quay.io/argoproj/argocd
     newTag: v2.9.3
 patches:
-  - path: ./argo-cd-repo-server-ksops-patch.yaml
+  - path: overlay/argo-cd-repo-server-ksops-patch.yaml
     target: 
       kind: Deployment
       name: argocd-repo-server
