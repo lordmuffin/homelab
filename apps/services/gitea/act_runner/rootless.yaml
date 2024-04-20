@@ -8,15 +8,15 @@ spec:
   resources:
     requests:
       storage: 1Gi
-  storageClassName: freenas-iscsi-csi
----
-apiVersion: v1
-data:
-  token: << runner registration token goes here >>
-kind: Secret
-metadata:
-  name: runner-secret
-type: Opaque
+  storageClassName: freenas-nfs-csi
+# ---
+# apiVersion: v1
+# data:
+#   token: << runner registration token goes here >>
+# kind: Secret
+# metadata:
+#   name: runner-secret
+# type: Opaque
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -60,8 +60,8 @@ spec:
         - name: GITEA_RUNNER_REGISTRATION_TOKEN
           valueFrom:
             secretKeyRef:
-              name: runner-secret
-              key: token
+              name: gitea-runner-token-1password
+              key: password
         securityContext:
           privileged: true
         volumeMounts:
