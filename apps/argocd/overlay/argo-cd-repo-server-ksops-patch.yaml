@@ -16,7 +16,11 @@ spec:
         - name: custom-tools
           emptyDir: {}
         - name: sops-age
-          secret: k8s-age-key-1password
+          secret: 
+            secretName: k8s-age-key-1password
+            items:
+            - key: password
+              path: keys.txt
       # 2. Use an init container to download/copy custom binaries into the emptyDir
       initContainers:
         - name: install-ksops
