@@ -231,12 +231,6 @@ spec:
           name: helm-working-dir
         - mountPath: /home/argocd/cmp-server/plugins
           name: plugins
-        - mountPath: /usr/local/bin/kustomize
-          name: custom-tools
-          subPath: kustomize
-        - mountPath: /usr/local/bin/ksops
-          name: custom-tools
-          subPath: ksops
       initContainers:
       - command:
         - /bin/cp
@@ -257,17 +251,6 @@ spec:
         volumeMounts:
         - mountPath: /var/run/argocd
           name: var-files
-        - name: install-ksops
-          image: viaductoss/ksops:v4.3.1
-          command: ["/bin/sh", "-c"]
-          args:
-            - echo "Installing KSOPS...";
-              mv ksops /custom-tools/;
-              mv kustomize /custom-tools/;
-              echo "Done.";
-          volumeMounts:
-            - mountPath: /custom-tools
-              name: custom-tools
       serviceAccountName: argocd-repo-server
       volumes:
       - configMap:
@@ -300,5 +283,3 @@ spec:
         name: var-files
       - emptyDir: {}
         name: plugins
-      - name: custom-tools
-        emptyDir: {}

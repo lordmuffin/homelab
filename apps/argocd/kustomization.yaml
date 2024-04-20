@@ -73,6 +73,10 @@ images:
   - name: quay.io/argoproj/argocd
     newTag: v2.9.3
 patches:
+  - path: argocd-repo-deployment-patch.yaml
+    target: 
+      kind: Deployment
+      name: argocd-repo-server
   - patch: |-
       - op: replace
         path: "/metadata/namespace"
