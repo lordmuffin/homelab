@@ -47,14 +47,14 @@ spec:
       - name: runner
         image: gitea/act_runner:nightly-dind-rootless
         imagePullPolicy: Always
-        command: ["sh", "-c", "while ! nc -z localhost 2376 </dev/null; do echo 'waiting for docker daemon...'; sleep 5; done; /sbin/tini -- /opt/act/run.sh"]
+        command: ["sh", "-c", "(sleep 10 && chmod a+rwx /run/user/1000/docker.sock) & /usr/bin/supervisord -c /etc/supervisord.conf"]
         env:
         - name: DOCKER_HOST
-          value: tcp://localhost:2376
-        - name: DOCKER_CERT_PATH
-          value: /certs/client
-        - name: DOCKER_TLS_VERIFY
-          value: "1"
+          value: unix:///run/user/1000/docker.sock
+        # - name: DOCKER_CERT_PATH
+        #   value: /certs/client
+        # - name: DOCKER_TLS_VERIFY
+        #   value: "1"
         - name: GITEA_INSTANCE_URL
           value: http://gitea-http.gitea.svc.cluster.local:3000
         - name: GITEA_RUNNER_REGISTRATION_TOKEN
