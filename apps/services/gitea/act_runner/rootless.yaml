@@ -47,7 +47,7 @@ spec:
       - name: runner
         image: gitea/act_runner:nightly-dind-rootless
         imagePullPolicy: Always
-        # command: ["sh", "-c", "while ! nc -z localhost 2376 </dev/null; do echo 'waiting for docker daemon...'; sleep 5; done; /sbin/tini -- /opt/act/run.sh"]
+        command: ["sh", "-c", "while ! nc -z localhost 2376 </dev/null; do echo 'waiting for docker daemon...'; sleep 5; done; /sbin/tini -- /opt/act/run.sh"]
         env:
         - name: DOCKER_HOST
           value: tcp://localhost:2376
