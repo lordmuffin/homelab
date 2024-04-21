@@ -45,7 +45,7 @@ spec:
         fsGroup: 1000
       containers:
       - name: runner
-        image: gitea/act_runner:act_runner-0.2.10-darwin-amd64
+        image: gitea/act_runner:nightly-dind-rootless
         imagePullPolicy: Always
         command: ["sh", "-c", "(sleep 10 && chmod a+rwx /run/user/1000/docker.sock) & /usr/bin/supervisord -c /etc/supervisord.conf"]
         env:
