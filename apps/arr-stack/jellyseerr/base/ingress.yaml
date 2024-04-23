@@ -21,7 +21,8 @@ spec:
         - name: traefik-forward-auth
           namespace: traefik
       services:
-        - name: jellyseerr
+        - kind: Service
+          name: jellyseerr
           port: 5055
   tls:
     secretName: labs-andrewpjackson-com-tls
@@ -54,7 +55,8 @@ spec:
     - match: Host(`jellyseerr.labs.andrewpjackson.com`)
       kind: Rule
       services:
-        - name: jellyseerr
+        - kind: Service
+          name: jellyseerr
           port: 5055
   tls:
     secretName: labs-andrewpjackson-com-tls
