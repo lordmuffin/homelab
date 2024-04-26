@@ -12,5 +12,5 @@ spec:
   ports:
     - name: handbrake
       port: 5800
-      protocol: TCP
+      targetPort: handbrake
   type: ClusterIP
