@@ -21,9 +21,16 @@ spec:
           - "--serversTransport.insecureSkipVerify=true"
           - "--log.level=INFO"
 
-        nodeSelector:
-          dedicated: control
-          
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+              - matchExpressions:
+                - key: dedicated
+                  operator: In
+                  values:
+                  - control
+
         tolerations:
           - key: dedicated
             operator: Equal
