@@ -17,6 +17,10 @@ spec:
         - name: handbrake
           image: jlesage/handbrake:v24.03.1
           env:
+            - name: USER_ID
+              value: "1000"
+            - name: GROUP_ID
+              value: "1000"
             - name: DARK_MODE
               value: "1"
             - name: SECURE_CONNECTION
@@ -28,9 +32,14 @@ spec:
                 secretKeyRef:
                   name: handbrake-vnc-1password
                   key: password
+            - name: AUTOMATED_CONVERSION_PRESET
+              value: "General/HQ 2160p60 4K HEVC Surround"
           volumeMounts:
             - mountPath: /config
               name: handbrake-config
+            - name: config
+              mountPath: "/config"
+              readOnly: true
             - mountPath: /storage
               name: handbrake-storage
             - mountPath: /watch
@@ -52,3 +61,6 @@ spec:
         - name: arr-smb-volume
           persistentVolumeClaim:
             claimName: arr-smb-volume-pvc
+        - name: config
+          configMap:
+            name: handbrake-files

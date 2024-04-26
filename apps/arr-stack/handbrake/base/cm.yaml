@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: handbrake-files
+  namespace: arr-stack
+data:
+  pre_conversion.sh: |
+    # Setting permissions for incoming files.
+    chmod $USER_ID:$GROUP_ID $2
