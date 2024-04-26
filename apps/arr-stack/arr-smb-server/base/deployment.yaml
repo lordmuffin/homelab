@@ -28,7 +28,7 @@ spec:
               value: "share;/smbshare/;yes;no;no;all;none"
           volumeMounts:
             - mountPath: /smbshare
-              name: arr- smb-volume
+              name: arr-smb-volume
           ports:
             - name: arr-smb-server
               containerPort: 445
