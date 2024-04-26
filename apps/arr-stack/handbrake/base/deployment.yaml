@@ -39,6 +39,7 @@ spec:
               name: handbrake-config
             - name: hooks
               mountPath: "/config/hooks"
+              readOnly: false
             - mountPath: /storage
               name: handbrake-storage
             - mountPath: /watch
@@ -62,4 +63,10 @@ spec:
             claimName: arr-smb-volume-pvc
         - name: hooks
           configMap:
-            name: handbrake-hooks
+            # Provide the name of the ConfigMap you want to mount.
+            name: handbrake-files
+            # An array of keys from the ConfigMap to create as files
+            items:
+            - key: "pre_conversion.sh"
+              path: "pre_conversion.sh"
+
