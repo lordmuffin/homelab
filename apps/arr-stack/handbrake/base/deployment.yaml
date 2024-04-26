@@ -1,0 +1,54 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: handbrake
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: handbrake
+  template:
+    metadata:
+      name: handbrake
+      labels:
+        app: handbrake
+    spec:
+      containers:
+        - name: handbrake
+          image: jlesage/handbrake:v24.03.1
+          env:
+            - name: DARK_MODE
+              value: "1"
+            - name: SECURE_CONNECTION
+              value: "1"
+            - name: HANDBRAKE_GUI
+              value: "1"
+            - name: VNC_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: handbrake-vnc-1password
+                  key: password
+          volumeMounts:
+            - mountPath: /config
+              name: handbrake-config
+            - mountPath: /storage
+              name: handbrake-storage
+            - mountPath: /watch
+              name: arr-smb-volume
+              subPath: watch
+            - mountPath: /output
+              name: arr-smb-volume
+              subPath: output
+          ports:
+            - name: handbrake
+              containerPort: 5800
+      volumes:
+        - name: handbrake-config
+          persistentVolumeClaim:
+            claimName: handbrake-config-pvc
+        - name: handbrake-storage
+          persistentVolumeClaim:
+            claimName: handbrake-storage-pvc
+        - name: arr-smb-volume
+          persistentVolumeClaim:
+            claimName: arr-smb-volume-pvc

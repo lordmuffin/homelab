@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: handbrake
+  namespace: handbrake
+  annotations:
+      prometheus.io/scrape: 'true'
+      prometheus.io/port:   '9090'
+spec:
+  selector:
+    app: handbrake
+  ports:
+    - name: handbrake
+      port: 5800
+      protocol: TCP
+  type: ClusterIP

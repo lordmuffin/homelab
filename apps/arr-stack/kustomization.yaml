@@ -2,6 +2,7 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 bases:
 - ./arr-smb-server/base
+- ./handbrake/base
 - ./jellyfin/base
 - ./jellyseerr/base
 - ./prowlarr/base
