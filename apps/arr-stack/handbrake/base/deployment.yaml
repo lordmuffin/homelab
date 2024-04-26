@@ -38,8 +38,9 @@ spec:
             - mountPath: /config
               name: handbrake-config
             - name: hooks
-              mountPath: "/config/hooks"
-              readOnly: false
+              mountPath: "/config/hooks/pre_conversion.sh"
+              readOnly: true
+              subPath: pre_conversion.sh
             - mountPath: /storage
               name: handbrake-storage
             - mountPath: /watch
