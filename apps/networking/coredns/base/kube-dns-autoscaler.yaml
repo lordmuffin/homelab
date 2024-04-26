@@ -82,6 +82,10 @@ spec:
           - --logtostderr=true
           - --v=2
       tolerations:
-      - key: "CriticalAddonsOnly"
-        operator: "Exists"
+        - key: "CriticalAddonsOnly"
+          operator: "Exists"
+        - key: dedicated
+          operator: Equal
+          value: control
+          effect: NoSchedule
       serviceAccountName: kube-dns-autoscaler
