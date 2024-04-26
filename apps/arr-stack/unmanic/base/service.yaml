@@ -4,7 +4,7 @@ metadata:
   name: unmanic
   namespace: unmanic
 spec:
-  type: LoadBalancer
+  type: ClusterIP
   selector:
     servarr.app: unmanic
   ports:

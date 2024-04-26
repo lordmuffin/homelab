@@ -4,7 +4,7 @@ metadata:
   name: prowlarr
   namespace: prowlarr
 spec:
-  type: LoadBalancer
+  type: ClusterIP
   selector:
     servarr.app: prowlarr
   ports:
