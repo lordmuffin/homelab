@@ -29,7 +29,7 @@ spec:
 
         deployment:
           enabled: true
-          replicas: 3
+          replicas: 5
           annotations: {}
           podAnnotations: {}
           additionalContainers: []
