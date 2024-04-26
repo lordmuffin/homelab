@@ -39,7 +39,6 @@ spec:
               name: handbrake-config
             - name: config
               mountPath: "/config"
-              readOnly: true
             - mountPath: /storage
               name: handbrake-storage
             - mountPath: /watch
