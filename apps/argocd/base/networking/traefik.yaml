@@ -21,6 +21,15 @@ spec:
           - "--serversTransport.insecureSkipVerify=true"
           - "--log.level=INFO"
 
+        nodeSelector:
+          dedicated: control
+          
+        tolerations:
+          - key: dedicated
+            operator: Equal
+            value: control
+            effect: NoSchedule
+
         deployment:
           enabled: true
           replicas: 3
