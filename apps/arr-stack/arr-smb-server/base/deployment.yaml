@@ -1,0 +1,38 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: arr-smb-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: arr-smb-server
+  template:
+    metadata:
+      name: arr-smb-server
+      labels:
+        app: arr-smb-server
+    spec:
+      containers:
+        - name: arr-smb-server
+          image: dperson/samba
+          env:
+            - name: PERMISSIONS
+              value: ""
+            - name: USER
+              valueFrom:
+                secretKeyRef:
+                  name: arr-smb-server-creds-1password
+                  key: userpass
+            - name: SHARE
+              value: "share;/smbshare/;yes;no;no;all;none"
+          volumeMounts:
+            - mountPath: /smbshare
+              name: smb-volume
+          ports:
+            - name: arr-smb-server
+              containerPort: 445
+      volumes:
+        - name: arr-smb-volume
+          persistentVolumeClaim:
+            claimName: arr-smb-volume-pvc

@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: arr-smb-server
+  namespace: arr-smb-server
+  annotations:
+      prometheus.io/scrape: 'true'
+      prometheus.io/port:   '9090'
+spec:
+  selector:
+    app: arr-smb-server
+  ports:
+    - name: arr-smb-server
+      port: 445
+      protocol: TCP
+  type: LoadBalancer
