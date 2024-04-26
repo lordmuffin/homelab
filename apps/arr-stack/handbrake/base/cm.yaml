@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: handbrake-files
+  name: handbrake-hooks
   namespace: arr-stack
 data:
   pre_conversion.sh: |

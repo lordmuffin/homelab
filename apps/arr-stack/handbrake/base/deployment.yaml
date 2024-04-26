@@ -37,8 +37,9 @@ spec:
           volumeMounts:
             - mountPath: /config
               name: handbrake-config
-            - name: config
-              mountPath: "/config"
+            - name: hooks
+              mountPath: "/config/hooks"
+              readOnly: true
             - mountPath: /storage
               name: handbrake-storage
             - mountPath: /watch
@@ -60,6 +61,6 @@ spec:
         - name: arr-smb-volume
           persistentVolumeClaim:
             claimName: arr-smb-volume-pvc
-        - name: config
+        - name: hooks
           configMap:
-            name: handbrake-files
+            name: handbrake-hooks
