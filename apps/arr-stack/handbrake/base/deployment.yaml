@@ -41,10 +41,10 @@ spec:
         - name: file-perms-watch
           image: alpine:3
           command:
-            - ls
-            - -la
-            - /watch
-            - "&&"
+            # - ls
+            # - -la
+            # - /watch
+            # - "&&"
             - chown
             - -R
             - 1000:1000
