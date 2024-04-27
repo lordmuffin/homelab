@@ -57,7 +57,7 @@ spec:
               name: arr-smb-volume
               subPath: watch
       securityContext:
-        # runAsUser: 1000
+        runAsUser: 1000
         fsGroup: 1000
       containers:
         - name: handbrake
