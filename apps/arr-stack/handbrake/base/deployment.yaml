@@ -30,7 +30,7 @@ spec:
               subPath: pre_conversion.sh
             - mountPath: /config
               name: handbrake-config
-        - name: file-perms
+        - name: file-perms-hooks
           image: alpine:3
           securityContext:
             runAsUser: 1000
@@ -42,6 +42,19 @@ spec:
           volumeMounts:
             - mountPath: /config
               name: handbrake-config
+        - name: file-perms-watch
+          image: alpine:3
+          securityContext:
+            runAsUser: 1000
+          command:
+            - chown
+            - -R
+            - 1000:1000
+            - /watch
+          volumeMounts:
+            - mountPath: /watch
+              name: arr-smb-volume
+              subPath: watch
       # securityContext:
       #   runAsUser: 1000
       #   fsGroup: 1000
