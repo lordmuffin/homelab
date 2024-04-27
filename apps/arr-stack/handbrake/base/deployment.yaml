@@ -16,8 +16,6 @@ spec:
       initContainers:
         - name: copy-file
           image: alpine:3
-          securityContext:
-            runAsUser: 1000
           command:
             - cp
             - -R
@@ -32,8 +30,6 @@ spec:
               name: handbrake-config
         - name: file-perms-hooks
           image: alpine:3
-          securityContext:
-            runAsUser: 1000
           command:
             - chown
             - -R
@@ -44,9 +40,6 @@ spec:
               name: handbrake-config
         - name: file-perms-watch
           image: alpine:3
-          securityContext:
-            runAsUser: 1000
-            fsGroup: 1000
           command:
             - ls
             - -la
@@ -59,9 +52,6 @@ spec:
             - mountPath: /watch
               name: arr-smb-volume
               subPath: watch
-      securityContext:
-        runAsUser: 1000
-        fsGroup: 1000
       containers:
         - name: handbrake
           image: jlesage/handbrake:v24.03.1-debug
