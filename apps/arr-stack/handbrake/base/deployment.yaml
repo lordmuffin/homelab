@@ -35,6 +35,8 @@ spec:
           env:
             - name: CONTAINER_DEBUG
               value: "1"
+            - name: HANDBRAKE_DEBUG
+              value: "1"
             - name: USER_ID
               value: "1000"
             - name: GROUP_ID
