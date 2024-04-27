@@ -48,10 +48,13 @@ spec:
             runAsUser: 1000
             fsGroup: 1000
           command:
-            - chown
-            - -R
-            - 1000:1000
+            - ls
+            - -la
             - /watch
+            # - chown
+            # - -R
+            # - 1000:1000
+            # - /watch
           volumeMounts:
             - mountPath: /watch
               name: arr-smb-volume
