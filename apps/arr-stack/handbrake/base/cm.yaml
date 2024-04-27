@@ -6,4 +6,4 @@ metadata:
 data:
   pre_conversion.sh: |
     # Setting permissions for incoming files.
-    chmod $USER_ID:$GROUP_ID $2
+    chmod $USER_ID:$GROUP_ID "$2"
