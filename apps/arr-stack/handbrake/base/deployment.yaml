@@ -14,22 +14,34 @@ spec:
         app: handbrake
     spec:
       initContainers:
-        - name: take-data-dir-ownership
+        - name: copy-file
           image: alpine:3
           securityContext:
             runAsUser: 1000
-          # Give `grafana` user (id 472) permissions a mounted volume
-          # https://github.com/grafana/grafana-docker/blob/master/Dockerfile
+          command:
+            - cp
+            - -R
+            - /tmp/hooks/pre_conversion.sh
+            - /config/hooks/pre_conversion.sh
+          volumeMounts:
+            - name: hooks
+              mountPath: "/tmp/hooks/pre_conversion.sh"
+              readOnly: false
+              subPath: pre_conversion.sh
+            - mountPath: /config
+              name: handbrake-config
+        - name: file-perms
+          image: alpine:3
+          securityContext:
+            runAsUser: 1000
           command:
             - chown
             - -R
             - 1000:1000
-            - /config/hooks
+            - /config/hooks/pre_conversion.sh
           volumeMounts:
-            - name: hooks
-              mountPath: "/config/hooks/pre_conversion.sh"
-              readOnly: false
-              subPath: pre_conversion.sh
+            - mountPath: /config
+              name: handbrake-config
       securityContext:
         runAsUser: 1000
         fsGroup: 1000
