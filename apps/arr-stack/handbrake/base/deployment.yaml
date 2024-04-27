@@ -44,7 +44,7 @@ spec:
             - ls
             - -la
             - /watch
-            - &&
+            - "&&"
             - chown
             - -R
             - 1000:1000
