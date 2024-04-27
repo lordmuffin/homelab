@@ -13,23 +13,25 @@ spec:
       labels:
         app: handbrake
     spec:
-      # initContainers:
-      #   - name: take-data-dir-ownership
-      #     image: alpine:3
-      #     # Give `grafana` user (id 472) permissions a mounted volume
-      #     # https://github.com/grafana/grafana-docker/blob/master/Dockerfile
-      #     command:
-      #       - chown
-      #       - -R
-      #       - 1000:1000
-      #       - /config/hooks
-      #     volumeMounts:
-      #       - name: hooks
-      #         mountPath: "/config/hooks/pre_conversion.sh"
-      #         readOnly: false
-      #         subPath: pre_conversion.sh
-      #         defaultMode: 0777
+      initContainers:
+        - name: take-data-dir-ownership
+          image: alpine:3
+          securityContext:
+            runAsUser: 1000
+          # Give `grafana` user (id 472) permissions a mounted volume
+          # https://github.com/grafana/grafana-docker/blob/master/Dockerfile
+          command:
+            - chown
+            - -R
+            - 1000:1000
+            - /config/hooks
+          volumeMounts:
+            - name: hooks
+              mountPath: "/config/hooks/pre_conversion.sh"
+              readOnly: false
+              subPath: pre_conversion.sh
       securityContext:
+        runAsUser: 1000
         fsGroup: 1000
       containers:
         - name: handbrake
@@ -59,10 +61,10 @@ spec:
           volumeMounts:
             - mountPath: /config
               name: handbrake-config
-            - name: hooks
-              mountPath: "/config/hooks/pre_conversion.sh"
-              readOnly: false
-              subPath: pre_conversion.sh
+            # - name: hooks
+            #   mountPath: "/config/hooks/pre_conversion.sh"
+            #   readOnly: false
+            #   subPath: pre_conversion.sh
             - mountPath: /storage
               name: handbrake-storage
             - mountPath: /watch
