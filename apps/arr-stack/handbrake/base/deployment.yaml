@@ -44,10 +44,11 @@ spec:
             - ls
             - -la
             - /watch
-            # - chown
-            # - -R
-            # - 1000:1000
-            # - /watch
+            - &&
+            - chown
+            - -R
+            - 1000:1000
+            - /watch
           volumeMounts:
             - mountPath: /watch
               name: arr-smb-volume
