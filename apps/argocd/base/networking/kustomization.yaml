@@ -3,6 +3,7 @@ kind: Kustomization
 
 resources:
 # - ./external-dns
+- cilium.yaml
 - metallb-system.yaml
 - traefik.yaml
 - traefik-kustomize.yaml
