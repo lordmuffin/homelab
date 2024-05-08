@@ -1,7 +1,7 @@
 # Pulumi Setup
 ```
 export IMG="pulumi/pulumi-python:latest"
-docker run -e PULUMI_ACCESS_TOKEN=pul-17fe914ed5c67f321bcc03184db3166451fb83e9 \
+docker run -e PULUMI_ACCESS_TOKEN=<pulumi-access-token> \
 -e PROXMOX_VE_USERNAME="pulumi@pve" \
 -e PROXMOX_VE_PASSWORD="pulumi" \
 -e PROXMOX_VE_ENDPOINT="https://192.168.1.13:8006/" \
@@ -9,7 +9,7 @@ docker run -e PULUMI_ACCESS_TOKEN=pul-17fe914ed5c67f321bcc03184db3166451fb83e9 \
 ```
 ```
 export IMG="pulumi/pulumi-python:latest"
-docker run -e PULUMI_ACCESS_TOKEN=pul-17fe914ed5c67f321bcc03184db3166451fb83e9 \
+docker run -e PULUMI_ACCESS_TOKEN=<pulumi-access-token> \
 -e PROXMOX_VE_USERNAME="pulumi@pve" \
 -e PROXMOX_VE_PASSWORD="pulumi" \
 -e PROXMOX_VE_ENDPOINT="https://192.168.1.13:8006" \
@@ -17,7 +17,7 @@ docker run -e PULUMI_ACCESS_TOKEN=pul-17fe914ed5c67f321bcc03184db3166451fb83e9 \
 ```
 ```
 export IMG="pulumi/pulumi-python:latest"
-docker run -e PULUMI_ACCESS_TOKEN=pul-17fe914ed5c67f321bcc03184db3166451fb83e9 \
+docker run -e PULUMI_ACCESS_TOKEN=<pulumi-access-token> \
 -e PROXMOX_VE_USERNAME="pulumi@pve" \
 -e PROXMOX_VE_PASSWORD="pulumi" \
 -e PROXMOX_VE_ENDPOINT="https://192.168.1.13:8006" \
