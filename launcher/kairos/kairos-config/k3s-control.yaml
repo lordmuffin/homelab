@@ -1,4 +1,8 @@
 #cloud-config
+install:
+  auto: true
+  device: "auto"
+  reboot: true
 
 hostname: kairos-{{ trunc 4 .MachineID }}
 users:
@@ -12,7 +16,10 @@ users:
 k3s:
   enabled: true
   args:
-  - --disable=traefik,servicelb
+  - --disable=traefik,servicelb,kube-proxy
+  - --flannel-backend=none
+  - --disable-network-policy
+  - --node-taint dedicated=control:NoSchedule
   - --server https://192.168.1.247:6443
   env:
-    K3S_TOKEN: K102dfcfd37a528cf6a7d216d0641009be7b80014927bb8e6520bb9e7a7c760219e::server:9a219b32b86c08e34a527b2d31eefae3
+    K3S_TOKEN: K10a6c1c8c50f2d48e8c42b146dc197863b0b999acec022f2b4e5f993d8e94b552f::server:1wz8kq.piy4kdi3ofc14ilw

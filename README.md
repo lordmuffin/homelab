@@ -46,43 +46,36 @@ Be sure to deploy the required VM's ahead of time and then run the Kairos Steps 
 
 Run this on a linux server to serve AuroraBoot
 ```
+                    --set "container_image=ghcr.io/lordmuffin/custom-ubuntu-22.04-standard-amd64-generic-v2.4.3-k3sv1.28.2-k3s1:v0.0.4"
 
 cat <<EOF | sudo docker run --rm -i --net host quay.io/kairos/auroraboot \
                     --cloud-config - \
-                    --set "container_image=ghcr.io/lordmuffin/custom-ubuntu-22.04-standard-amd64-generic-v2.4.3-k3sv1.28.2-k3s1:v0.0.4"
+                    --set "container_image=ghcr.io/lordmuffin/k8s-kairos:v1.28"
 #cloud-config
-
-# https://github.com/kairos-io/kairos/issues/885
-config_url: ""
-
 install:
   auto: true
   device: "auto"
   reboot: true
 
-hostname: kairoslab-{{ trunc 4 .MachineID }}
+hostname: kairos-{{ trunc 4 .MachineID }}
 users:
 - name: kairos
+  # Change to your pass here
   passwd: kairos
   ssh_authorized_keys:
+  # Replace with your github user and un-comment the line below:
   - github:lordmuffin
-
-kubevip:
-  eip: "192.168.1.20"
 
 k3s:
   enabled: true
   args:
-  - --disable=traefik,servicelb
+  - --disable=traefik,servicelb,kube-proxy
+  - --flannel-backend=none
+  - --disable-network-policy
+  - --node-taint dedicated=control:NoSchedule
+  env:
+    K3S_TOKEN: K10a6c1c8c50f2d48e8c42b146dc197863b0b999acec022f2b4e5f993d8e94b552f::server:1wz8kq.piy4kdi3ofc14ilw
 
-p2p:
-  disable_dht: true #Enabled by default
-  network_token: "<INSERT YOUR TOKEN>"
-  auto:
-    enable: true
-    ha:
-      enable: true
-      master_nodes: 2
 EOF
 
 ```
@@ -97,6 +90,23 @@ sudo docker run --rm -ti --net host quay.io/kairos/auroraboot \
                     --set repository="kairos-io/kairos" \
                     --cloud-config https://raw.githubusercontent.com/lordmuffin/homelab/main/launcher/kairos-config/k3s-HA-lab.yaml \
                     --set "network.token=<TOKEN HERE>"
+```
+
+
+### Cilium Install Steps
+```
+export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+
+mkdir /usr/local/bin
+
+CILIUM_CLI_VERSION=$(curl -s https://raw.githubusercontent.com/cilium/cilium-cli/main/stable.txt)
+CLI_ARCH=amd64
+if [ "$(uname -m)" = "aarch64" ]; then CLI_ARCH=arm64; fi
+curl -L --fail --remote-name-all https://github.com/cilium/cilium-cli/releases/download/${CILIUM_CLI_VERSION}/cilium-linux-${CLI_ARCH}.tar.gz{,.sha256sum}
+sha256sum --check cilium-linux-${CLI_ARCH}.tar.gz.sha256sum
+sudo tar xzvfC cilium-linux-${CLI_ARCH}.tar.gz /usr/local/bin
+rm cilium-linux-${CLI_ARCH}.tar.gz{,.sha256sum}
+
 ```
 
 ## Docker Launcher Steps

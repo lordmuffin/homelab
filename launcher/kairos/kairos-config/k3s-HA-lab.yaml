@@ -21,12 +21,19 @@ kubevip:
 k3s:
   enabled: true
   args:
-  - --disable=traefik,servicelb
+  - --disable=traefik,servicelb,kube-proxy
+  - --flannel-backend=none
+  - --no-flannel
+  - --disable-network-policy
   - --node-taint dedicated=control:NoSchedule
+  - --tls-san=192.168.1.20
 
 p2p:
-  disable_dht: true #Enabled by default
-  network_token: "<INSERT YOUR TOKEN>"
+  disable_dht: false #Enabled by default
+  network_token: ""
+  vpn:
+    create: false # defaults to true
+    use: false # defaults to true
   auto:
     enable: true
     ha:

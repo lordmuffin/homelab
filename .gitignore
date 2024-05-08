@@ -15,6 +15,10 @@ j*.pem
 .DS_Store
 .history
 
+#Python
+venv
+__pycache__
+
 # Crash log files
 crash.log
 debug.log
