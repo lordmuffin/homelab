@@ -13,6 +13,7 @@ vars:
   INT_REGISTRY: registry.localhost
   PATH_ERROR: is not installed or correctly configured in PATH.
   ARGOCD_VERSION: 2.8.3
+  ENV: prod-lab
 
 silent: true
 
@@ -85,10 +86,12 @@ tasks:
     - sh: 'which kubectl'
       msg: 'kubectl {{.PATH_ERROR}}'
     cmds:
+    - kubectl config use-context {{.ENV}} --cluster={{.ENV}} --namespace=argocd
     - kubectl create namespace argocd
-    - kustomize build | kubectl apply -f -
-    - sleep 10
-    - kustomize build | kubectl apply -f -
+    # - kubectl kustomize --enable-helm | kubectl apply -f -
+    - kustomize build . | kubectl apply -f -
+    # - sleep 10
+    # - kustomize build . | kubectl apply -f -
     - kubectl wait deploy/argocd-server -n argocd --for condition=available --timeout=600s
     - echo ""
     ignore_error: true
@@ -129,7 +132,9 @@ tasks:
     - sh: 'which kustomize'
       msg: 'kustomize {{.PATH_ERROR}}'
     cmds:
-    - kustomize build | kubectl delete -f -
+    - kubectl config use-context {{.ENV}} --cluster={{.ENV}} --namespace=argocd
+    # - kubectl kustomize --enable-helm | kubectl delete -f -
+    - kustomize build . | kubectl delete -f -
     ignore_error: true
 
   bridge: kubectl port-forward -n argocd svc/argocd-server 8832:80

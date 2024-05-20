@@ -107,25 +107,52 @@ sha256sum --check cilium-linux-${CLI_ARCH}.tar.gz.sha256sum
 sudo tar xzvfC cilium-linux-${CLI_ARCH}.tar.gz /usr/local/bin
 rm cilium-linux-${CLI_ARCH}.tar.gz{,.sha256sum}
 
+
+cilium install --version 1.15.5 --set=ipam.operator.clusterPoolIPv4PodCIDRList="10.42.0.0/16"
+cilium hubble enable
+# MAY NEED TO ALSO INSTALL THIS: https://docs.cilium.io/en/stable/gettingstarted/hubble_setup/#hubble-setup
 ```
+
+
 
 ## Docker Launcher Steps
-#### 1. Install namespaces
+#### 1. k3sup get configs and set context
 ```
-docker run --rm -v ~/.kube/:/root/.kube:ro -v ${PWD}:/launcher -ti homelab-launcher:v0.1.3 task namespaces:create
+export IP=192.168.10.40
+export USER=ubuntu
+export NAME=dev-lab
+export SSH_PRIV_KEY=~/.ssh/ubuntu.pem
+op read --out-file $SSH_PRIV_KEY "op://HomeLab/onarfzninuoetwe2hh2ni7m52q/private key?ssh-format=openssh"
+
+k3sup install \
+  --ip $IP \
+  --user $USER \
+  --skip-install \
+  --ssh-key $SSH_PRIV_KEY \
+  --merge \
+  --local-path $HOME/.kube/config \
+  --context $NAME
+```
+#### 2. Set Context
+```
+kubectl config set-context prod-lab --cluster=prod-lab
+```
+#### 3. Install namespaces
+```
+docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=<ENVIRONMENT> -ti homelab-launcher:v0.1.3 task namespaces:create
 ```
 
-#### 2. 1Password Instead of Vault??
+#### 4. 1Password Instead of Vault??
 ```
-docker run --rm -v ~/.kube/:/root/.kube:ro -v ${PWD}:/launcher -e TOKEN=<TOKEN> -ti homelab-launcher:v0.1.3 task 1password:install
-```
-
-#### 3. Install ArgoCD
-```
-docker run --rm -v ~/.kube/:/root/.kube:ro -v ${PWD}:/launcher -e GH_USER=lordmuffin -e GH_PASS=<GH-TOKEN> -ti homelab-launcher:v0.1.3 task argocd:install
+docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=<ENVIRONMENT> -e TOKEN=<TOKEN> -ti homelab-launcher:v0.1.3 task 1password:install
 ```
 
-#### 4. Create Headscale image
+#### 5. Install ArgoCD
+```
+docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=<ENVIRONMENT> -e GH_USER=lordmuffin -e GH_PASS=<GH-TOKEN> -ti homelab-launcher:v0.1.3 task argocd:install
+```
+
+#### 6. Create Headscale image
 ```
 cd ~/Git
 git clone https://github.com/juanfont/headscale.git

@@ -5,7 +5,7 @@ export PROJECT=k3s-nodes
 echo "Running project: $PROJECT"
 
 export IMG="pulumi/pulumi-python:latest"
-docker run -e PULUMI_ACCESS_TOKEN=pul-38a7bac35d5395681ca58e07ef1e9e09189dd91f \
+docker run -e PULUMI_ACCESS_TOKEN=$(op read "op://HomeLab/Pulumi Access Token/password") \
 -e "PROXMOX_VE_PASSWORD=$(op read "op://HomeLab/proxmox pulumi/password")" \
 -e "SSH_PUB_KEY=$(op read "op://HomeLab/onarfzninuoetwe2hh2ni7m52q/public key")" \
 -e "SSH_PRIV_KEY=$(op read "op://HomeLab/onarfzninuoetwe2hh2ni7m52q/private key?ssh-format=openssh")" \
@@ -13,7 +13,7 @@ docker run -e PULUMI_ACCESS_TOKEN=pul-38a7bac35d5395681ca58e07ef1e9e09189dd91f \
 ```
 echo "Running project: $PROJECT"
 export IMG="pulumi/pulumi-python:latest"
-docker run -e PULUMI_ACCESS_TOKEN=pul-38a7bac35d5395681ca58e07ef1e9e09189dd91f \
+docker run -e PULUMI_ACCESS_TOKEN=$(op read "op://HomeLab/Pulumi Access Token/password") \
 -e "PROXMOX_VE_PASSWORD=$(op read "op://HomeLab/proxmox pulumi/password")" \
 -v "$(pwd):/pulumi/projects" $IMG /bin/bash -c "cd /pulumi/projects/$PROJECT && pulumi destroy --continue-on-error --yes -s dev"
 ```
@@ -24,7 +24,7 @@ export PROXMOX_VE_PASSWORD="pulumi"
 ```
 # K3Sup Commands
 ```
-export K3S_VERSION="v1.22.4+k3s1"
+export K3S_VERSION="v1.28.2+k3s1"
 export K3S_OPTIONS="--flannel-backend=none --no-flannel --disable-kube-proxy --disable servicelb --disable-network-policy --tls-san=192.168.10.10"
 export USER="ubuntu"
 k3sup install --cluster --ip $(govc vm.ip /42can/vm/cilium0) --user $UBUNTU --local-path ~/.kube/cilium.yaml --k3s-version $K3S_VERSION --k3s-extra-args $K3S_OPTIONS

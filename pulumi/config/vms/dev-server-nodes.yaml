@@ -1,9 +1,13 @@
 ---
-- name: "pve-control-nodes"
-  count: 1
+- name: "server-nodes"
+  count: 3
   # node_name: "pve"
-  resource_name: "k3s-control"
+  vm_type: "server" # server or agent
+  environment: "dev"
+  resource_name: "lab"
   vm_id: 1000
+  clone_vm_id: 8000
+  tls_san: "192.168.1.10"
   agent:
     enabled: true
     type: "virtio"

@@ -6,16 +6,16 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: station
-  namespace: arr-stack
+  namespace: kube-system
 spec:
   containers:
   - name: alpine
     image: alpine:latest
     command: ['sleep', 'infinity']
-    volumeMounts:
-    - name: data
-      mountPath: /data
-  volumes:
-  - name: data
-    persistentVolumeClaim:
-      claimName: sabnzbd-downloads
+  #   volumeMounts:
+  #   - name: data
+  #     mountPath: /data
+  # volumes:
+  # - name: data
+  #   persistentVolumeClaim:
+  #     claimName: sabnzbd-downloads

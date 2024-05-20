@@ -12,7 +12,7 @@ vars:
   CLEAR: tput reset
   INT_REGISTRY: registry.localhost
   PATH_ERROR: is not installed or correctly configured in PATH.
-
+  ENV: prod-lab
 
 silent: true
 
@@ -24,18 +24,19 @@ tasks:
     - sh: 'which kubectl'
       msg: 'kubectl {{.PATH_ERROR}}'
     cmds:
-    - kubectl create namespace metallb-system
-    - kubectl create namespace traefik
-    - kubectl create namespace networking
-    - kubectl create namespace homeassistant
-    - kubectl create namespace mlops
-    - kubectl create namespace media
-    - kubectl create namespace unifi
-    - kubectl create namespace services
-    - kubectl create namespace rss
-    - kubectl create namespace gitea
-    - kubectl create namespace monitoring
-    - kubectl create namespace democratic-csi
-    - kubectl create namespace 1password
+    - kubectl config use-context {{.ENV}} --cluster={{.ENV}}
+    - kubectl --context {{.ENV}} create namespace metallb-system
+    - kubectl --context {{.ENV}} create namespace traefik
+    - kubectl --context {{.ENV}} create namespace networking
+    - kubectl --context {{.ENV}} create namespace homeassistant
+    - kubectl --context {{.ENV}} create namespace mlops
+    - kubectl --context {{.ENV}} create namespace media
+    - kubectl --context {{.ENV}} create namespace unifi
+    - kubectl --context {{.ENV}} create namespace services
+    - kubectl --context {{.ENV}} create namespace rss
+    - kubectl --context {{.ENV}} create namespace gitea
+    - kubectl --context {{.ENV}} create namespace monitoring
+    - kubectl --context {{.ENV}} create namespace democratic-csi
+    - kubectl --context {{.ENV}} create namespace 1password
 
     ignore_error: true
