@@ -108,7 +108,9 @@ sudo tar xzvfC cilium-linux-${CLI_ARCH}.tar.gz /usr/local/bin
 rm cilium-linux-${CLI_ARCH}.tar.gz{,.sha256sum}
 
 
-cilium install --version 1.15.5 --set=ipam.operator.clusterPoolIPv4PodCIDRList="10.42.0.0/16"
+API_SERVER_IP="192.168.10.30"
+API_SERVER_PORT="6443"
+cilium install --version 1.15.5 --namespace cilium --set=ipam.operator.clusterPoolIPv4PodCIDRList="10.42.0.0/16" --set kubeProxyReplacement=strict --set k8sServiceHost=${API_SERVER_IP} --set k8sServicePort=${API_SERVER_PORT}
 cilium hubble enable
 # MAY NEED TO ALSO INSTALL THIS: https://docs.cilium.io/en/stable/gettingstarted/hubble_setup/#hubble-setup
 ```
