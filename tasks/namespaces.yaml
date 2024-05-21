@@ -25,6 +25,10 @@ tasks:
       msg: 'kubectl {{.PATH_ERROR}}'
     cmds:
     - kubectl config use-context {{.ENV}} --cluster={{.ENV}}
+    - kubectl --context {{.ENV}} create namespace arr-stack
+    - kubectl --context {{.ENV}} create namespace cert-manager
+    - kubectl --context {{.ENV}} create namespace headscale
+    - kubectl --context {{.ENV}} create namespace tailscale
     - kubectl --context {{.ENV}} create namespace metallb-system
     - kubectl --context {{.ENV}} create namespace traefik
     - kubectl --context {{.ENV}} create namespace networking

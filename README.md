@@ -146,6 +146,8 @@ docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=<ENVIRONMENT>
 
 #### 4. 1Password Instead of Vault??
 ```
+kubectl create secret generic op-credentials -n 1password --from-file=1password-credentials.json=./launcher/1password-credentials.json
+
 docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=<ENVIRONMENT> -e TOKEN=<TOKEN> -ti homelab-launcher:v0.1.3 task 1password:install
 ```
 
