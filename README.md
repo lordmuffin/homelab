@@ -111,7 +111,7 @@ rm cilium-linux-${CLI_ARCH}.tar.gz{,.sha256sum}
 API_SERVER_IP="192.168.10.30"
 API_SERVER_PORT="6443"
 cilium install --version 1.15.5 --namespace cilium --set=ipam.operator.clusterPoolIPv4PodCIDRList="10.42.0.0/16" --set kubeProxyReplacement=strict --set k8sServiceHost=${API_SERVER_IP} --set k8sServicePort=${API_SERVER_PORT}
-cilium hubble enable
+cilium hubble enable --namespace cilium
 # MAY NEED TO ALSO INSTALL THIS: https://docs.cilium.io/en/stable/gettingstarted/hubble_setup/#hubble-setup
 ```
 
@@ -122,7 +122,7 @@ cilium hubble enable
 ```
 export IP=192.168.10.40
 export USER=ubuntu
-export NAME=dev-lab
+export NAME=prod-lab
 export SSH_PRIV_KEY=~/.ssh/ubuntu.pem
 op read --out-file $SSH_PRIV_KEY "op://HomeLab/onarfzninuoetwe2hh2ni7m52q/private key?ssh-format=openssh"
 

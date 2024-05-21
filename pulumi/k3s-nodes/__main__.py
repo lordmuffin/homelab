@@ -430,10 +430,9 @@ for vm in parsed_data:
 
 
 for vm in parsed_data:
-    environments = []
+    environments = ["dev", "prod"]
     result_data = []
     for v in vm:
-        environments.append(v["environment"])
         for env in environments:
             if env == v["environment"]:
                 # Loop through count of VM's and customize dict for bootstrap.
@@ -452,6 +451,7 @@ for vm in parsed_data:
                     server_ip = get_server_ip(parsed_data, v["environment"])
                     data = {
                         "name": v['environment'] + "-" + v["resource_name"] + "-" + f"{name_counter:03d}",
+                        "environment": v["environment"],
                         "vm_type": v["vm_type"],
                         "ip": new_ip,
                         "server_ip": server_ip,
@@ -462,7 +462,11 @@ for vm in parsed_data:
                     }
 
                     result_data.append(data)
-                # print(result_data)
-                control_vms_bootstrap = bootstrap.bootstrap(result_data, dependencies)
+                    name = data["name"]
+                    print(f"Adding {name} to result_data")
+                    # wait10_seconds = time.Sleep(f"wait10Seconds-{name}-pre-bootstrap", create_duration="10s", opts=pulumi.ResourceOptions())
+        # print(result_data)
+        # wait30_seconds = time.Sleep(f"wait30Seconds-{v['environment']}-{v['resource_name']}-{vmcount:03d}-pre-bootstrap", create_duration="30s", opts=pulumi.ResourceOptions())
+        control_vms_bootstrap = bootstrap.bootstrap(result_data, dependencies)
 
     pulumi.export(f"VM ID's", vm_ids)

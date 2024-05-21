@@ -12,8 +12,12 @@ import pulumiverse_time as time
 # Copy k3sup install? Or possibly run locally? 
 dial_error_limit = 10
 per_dial_timeout = 120
+count = 0
 
 def bootstrap(node_list, dependencies):
+    bootstrap_count = count + 1
+    env = node_list[0]["environment"]
+    # wait10_seconds = time.Sleep(f"wait10Seconds-pre-bootstrap-{env}-{bootstrap_count}", create_duration="10s", opts=pulumi.ResourceOptions())
     for index, item in enumerate(node_list):
     #     print(index, item)
     # for i in node_list:
@@ -43,13 +47,13 @@ def bootstrap(node_list, dependencies):
                 update=f'sh /tmp/k3sup_install.sh install {item["server_ip"]} {item["ip"]} {item["user"]} "{item["ssh_priv_key"]}" {item["tls_san"]}',
                 opts=pulumi.ResourceOptions(depends_on=[copy_file_resource])
             )
-            wait30_seconds = time.Sleep(f"wait30Seconds-{item['name']}-install-bootstrap", create_duration="30s", opts=pulumi.ResourceOptions(depends_on=[command_k3sup_install_resource]))
+            # wait30_seconds = time.Sleep(f"wait30Seconds-{item['name']}-install-bootstrap", create_duration="30s", opts=pulumi.ResourceOptions(depends_on=[command_k3sup_install_resource]))
             copy_cilium_resource = remote.CopyFile(f"copyCiliumInstallFileResource-{name}-{ip}",
                 connection=connection,
                 local_path="files/cilium_install.sh",
                 remote_path="/tmp/cilium_install.sh",
                 triggers=["any"],
-                opts=pulumi.ResourceOptions(depends_on=[command_k3sup_install_resource, wait30_seconds])
+                opts=pulumi.ResourceOptions(depends_on=[command_k3sup_install_resource])
             )
             command_cilium_install_resource = remote.Command(f"commandCiliumResource-install-{name}",
                 connection=connection,
@@ -59,18 +63,18 @@ def bootstrap(node_list, dependencies):
             )
 
         elif item["vm_type"] == "server" and index >= 1:
-            wait30_seconds = time.Sleep(f"wait30Seconds-{item['name']}-server-bootstrap", create_duration="30s", opts=pulumi.ResourceOptions(depends_on=[copy_cilium_resource]))
+            # wait30_seconds = time.Sleep(f"wait30Seconds-{item['name']}-server-bootstrap", create_duration="30s", opts=pulumi.ResourceOptions(depends_on=[]))
             command_k3sup_server_resource = remote.Command(f"commandResource-server-{name}",
                 connection=connection,
                 create=f'sh /tmp/k3sup_install.sh server {item["server_ip"]} {item["ip"]} {item["user"]} "{item["ssh_priv_key"]}" {item["tls_san"]}',
                 update=f'sh /tmp/k3sup_install.sh server {item["server_ip"]} {item["ip"]} {item["user"]} "{item["ssh_priv_key"]}" {item["tls_san"]}',
-                opts=pulumi.ResourceOptions(depends_on=[copy_file_resource, command_cilium_install_resource, wait30_seconds])
+                opts=pulumi.ResourceOptions(depends_on=[copy_file_resource])
             )
         elif item["vm_type"] == "agent":
-            wait30_seconds = time.Sleep(f"wait30Seconds-{item['name']}-agent-bootstrap", create_duration="30s", opts=pulumi.ResourceOptions(depends_on=[copy_file_resource]))
+            # wait30_seconds = time.Sleep(f"wait30Seconds-{item['name']}-agent-bootstrap", create_duration="30s", opts=pulumi.ResourceOptions(depends_on=[copy_file_resource]))
             command_k3sup_agent_resource = remote.Command(f"commandResource-agent-{name}",
                 connection=connection,
                 create=f'sh /tmp/k3sup_install.sh agent {item["server_ip"]} {item["ip"]} {item["user"]} "{item["ssh_priv_key"]}" {item["tls_san"]}',
                 update=f'sh /tmp/k3sup_install.sh agent {item["server_ip"]} {item["ip"]} {item["user"]} "{item["ssh_priv_key"]}" {item["tls_san"]}',
-                opts=pulumi.ResourceOptions(depends_on=[copy_file_resource, wait30_seconds])
+                opts=pulumi.ResourceOptions(depends_on=[copy_file_resource])
             )
