@@ -63,7 +63,7 @@ spec:
 
         driver:
           localtimeHostPath: ""
-          existingConfigSecret: democratic-csi-driver-config-1password
+          existingConfigSecret: democratic-csi-driver-config
           config:
             driver: freenas-api-iscsi
             instance_id:
