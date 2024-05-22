@@ -1,0 +1,48 @@
+version: '3'
+vars:
+  CYAN: tput setaf 6
+  RED: tput setaf 1
+  YELLOW: tput setaf 3
+  GREEN: tput setaf 2
+  BLUE: tput setaf 1
+  PURPLE: tput setaf 5
+  BG_B: tput setab 0
+  BOLD: tput bold
+  RESET: tput sgr0
+  CLEAR: tput reset
+  INT_REGISTRY: registry.localhost
+  PATH_ERROR: is not installed or correctly configured in PATH.
+  ENV: prod-lab
+
+silent: true
+
+tasks:
+
+  install:
+    desc: Installs democratic csi config maps
+    dir: config/democratic-csi
+    preconditions:
+    - sh: 'which kustomize'
+      msg: 'kustomize {{.PATH_ERROR}}'
+    - sh: 'which kubectl'
+      msg: 'kubectl {{.PATH_ERROR}}'
+    cmds:
+    - kubectl config use-context {{.ENV}} --cluster={{.ENV}} --namespace=democratic-csi
+    - kubectl create namespace democratic-csi
+    - kubectl create configmap --namespace democratic-csi freenas-nfs-democratic-csi-config --from-file=./freenas-nfs.yaml
+    - echo ""
+    ignore_error: true
+
+  rm:
+    dsc: Remove democratic csi config maps
+    dir: config/democratic-csi
+    preconditions:
+    - sh: 'which kustomize'
+      msg: 'kustomize {{.PATH_ERROR}}'
+    - sh: 'which kubectl'
+      msg: 'kubectl {{.PATH_ERROR}}'
+    cmds:
+    - kubectl config use-context {{.ENV}} --cluster={{.ENV}} --namespace=democratic-csi
+    - kubectl delete configmap --namespace democratic-csi freenas-nfs-democratic-csi-config
+    - echo ""
+    ignore_error: true

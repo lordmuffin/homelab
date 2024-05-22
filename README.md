@@ -151,6 +151,11 @@ kubectl create secret generic op-credentials -n 1password --from-file=1password-
 docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=<ENVIRONMENT> -e TOKEN=<TOKEN> -ti homelab-launcher:v0.1.3 task 1password:install
 ```
 
+#### 5. Democratic-csi
+```
+docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=<ENVIRONMENT> -e API_KEY=<API_KEY> -ti homelab-launcher:v0.1.3 task csi:install
+```
+
 #### 5. Install ArgoCD
 ```
 docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=<ENVIRONMENT> -e GH_USER=lordmuffin -e GH_PASS=<GH-TOKEN> -ti homelab-launcher:v0.1.3 task argocd:install

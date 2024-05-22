@@ -4,6 +4,7 @@ silent: true
 
 includes:
   cli: ./tasks/cli.yaml
+  csi: ./tasks/csi.yaml
   postgres: ./tasks/postgres.yaml
   tailscale: ./tasks/tailscale.yaml
   argocd: ./tasks/argocd.yaml
