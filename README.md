@@ -153,7 +153,8 @@ docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=<ENVIRONMENT>
 
 #### 5. Democratic-csi
 ```
-docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=<ENVIRONMENT> -e API_KEY=<API_KEY> -ti homelab-launcher:v0.1.3 task csi:install
+docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=prod-lab -e APITOKEN=3-gIwGlyCyW0ObePaczJ6UaCVrt92guDpTIMJzg8CHdF2ZZQ302MTLfNjUJ6r1Yc0S -ti homelab-launcher:v0.1.3 task secrets:democratic-csi-nfs-driver-config
+docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=prod-lab -e APITOKEN=3-gIwGlyCyW0ObePaczJ6UaCVrt92guDpTIMJzg8CHdF2ZZQ302MTLfNjUJ6r1Yc0S -ti homelab-launcher:v0.1.3 task secrets:democratic-csi-driver-config
 ```
 
 #### 5. Install ArgoCD
