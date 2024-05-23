@@ -170,18 +170,7 @@ docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=$ENV -e APITO
 docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=$ENV -e GH_USER=$GH_USER -e GH_PASS=$GH_PASS -ti homelab-launcher:v0.1.3 task argocd:install
 ```
 
-#### 6. Create Headscale image
-```
-cd ~/Git
-git clone https://github.com/juanfont/headscale.git
-docker build -t ghcr.io/lordmuffin/homelab-headscale:latest ./headscale
-docker push ghcr.io/lordmuffin/homelab-headscale:latest
-```
 
-<!-- #### 4. Secrets democratic-csi-driver-config - OLD -->
-<!-- ```
-docker run --rm -v ~/.kube/:/root/.kube:ro -v ${PWD}:/launcher -e APITOKEN=<PASSWORD> -ti homelab-launcher:v0.1.3 task secrets:democratic-csi-driver-config
-``` -->
 
 <br>
 <p align="center">

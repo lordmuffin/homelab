@@ -6,7 +6,7 @@ spec:
   project: core
   source:
     repoURL: https://github.com/democratic-csi/charts.git
-    targetRevision: democratic-csi-0.14.3
+    targetRevision: democratic-csi-0.14.6
     path: stable/democratic-csi
     helm:
       releaseName: democratic-csi
