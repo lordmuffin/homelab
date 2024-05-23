@@ -90,7 +90,8 @@ tasks:
     - kubectl create namespace argocd
     # - kubectl kustomize --enable-helm | kubectl apply -f -
     - kustomize build . | kubectl apply -f -
-    # - sleep 10
+    - sleep 10
+    - kustomize build . | kubectl apply -f -
     # - kustomize build . | kubectl apply -f -
     - kubectl wait deploy/argocd-server -n argocd --for condition=available --timeout=600s
     - echo ""

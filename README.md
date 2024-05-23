@@ -118,6 +118,15 @@ cilium hubble enable --namespace cilium
 
 
 ## Docker Launcher Steps
+#### 0. SET VARS
+```
+export ENV="prod-lab"
+export OP_TOKEN="$(op read "op://HomeLab/x65o3xuspdsumormc5ffp4p2v4/credential")"
+export GH_USER="lordmuffin"
+export GH_PASS="$(op read "op://Private/GitHub General Access Token/password")"
+export APITOKEN="$(op read "op://Private/TrueNAS API Key/password")"
+```
+
 #### 1. k3sup get configs and set context
 ```
 export IP=192.168.11.30
@@ -138,29 +147,27 @@ k3sup install \
 ```
 #### 2. Set Context
 ```
-kubectl config set-context prod-lab --cluster=prod-lab
+kubectl config set-context $ENV --cluster=$ENV
 ```
 #### 3. Install namespaces
 ```
-docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=<ENVIRONMENT> -ti homelab-launcher:v0.1.3 task namespaces:create
+docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=$ENV -ti homelab-launcher:v0.1.3 task namespaces:create
 ```
 
 #### 4. 1Password Instead of Vault??
 ```
-kubectl create secret generic op-credentials -n 1password --from-file=1password-credentials.json=./launcher/1password-credentials.json
-
-docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=<ENVIRONMENT> -e TOKEN=<TOKEN> -ti homelab-launcher:v0.1.3 task 1password:install
+docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=$ENV -e TOKEN=1P_TOKEN -ti homelab-launcher:v0.1.3 task 1password:install
 ```
 
 #### 5. Democratic-csi
 ```
-docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=prod-lab -e APITOKEN=3-gIwGlyCyW0ObePaczJ6UaCVrt92guDpTIMJzg8CHdF2ZZQ302MTLfNjUJ6r1Yc0S -ti homelab-launcher:v0.1.3 task secrets:democratic-csi-nfs-driver-config
-docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=prod-lab -e APITOKEN=3-gIwGlyCyW0ObePaczJ6UaCVrt92guDpTIMJzg8CHdF2ZZQ302MTLfNjUJ6r1Yc0S -ti homelab-launcher:v0.1.3 task secrets:democratic-csi-driver-config
+docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=$ENV -e APITOKEN=$APITOKEN -ti homelab-launcher:v0.1.3 task secrets:democratic-csi-nfs-driver-config
+docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=$ENV -e APITOKEN=$APITOKEN -ti homelab-launcher:v0.1.3 task secrets:democratic-csi-driver-config
 ```
 
 #### 5. Install ArgoCD
 ```
-docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=<ENVIRONMENT> -e GH_USER=lordmuffin -e GH_PASS=<GH-TOKEN> -ti homelab-launcher:v0.1.3 task argocd:install
+docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=$ENV -e GH_USER=$GH_USER -e GH_PASS=$GH_PASS -ti homelab-launcher:v0.1.3 task argocd:install
 ```
 
 #### 6. Create Headscale image
