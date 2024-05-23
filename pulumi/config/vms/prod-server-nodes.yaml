@@ -7,7 +7,7 @@
   resource_name: "lab"
   vm_id: 2000
   clone_vm_id: 8000
-  tls_san: "192.168.1.15"
+  tls_san: "192.168.11.10"
   agent:
     enabled: true
     type: "virtio"
@@ -28,8 +28,8 @@
       servers: ["1.1.1.1","8.8.8.8"]
     ip_configs:
       - ipv4:
-          address: "192.168.10.40/24"
-          gateway: "192.168.10.1"
+          address: "192.168.11.30/24"
+          gateway: "192.168.11.1"
     user_account:
       username: "ubuntu"
       password: "ubuntu"
@@ -50,7 +50,7 @@
     - net1:
         bridge: "vmbr0"
         model: "virtio"
-        vlan_id: 10
+        vlan_id: 11
   on_boot: true
 
 

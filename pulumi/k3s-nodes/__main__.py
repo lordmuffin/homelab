@@ -400,8 +400,8 @@ for vm in parsed_data:
                         ),
                         ip_configs=ip_configs,
                         user_account=proxmox.vm.VirtualMachineInitializationUserAccountArgs(
-                            username=v['cloud_init']['user_account']['username'],
-                            password=v['cloud_init']['user_account']['password'],
+                            username=os.getenv("VM_USER"),
+                            password=os.getenv("VM_PASS"),
                             keys=ssh_keys
                         ),
                     ),

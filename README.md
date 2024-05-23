@@ -120,10 +120,11 @@ cilium hubble enable --namespace cilium
 ## Docker Launcher Steps
 #### 1. k3sup get configs and set context
 ```
-export IP=192.168.10.40
+export IP=192.168.11.30
 export USER=ubuntu
 export NAME=prod-lab
 export SSH_PRIV_KEY=~/.ssh/ubuntu.pem
+rm $SSH_PRIV_KEY
 op read --out-file $SSH_PRIV_KEY "op://HomeLab/onarfzninuoetwe2hh2ni7m52q/private key?ssh-format=openssh"
 
 k3sup install \
