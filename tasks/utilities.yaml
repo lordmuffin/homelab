@@ -1,0 +1,49 @@
+version: '3'
+vars:
+  CYAN: tput setaf 6
+  RED: tput setaf 1
+  YELLOW: tput setaf 3
+  GREEN: tput setaf 2
+  BLUE: tput setaf 1
+  PURPLE: tput setaf 5
+  BG_B: tput setab 0
+  BOLD: tput bold
+  RESET: tput sgr0
+  CLEAR: tput reset
+  INT_REGISTRY: registry.localhost
+  PATH_ERROR: is not installed or correctly configured in PATH.
+  ARGOCD_VERSION: 2.8.3
+  ENV: prod-lab
+  user: ubuntu
+
+silent: true
+
+tasks:
+  restart:
+    desc: Restart's all cluster nodes.
+    # dir: apps/argocd
+    preconditions:
+    - sh: 'which kustomize'
+      msg: 'kustomize {{.PATH_ERROR}}'
+    - sh: 'which kubectl'
+      msg: 'kubectl {{.PATH_ERROR}}'
+    cmds:
+    - |
+      export NODES=$(kubectl get nodes -o wide | awk -v OFS='\t\t' 'NR>1 {print $6}')
+      echo $NODES
+      for n in $NODES; do
+        echo "rebooting node: $n"
+        ssh -o "StrictHostKeyChecking no" -l $user $n "sudo reboot now"
+      done
+
+
+    # - kubectl config use-context {{.ENV}} --cluster={{.ENV}} --namespace=argocd
+    # - kubectl create namespace argocd
+    # # - kubectl kustomize --enable-helm | kubectl apply -f -
+    # - kustomize build . | kubectl apply -f -
+    # - sleep 10
+    # - kustomize build . | kubectl apply -f -
+    # # - kustomize build . | kubectl apply -f -
+    # - kubectl wait deploy/argocd-server -n argocd --for condition=available --timeout=600s
+    # - echo ""
+    ignore_error: true

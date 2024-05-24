@@ -21,6 +21,7 @@ includes:
   talos: ./tasks/talos.yaml
   commit: ./tasks/commit.yaml
   milvus: ./tasks/milvus.yaml
+  utilities: ./tasks/utilities.yaml
 
 vars:
   PATH_ERROR: is not installed or correctly configured in PATH.

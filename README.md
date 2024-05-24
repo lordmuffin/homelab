@@ -170,6 +170,11 @@ docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=$ENV -e APITO
 docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=$ENV -e GH_USER=$GH_USER -e GH_PASS=$GH_PASS -ti homelab-launcher:v0.1.3 task argocd:install
 ```
 
+#### 5. Utilities like reboot
+```
+docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=$ENV -ti homelab-launcher:v0.1.3 task utilities:restart
+```
+
 
 
 <br>

@@ -59,7 +59,7 @@ spec:
         #    snapshotter-secret:
 
         driver:
-          existingConfigSecret: democratic-csi-driver-config
+          existingConfigSecret: democratic-csi-nfs-driver-config
           config:
             # please see the most up-to-date example of the corresponding config here:
             # https://github.com/democratic-csi/democratic-csi/tree/master/examples
