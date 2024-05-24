@@ -40,8 +40,8 @@ spec:
             # detachedVolumesFromVolumes: "false"
 
           mountOptions:
-          - noatime
-          - nfsvers=4
+          # - noatime
+          # - nfsvers=4
           secrets:
             provisioner-secret:
             controller-publish-secret:
