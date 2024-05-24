@@ -15,6 +15,10 @@ spec:
           # should be globally unique for a given cluster
           name: "org.democratic-csi.nfs"
 
+        controller:
+          driver:
+            logLevel: debug
+
         # add note here about volume expansion requirements
         storageClasses:
         - name: freenas-nfs-csi
