@@ -118,36 +118,22 @@ cilium hubble enable --namespace cilium
 
 
 ## Docker Launcher Steps
-#### 0. SET VARS
+#### 0. k3sup get configs and set context
+```
+docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher \
+-ti homelab-launcher:v0.1.3 task cluster:update-config
+```
+
+#### 3. Cluster Pre Seed # Replace steps 3+
 ```
 export ENV="prod-lab"
 export OP_TOKEN="$(op read "op://HomeLab/x65o3xuspdsumormc5ffp4p2v4/credential")"
 export GH_USER="lordmuffin"
 export GH_PASS="$(op read "op://Private/GitHub General Access Token/password")"
-export APITOKEN="$(op read "op://Private/TrueNAS API Key/password")"
-```
+export NAS_API_KEY="$(op read "op://Private/TrueNAS API Key/password")"
 
-#### 1. k3sup get configs and set context
-```
-export IP=192.168.11.30
-export USER=ubuntu
-export NAME=prod-lab
-export SSH_PRIV_KEY=~/.ssh/ubuntu.pem
-rm $SSH_PRIV_KEY
-op read --out-file $SSH_PRIV_KEY "op://HomeLab/onarfzninuoetwe2hh2ni7m52q/private key?ssh-format=openssh"
+docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=$ENV -e OP_TOKEN=$OP_TOKEN -e GH_USER=$GH_USER -e GH_PASS=$GH_PASS -e NAS_API_KEY=$NAS_API_KEY -ti homelab-launcher:v0.1.3 task cluster:pre-seed
 
-k3sup install \
-  --ip $IP \
-  --user $USER \
-  --skip-install \
-  --ssh-key $SSH_PRIV_KEY \
-  --merge \
-  --local-path $HOME/.kube/config \
-  --context $NAME
-```
-#### 2. Set Context
-```
-kubectl config set-context $ENV --cluster=$ENV
 ```
 #### 3. Install namespaces
 ```
@@ -161,8 +147,8 @@ docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=$ENV -e TOKEN
 
 #### 5. Democratic-csi
 ```
-docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=$ENV -e APITOKEN=$APITOKEN -ti homelab-launcher:v0.1.3 task secrets:democratic-csi-nfs-driver-config
-docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=$ENV -e APITOKEN=$APITOKEN -ti homelab-launcher:v0.1.3 task secrets:democratic-csi-driver-config
+docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=$ENV -e NAS_API_KEY=$NAS_API_KEY -ti homelab-launcher:v0.1.3 task secrets:democratic-csi-nfs-driver-config
+docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=$ENV -e NAS_API_KEY=$NAS_API_KEY -ti homelab-launcher:v0.1.3 task secrets:democratic-csi-driver-config
 ```
 
 #### 5. Install ArgoCD

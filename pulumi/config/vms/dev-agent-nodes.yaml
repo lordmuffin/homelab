@@ -6,7 +6,7 @@
   environment: "dev"
   resource_name: "lab"
   vm_id: 1100
-  clone_vm_id: 8000
+  clone_vm_id: 8001
   tls_san: "192.168.1.10"
   agent:
     enabled: true
@@ -28,7 +28,7 @@
       servers: ["1.1.1.1","8.8.8.8"]
     ip_configs:
       - ipv4:
-          address: "192.168.10.35/24"
+          address: "192.168.10.40/24"
           gateway: "192.168.10.1"
     user_account:
       username: "ubuntu"

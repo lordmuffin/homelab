@@ -174,6 +174,7 @@ for p in providers_data:
         providers_i["name"] = i["name"]
         providers_i["node_name"] = i["node_name"]
         providers_i["provider"] = provider
+        providers_i["hostpcis"] = i["hostpcis"]
 
         providers.append(providers_i)
 
@@ -306,7 +307,7 @@ for vm in parsed_data:
 
                 pulumi.export(v['name'], virtual_machine.id)
 
-        if v["vm_type"] == "agent":
+        elif v["vm_type"] == "agent":
             for vmcount in range(v['count']):
                 base_resource_name=v['environment'] + "-" + v['resource_name'] + "-" + v['vm_type']
                 name_counter = vmcount + 1
@@ -390,6 +391,138 @@ for vm in parsed_data:
                     ),
                     name=f"{base_resource_name}-{name_counter:03d}",
                     network_devices=nets,
+                    initialization=proxmox.vm.VirtualMachineInitializationArgs(
+                        type=v['cloud_init']['type'],
+                        datastore_id=v['cloud_init']['datastore_id'],
+                        interface=v['cloud_init']['interface'],
+                        dns=proxmox.vm.VirtualMachineInitializationDnsArgs(
+                            domain=v['cloud_init']['dns']['domain'],
+                            servers=v['cloud_init']['dns']['servers']
+                        ),
+                        ip_configs=ip_configs,
+                        user_account=proxmox.vm.VirtualMachineInitializationUserAccountArgs(
+                            username=os.getenv("VM_USER"),
+                            password=os.getenv("VM_PASS"),
+                            keys=ssh_keys
+                        ),
+                    ),
+                    on_boot=v['on_boot'],
+                    reboot=v['on_boot'],
+                    opts=pulumi.ResourceOptions(provider=provider,ignore_changes=v['ignore_changes'],depends_on=dependencies),
+                )
+
+                vm_details = Output.all(virtual_machine.name, virtual_machine.id) \
+                .apply(lambda args: {
+                    args[0]: args[1]
+                })
+                # vm_id = virtual_machine.id.apply(lambda id: virtual_machine.id)
+                # vm_name = f"{base_resource_name}-{name_counter}",
+                vm_ids.append(vm_details)
+
+                # wait30_seconds = time.Sleep(f"wait30Seconds-{base_resource_name}-{name_counter:03d}-build", create_duration="30s", opts=pulumi.ResourceOptions(depends_on=[virtual_machine]))
+
+                # dependencies.append(wait30_seconds)
+                dependencies.append(virtual_machine)
+
+                pulumi.export(v['name'], virtual_machine.id)
+            #
+            # Run bootstrap process
+            # WAIT FOR VM's to be built.
+
+        elif v["vm_type"] == "gpu-agent":
+            for vmcount in range(v['count']):
+                base_resource_name=v['environment'] + "-" + v['resource_name'] + "-" + v['vm_type']
+                name_counter = vmcount + 1
+                base_vm_id=v['vm_id'],
+
+                if providers[vmcount]["hostpcis"] == "gpu":
+                    provider = providers[vmcount]["provider"]
+                    node_name = providers[vmcount]["node_name"]
+                    hostpcis = providers[vmcount]["hostpcis"]
+                else:
+                    continue
+
+                for disk_entry in v['disks']:
+                    for d in disk_entry:
+                        disks.append(
+                            proxmox.vm.VirtualMachineDiskArgs(
+                                interface=disk_entry[d]['interface'],
+                                datastore_id=disk_entry[d]['datastore_id'],
+                                size=disk_entry[d]['size'],
+                                file_format=disk_entry[d]['file_format'],
+                                cache=disk_entry[d]['cache']
+                            )
+                        )
+
+                for ip_config_entry in v['cloud_init']['ip_configs']:
+                    ipv4 = ip_config_entry.get('ipv4')
+
+                    if ipv4:
+                        new_address = ''
+                        ip, subnet = ipv4.get('address', '').split('/')
+                        gateway = ipv4.get('gateway')
+                        new_ip = str(ipaddress.ip_address(ip) + vmcount)
+                        new_address = f"{new_ip}/{subnet}"
+
+                        ip_configs = []
+                        ip_configs.append(
+                            proxmox.vm.VirtualMachineInitializationIpConfigArgs(
+                                ipv4=proxmox.vm.VirtualMachineInitializationIpConfigIpv4Args(
+                                    address=new_address,
+                                    gateway=gateway
+                                )
+                            )
+                        )
+
+                for ssk_keys_entry in v['cloud_init']['user_account']['keys']:
+                    ssh_keys.append(ssk_keys_entry)
+
+                if os.getenv("SSH_PUB_KEY"):
+                    ssh_keys.append(os.getenv("SSH_PUB_KEY"))
+
+                for net_entry in v['network_devices']:
+                    for n in net_entry:
+                        print(f"NETWORK INTERFACES:: {n}")
+                        nets.append(
+                            proxmox.vm.VirtualMachineNetworkDeviceArgs(
+                                bridge=net_entry[n]['bridge'],
+                                model=net_entry[n]['model'],
+                                vlan_id=net_entry[n]['vlan_id']
+                            )
+                        )
+
+                hostpcis=proxmoxve.vm.VirtualMachineHostpciArgs(
+                            device="hostpci0",
+                            mapping=hostpcis,
+                        )
+                
+                virtual_machine = proxmox.vm.VirtualMachine(
+                    vm_id=base_vm_id[0] + vmcount,
+                    resource_name=f"{base_resource_name}-{name_counter:03d}",
+                    node_name=node_name,
+                    agent=proxmox.vm.VirtualMachineAgentArgs(
+                        enabled=v['agent']['enabled'],
+                        # trim=v['agent']['trim'],
+                        type=v['agent']['type']
+                    ),
+                    bios=v['bios'],
+                    cpu=proxmox.vm.VirtualMachineCpuArgs(
+                        cores=v['cpu']['cores'],
+                        sockets=v['cpu']['sockets'],
+                        type="kvm64"
+                    ),
+                    clone=proxmox.vm.VirtualMachineCloneArgs(
+                        node_name=node_name,
+                        vm_id=v["clone_vm_id"],
+                        full=v['clone']['full'],
+                    ),
+                    disks=disks,
+                    memory=proxmox.vm.VirtualMachineMemoryArgs(
+                        dedicated=v['memory']['dedicated']
+                    ),
+                    name=f"{base_resource_name}-{name_counter:03d}",
+                    network_devices=nets,
+                    hostpcis=[hostpcis],
                     initialization=proxmox.vm.VirtualMachineInitializationArgs(
                         type=v['cloud_init']['type'],
                         datastore_id=v['cloud_init']['datastore_id'],

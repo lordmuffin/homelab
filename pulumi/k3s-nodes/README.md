@@ -1,7 +1,7 @@
 # Pulumi Setup
 ```
 export IMG="pulumi/pulumi-python:latest"
-docker run -e PULUMI_ACCESS_TOKEN=$(op read "op://HomeLab/Pulumi Access Token/password") \
+docker run --rm -e PULUMI_ACCESS_TOKEN=$(op read "op://HomeLab/Pulumi Access Token/password") \
 -e "PROXMOX_VE_PASSWORD=$(op read "op://HomeLab/proxmox pulumi/password")" \
 -e "SSH_PUB_KEY=$(op read "op://HomeLab/onarfzninuoetwe2hh2ni7m52q/public key")" \
 -e "SSH_PRIV_KEY=$(op read "op://HomeLab/onarfzninuoetwe2hh2ni7m52q/private key?ssh-format=openssh")" \
@@ -9,15 +9,17 @@ docker run -e PULUMI_ACCESS_TOKEN=$(op read "op://HomeLab/Pulumi Access Token/pa
 -e "VM_PASS=$(op read "op://HomeLab/Ubuntu VM Default Creds/password")" \
 -v "$(pwd)/pulumi:/pulumi/projects" $IMG /bin/bash -c "cd /pulumi/projects/$PROJECT && pip install -r ./requirements.txt && pulumi up -f -y -s dev"
 ```
+```
 export IMG="pulumi/pulumi-python:latest"
-docker run -e PULUMI_ACCESS_TOKEN=$(op read "op://HomeLab/Pulumi Access Token/password") \
+docker run --rm -e PULUMI_ACCESS_TOKEN=$(op read "op://HomeLab/Pulumi Access Token/password") \
 -e "PROXMOX_VE_PASSWORD=$(op read "op://HomeLab/proxmox pulumi/password")" \
 -v "$(pwd)/pulumi:/pulumi/projects" $IMG /bin/bash -c "cd /pulumi/projects/$PROJECT && pulumi destroy --continue-on-error --yes -s dev"
 ```
-export PROXMOX_VE_ENDPOINT="https://192.168.1.13:8006/"
-export PROXMOX_VE_USERNAME="pulumi@pve"
-export PROXMOX_VE_PASSWORD="pulumi"
-
+```
+export IMG="pulumi/pulumi-python:latest"
+docker run --rm -e PULUMI_ACCESS_TOKEN=$(op read "op://HomeLab/Pulumi Access Token/password") \
+-e "PROXMOX_VE_PASSWORD=$(op read "op://HomeLab/proxmox pulumi/password")" \
+-v "$(pwd)/pulumi:/pulumi/projects" $IMG /bin/bash -c "cd /pulumi/projects/$PROJECT && pulumi refresh --yes -s dev"
 ```
 # K3Sup Commands
 ```
@@ -57,6 +59,7 @@ qm set $VM_ID --serial0 socket --vga serial0
 qm set $VM_ID --agent enabled=1
 qm resize $VM_ID scsi0 40G
 qm template $VM_ID
+
 ```
 
 # NOT USED::

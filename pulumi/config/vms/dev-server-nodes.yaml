@@ -6,7 +6,7 @@
   environment: "dev"
   resource_name: "lab"
   vm_id: 1000
-  clone_vm_id: 8000
+  clone_vm_id: 8001
   tls_san: "192.168.1.10"
   agent:
     enabled: true

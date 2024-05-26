@@ -38,6 +38,10 @@ def create_vm(name, description, node_name, clone_vm_id, on_boot, reboot, starte
         datastore_id="local-lvm",  # template's datastore
         node_name=node_name,  # template's node name
     )
+    hostpcis=proxmoxve.vm.VirtualMachineHostpciArgs(
+        device="hostpci0",
+        id=id,
+    )
     vm_cpu_spec=proxmoxve.vm.VirtualMachineCpuArgs(
         cores=2,
         sockets=1,
