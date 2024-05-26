@@ -37,20 +37,26 @@ https://techno-tim.github.io/posts/cloud-init-cloud-image/
 Run this on pve nodes directly (Future State: Write a remote script? Pulumi?)
 ```
 apt install libguestfs-tools -y
+# Ubuntu 22.04
+wget https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img
+# Ubuntu 24.04
 wget https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img
 
+export IMG=jammy-server-cloudimg-amd64.img
+export VM_ID=8001
+export VER=22.04
 
-virt-customize -a noble-server-cloudimg-amd64.img --install qemu-guest-agent
-qm destroy 8000
-qm create 8000 --memory 2048 --core 2 --name ubuntu-cloud-24.04 --ostype l26 --net0 virtio,bridge=vmbr0
-qm importdisk 8000 noble-server-cloudimg-amd64.img local-lvm
-qm set 8000 --scsihw virtio-scsi-pci --scsi0 local-lvm:vm-8000-disk-0
-qm set 8000 --scsi1 local-lvm:cloudinit
-qm set 8000 --boot c --bootdisk scsi0
-qm set 8000 --serial0 socket --vga serial0
-qm set 8000 --agent enabled=1
-qm resize 8000 scsi0 40G
-qm template 8000
+virt-customize -a $IMG --install qemu-guest-agent
+qm destroy $VM_ID
+qm create $VM_ID --memory 2048 --core 2 --name ubuntu-cloud-$VER --ostype l26 --net0 virtio,bridge=vmbr0
+qm importdisk $VM_ID $IMG local-lvm
+qm set $VM_ID --scsihw virtio-scsi-pci --scsi0 local-lvm:vm-$VM_ID-disk-0
+qm set $VM_ID --scsi1 local-lvm:cloudinit
+qm set $VM_ID --boot c --bootdisk scsi0
+qm set $VM_ID --serial0 socket --vga serial0
+qm set $VM_ID --agent enabled=1
+qm resize $VM_ID scsi0 40G
+qm template $VM_ID
 ```
 
 # NOT USED::
@@ -62,4 +68,4 @@ runcmd:
     - reboot
 # Taken from https://forum.proxmox.com/threads/combining-custom-cloud-init-with-auto-generated.59008/page-3#post-428772
 EOF
-qm set 8000 --cicustom "user=local:snippets/template-user-data.yaml"
+qm set $VM_ID --cicustom "user=local:snippets/template-user-data.yaml"

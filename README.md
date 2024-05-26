@@ -156,7 +156,7 @@ docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=$ENV -ti home
 
 #### 4. 1Password Instead of Vault??
 ```
-docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=$ENV -e TOKEN=1P_TOKEN -ti homelab-launcher:v0.1.3 task 1password:install
+docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=$ENV -e TOKEN=$OP_TOKEN -ti homelab-launcher:v0.1.3 task 1password:install
 ```
 
 #### 5. Democratic-csi
@@ -175,6 +175,8 @@ docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=$ENV -e GH_US
 docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=$ENV -ti homelab-launcher:v0.1.3 task utilities:restart
 ```
 
+#### 6. GPU Passthrough (Per Node)
+https://www.virtualizationhowto.com/2023/10/proxmox-gpu-passthrough-step-by-step-guide/
 
 
 <br>
