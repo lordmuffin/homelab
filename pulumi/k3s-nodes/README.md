@@ -7,19 +7,19 @@ docker run --rm -e PULUMI_ACCESS_TOKEN=$(op read "op://HomeLab/Pulumi Access Tok
 -e "SSH_PRIV_KEY=$(op read "op://HomeLab/onarfzninuoetwe2hh2ni7m52q/private key?ssh-format=openssh")" \
 -e "VM_USER=$(op read "op://HomeLab/Ubuntu VM Default Creds/username")" \
 -e "VM_PASS=$(op read "op://HomeLab/Ubuntu VM Default Creds/password")" \
--v "$(pwd)/pulumi:/pulumi/projects" $IMG /bin/bash -c "cd /pulumi/projects/$PROJECT && pip install -r ./requirements.txt && pulumi up -f -y -s dev"
+-v "$(pwd)/pulumi:/pulumi/projects" $IMG /bin/bash -c "cd /pulumi/projects/k3s-nodes && pip install -r ./requirements.txt && pulumi up -f -y -s dev"
 ```
 ```
 export IMG="pulumi/pulumi-python:latest"
 docker run --rm -e PULUMI_ACCESS_TOKEN=$(op read "op://HomeLab/Pulumi Access Token/password") \
 -e "PROXMOX_VE_PASSWORD=$(op read "op://HomeLab/proxmox pulumi/password")" \
--v "$(pwd)/pulumi:/pulumi/projects" $IMG /bin/bash -c "cd /pulumi/projects/$PROJECT && pulumi destroy --continue-on-error --yes -s dev"
+-v "$(pwd)/pulumi:/pulumi/projects" $IMG /bin/bash -c "cd /pulumi/projects/k3s-nodes && pulumi destroy --continue-on-error --yes -s dev"
 ```
 ```
 export IMG="pulumi/pulumi-python:latest"
 docker run --rm -e PULUMI_ACCESS_TOKEN=$(op read "op://HomeLab/Pulumi Access Token/password") \
 -e "PROXMOX_VE_PASSWORD=$(op read "op://HomeLab/proxmox pulumi/password")" \
--v "$(pwd)/pulumi:/pulumi/projects" $IMG /bin/bash -c "cd /pulumi/projects/$PROJECT && pulumi refresh --yes -s dev"
+-v "$(pwd)/pulumi:/pulumi/projects" $IMG /bin/bash -c "cd /pulumi/projects/k3s-nodes && pulumi refresh --yes -s dev"
 ```
 # K3Sup Commands
 ```

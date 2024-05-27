@@ -24,6 +24,10 @@ RUN set -ex; \
     chmod +x kubeconform
 
 RUN set -ex; \
+    curl -fLO https://github.com/alexellis/k3sup/releases/download/0.13.5/k3sup && \
+    chmod +x k3sup
+
+RUN set -ex; \
     sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b task && \
     chmod +x ./task/task
 
@@ -64,6 +68,7 @@ COPY --from=downloader /downloads/kubectl /usr/local/bin/kubectl
 COPY --from=downloader /downloads/kustomize /usr/local/bin/kustomize
 COPY --from=downloader /downloads/linux-arm64/helm /usr/local/bin/helm
 COPY --from=downloader /downloads/kubeconform /usr/local/bin/kubeconform
+COPY --from=downloader /downloads/k3sup /usr/local/bin/k3sup
 COPY --from=downloader /downloads/task/task /usr/local/bin/task
 COPY --from=downloader /downloads/terraform /usr/local/bin/terraform
 COPY --from=downloader /downloads/kuota-calc /usr/local/bin/kuota-calc
@@ -75,4 +80,4 @@ FROM runtime AS test
 
 RUN set -ex; kubectl && kustomize && task --version && helm version && \
     terraform --version && kuota-calc --version && argocd version && yamllint -v && \
-    kubeconform -v
+    kubeconform -v && k3sup version

@@ -1,19 +1,19 @@
 ---
-- name: "node_pve_provider"
+- name: "pve_provider"
   node_name: "pve"
   vm_id: 8000
   endpoint: "https://192.168.1.13:8006/"
   username: pulumi@pve
   insecure: True
   hostpcis: ""
-- name: "node_pve2_provider"
+- name: "pve2_provider"
   node_name: "pve2"
   vm_id: 8000
   endpoint: "https://192.168.1.14:8006/"
   username: pulumi@pve
   insecure: True
   hostpcis: "gpu"
-- name: "node_pve_nas_01_provider"
+- name: "pve_nas_01_provider"
   node_name: "pve-nas-01"
   vm_id: 8000
   endpoint: "https://192.168.1.15:8006/"

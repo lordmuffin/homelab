@@ -43,7 +43,7 @@ tasks:
           --skip-install \
           --ssh-key $SSH_PRIV_KEY \
           --merge \
-          --local-path $HOME/.kube/config \
+          --local-path ~/.kube/config \
           --context $NAME
       - |
         export IP=192.168.11.30
@@ -59,7 +59,7 @@ tasks:
           --skip-install \
           --ssh-key $SSH_PRIV_KEY \
           --merge \
-          --local-path $HOME/.kube/config \
+          --local-path ~/.kube/config \
           --context $NAME
     ignore_error: true  
 

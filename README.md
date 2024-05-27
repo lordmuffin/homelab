@@ -121,12 +121,12 @@ cilium hubble enable --namespace cilium
 #### 0. k3sup get configs and set context
 ```
 docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher \
--ti homelab-launcher:v0.1.3 task cluster:update-config
+-ti homelab-launcher:v0.2.0 task cluster:update-config
 ```
 
 #### 3. Cluster Pre Seed # Replace steps 3+
 ```
-export ENV="prod-lab"
+export ENV="dev-lab"
 export OP_TOKEN="$(op read "op://HomeLab/x65o3xuspdsumormc5ffp4p2v4/credential")"
 export GH_USER="lordmuffin"
 export GH_PASS="$(op read "op://Private/GitHub General Access Token/password")"
