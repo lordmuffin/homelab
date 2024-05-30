@@ -120,8 +120,17 @@ cilium hubble enable --namespace cilium
 ## Docker Launcher Steps
 #### 0. k3sup get configs and set context
 ```
-docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher \
--ti homelab-launcher:v0.2.0 task cluster:update-config
+docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -ti homelab-launcher:v0.2.0 task cluster:update-config
+
+export IP=192.168.10.30
+export USER=ubuntu
+export NAME=dev-lab
+export SSH_PRIV_KEY=~/.ssh/ubuntu.pem
+rm $SSH_PRIV_KEY
+rm ~/.kube/config
+op read --out-file $SSH_PRIV_KEY "op://HomeLab/onarfzninuoetwe2hh2ni7m52q/private key?ssh-format=openssh"
+
+k3sup install --ip $IP --user $USER --skip-install --ssh-key $SSH_PRIV_KEY --merge --local-path ~/.kube/config --context $NAME
 ```
 
 #### 3. Cluster Pre Seed # Replace steps 3+

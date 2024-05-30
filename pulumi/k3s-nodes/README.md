@@ -2,6 +2,7 @@
 ```
 export IMG="pulumi/pulumi-python:latest"
 docker run --rm -e PULUMI_ACCESS_TOKEN=$(op read "op://HomeLab/Pulumi Access Token/password") \
+-e "GITHUB_TOKEN=$(op read "op://Private/GitHub General Access Token/password")" \
 -e "PROXMOX_VE_PASSWORD=$(op read "op://HomeLab/proxmox pulumi/password")" \
 -e "SSH_PUB_KEY=$(op read "op://HomeLab/onarfzninuoetwe2hh2ni7m52q/public key")" \
 -e "SSH_PRIV_KEY=$(op read "op://HomeLab/onarfzninuoetwe2hh2ni7m52q/private key?ssh-format=openssh")" \

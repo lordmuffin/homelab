@@ -31,20 +31,20 @@ echo "Var NEXT_SERVER_IP=$NEXT_SERVER_IP"
 echo "Var USER=$USER"
 # echo "Var SSH_KEY=$SSH_KEY"
 
-echo "k3sup init cluster"
 if [ "$K3SUP_NODE_TYPE" = 'install' ]; then
+  echo "k3sup init cluster"
   k3sup install --cluster --ssh-key $SSH_KEY_PATH --ip $SERVER_IP --user $USER --k3s-version $K3S_VERSION --no-extras --k3s-extra-args "$K3S_OPTIONS"
   exit
 fi;
-sleep 30
-echo "k3sup add server nodes"
+
 if [ "$K3SUP_NODE_TYPE" = 'server' ]; then
+  echo "k3sup add server nodes"
   k3sup join --server --ssh-key $SSH_KEY_PATH --ip $NEXT_SERVER_IP --server-ip $SERVER_IP --user $USER --k3s-version $K3S_VERSION --no-extras --k3s-extra-args "$K3S_OPTIONS"
   exit
 fi;
 
-echo "k3sup add agent nodes"
 if [ "$K3SUP_NODE_TYPE" = 'agent' ]; then
+  echo "k3sup add agent nodes"
   k3sup join --ssh-key $SSH_KEY_PATH --ip $NEXT_SERVER_IP --server-ip $SERVER_IP --user $USER --k3s-version $K3S_VERSION
   exit
 fi;
