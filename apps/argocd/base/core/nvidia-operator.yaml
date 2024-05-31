@@ -11,6 +11,8 @@ spec:
     helm:
       releaseName: gpu-operator
       values: |
+        operator
+          defaultRuntime: containerd
         toolkit:
           env:
           - name: CONTAINERD_CONFIG

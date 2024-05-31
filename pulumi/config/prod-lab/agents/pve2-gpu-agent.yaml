@@ -1,14 +1,14 @@
 ---
-- name: "pve2-dev-gpu-agent-nodes"
+- name: "pve2-prod-gpu-agent-nodes"
   count: 1
   node_name: "pve2"
   vm_type: "gpu-agent" # server or agent
-  environment: "dev"
+  environment: "prod"
   resource_name: "lab"
   suffix: "002"
-  vm_id: 1200
+  vm_id: 2201
   clone_vm_id: 8001
-  tls_san: "192.168.1.10"
+  tls_san: "192.168.11.10"
   agent:
     enabled: true
     type: "virtio"
@@ -29,8 +29,8 @@
       servers: ["1.1.1.1","8.8.8.8"]
     ip_configs:
       - ipv4:
-          address: "192.168.10.51/24"
-          gateway: "192.168.10.1"
+          address: "192.168.11.51/24"
+          gateway: "192.168.11.1"
     user_account:
       username: "ubuntu"
       password: "ubuntu"
@@ -51,5 +51,5 @@
     - net1:
         bridge: "vmbr0"
         model: "virtio"
-        vlan_id: 10
+        vlan_id: 11
   on_boot: true

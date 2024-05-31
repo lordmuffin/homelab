@@ -1,14 +1,14 @@
 ---
-- name: "pve-nas-01-dev-gpu-agent-nodes"
+- name: "pve-dev-server-nodes"
   count: 1
-  node_name: "pve-nas-01"
-  vm_type: "gpu-agent" # server or agent
+  node_name: "pve"
+  vm_type: "server" # server or agent
   environment: "dev"
   resource_name: "lab"
-  suffix: "003"
-  vm_id: 1200
+  suffix: "001"
+  vm_id: 1000
   clone_vm_id: 8001
-  tls_san: "192.168.1.10"
+  tls_san: "192.168.10.10"
   agent:
     enabled: true
     type: "virtio"
@@ -18,7 +18,7 @@
     - "cdrom"
     - "started"
   cpu:
-    cores: 4
+    cores: 2
     sockets: 1
   cloud_init:
     type: "nocloud"
@@ -29,7 +29,7 @@
       servers: ["1.1.1.1","8.8.8.8"]
     ip_configs:
       - ipv4:
-          address: "192.168.10.52/24"
+          address: "192.168.10.30/24"
           gateway: "192.168.10.1"
     user_account:
       username: "ubuntu"
@@ -46,7 +46,7 @@
         file_format: "raw"
         cache: "none"
   memory:
-    dedicated: 8192
+    dedicated: 4096
   network_devices:
     - net1:
         bridge: "vmbr0"

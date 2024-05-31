@@ -1,14 +1,14 @@
 ---
-- name: "pve-nas-01-dev-server-nodes"
+- name: "pve-nas-01-prod-agent-nodes"
   count: 1
   node_name: "pve-nas-01"
-  vm_type: "server" # server or agent
-  environment: "dev"
+  vm_type: "agent" # server or agent
+  environment: "prod"
   resource_name: "lab"
   suffix: "003"
-  vm_id: 1001
+  vm_id: 2102
   clone_vm_id: 8001
-  tls_san: "192.168.1.10"
+  tls_san: "192.168.11.10"
   agent:
     enabled: true
     type: "virtio"
@@ -18,7 +18,7 @@
     - "cdrom"
     - "started"
   cpu:
-    cores: 2
+    cores: 4
     sockets: 1
   cloud_init:
     type: "nocloud"
@@ -29,8 +29,8 @@
       servers: ["1.1.1.1","8.8.8.8"]
     ip_configs:
       - ipv4:
-          address: "192.168.10.32/24"
-          gateway: "192.168.10.1"
+          address: "192.168.11.42/24"
+          gateway: "192.168.11.1"
     user_account:
       username: "ubuntu"
       password: "ubuntu"
@@ -46,10 +46,13 @@
         file_format: "raw"
         cache: "none"
   memory:
-    dedicated: 4096
+    dedicated: 8192
   network_devices:
     - net1:
         bridge: "vmbr0"
         model: "virtio"
-        vlan_id: 10
+        vlan_id: 11
   on_boot: true
+
+
+

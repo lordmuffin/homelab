@@ -1,14 +1,14 @@
 ---
-- name: "pve2-dev-server-nodes"
+- name: "pve-dev-agent-nodes"
   count: 1
-  node_name: "pve2"
-  vm_type: "server" # server or agent
+  node_name: "pve"
+  vm_type: "agent" # server or agent
   environment: "dev"
   resource_name: "lab"
-  suffix: "002"
-  vm_id: 1000
+  suffix: "001"
+  vm_id: 1100
   clone_vm_id: 8001
-  tls_san: "192.168.1.10"
+  tls_san: "192.168.10.10"
   agent:
     enabled: true
     type: "virtio"
@@ -18,7 +18,7 @@
     - "cdrom"
     - "started"
   cpu:
-    cores: 2
+    cores: 4
     sockets: 1
   cloud_init:
     type: "nocloud"
@@ -29,7 +29,7 @@
       servers: ["1.1.1.1","8.8.8.8"]
     ip_configs:
       - ipv4:
-          address: "192.168.10.31/24"
+          address: "192.168.10.40/24"
           gateway: "192.168.10.1"
     user_account:
       username: "ubuntu"
@@ -46,10 +46,13 @@
         file_format: "raw"
         cache: "none"
   memory:
-    dedicated: 4096
+    dedicated: 8192
   network_devices:
     - net1:
         bridge: "vmbr0"
         model: "virtio"
         vlan_id: 10
   on_boot: true
+
+
+

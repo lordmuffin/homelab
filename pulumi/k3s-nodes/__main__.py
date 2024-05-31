@@ -13,7 +13,6 @@ import ipaddress
 
 providers_path = "../config/providers/"
 folder_path = "../config/vms/"
-dev_cluster_path = "../config/dev-lab/"
 
 def random_char(length):
     chars = string.digits + string.ascii_letters
@@ -148,7 +147,7 @@ def vm_virtual_machine(i, name, node_name, provider, depends_on, ignore_changes)
     )
 
     name = name
-    dial_error_limit = 10
+    dial_error_limit = 25
     per_dial_timeout = 30
     private_key = os.getenv("SSH_PRIV_KEY")
 
@@ -240,8 +239,15 @@ def vm_virtual_machine(i, name, node_name, provider, depends_on, ignore_changes)
 # environments = load_folders_from_path(folder_path)
 # parsed_data = load_yaml_files_from_foldedr(folder_path)
 providers_data = load_yaml_files_from_folder(providers_path)
+dev_cluster_path = "../config/dev-lab/"
 dev_cluster_data_servers = load_yaml_files_from_folder(dev_cluster_path + "servers/")
 dev_cluster_data_agents = load_yaml_files_from_folder(dev_cluster_path + "agents/")
+prod_cluster_path = "../config/prod-lab/"
+prod_cluster_data_servers = load_yaml_files_from_folder(prod_cluster_path + "servers/")
+prod_cluster_data_agents = load_yaml_files_from_folder(prod_cluster_path + "agents/")
+
+cluster_servers_paths = [dev_cluster_data_servers, prod_cluster_data_servers]
+cluster_agents_paths = [dev_cluster_data_agents, prod_cluster_data_agents]
 
 # Build Providers
 providers = []
@@ -265,66 +271,67 @@ agent_depends_on = []
 pause = time.Sleep(f"wait30Seconds-pre-server-create", create_duration="30s", opts=pulumi.ResourceOptions())
 agent_depends_on.append(pause)
 
+for servers in cluster_servers_paths:
+    # dev-lab cluster Server builds
+    for file in servers:
+        disks = []
+        nets = []
+        ip_configs = []
+        ssh_keys = []
+        vm_ids = []
+        public_ip_addresses = [] # create an array to store the information
+        dependencies = []
+        server_vms = []
+        depends_on = []
 
-# dev-lab cluster Server builds
-for file in dev_cluster_data_servers:
-    disks = []
-    nets = []
-    ip_configs = []
-    ssh_keys = []
-    vm_ids = []
-    public_ip_addresses = [] # create an array to store the information
-    dependencies = []
-    server_vms = []
-    depends_on = []
+        for v in file:
+            base_resource_name=v['environment'] + "-" + v['resource_name'] + "-" + v['vm_type']
+            name = v["environment"] + "-" + v["resource_name"] + "-" + v["vm_type"] + "-" + v["suffix"]
 
-    for v in file:
-        base_resource_name=v['environment'] + "-" + v['resource_name'] + "-" + v['vm_type']
-        name = v["environment"] + "-" + v["resource_name"] + "-" + v["vm_type"] + "-" + v["suffix"]
+            for p in providers:
+                if p["node_name"] == v["node_name"]:
+                    current_provider = p["provider"]
 
-        for p in providers:
-            if p["node_name"] == v["node_name"]:
-                current_provider = p["provider"]
+                    virtual_machine = vm_virtual_machine(
+                        i=v,
+                        name=name,
+                        node_name=v["node_name"],
+                        provider=current_provider,
+                        depends_on=agent_depends_on,
+                        ignore_changes=v['ignore_changes'],
+                    )
+                    agent_depends_on.append(virtual_machine) #ERROR - This is not getting item before next loop starts.
 
-                virtual_machine = vm_virtual_machine(
-                    i=v,
-                    name=name,
-                    node_name=v["node_name"],
-                    provider=current_provider,
-                    depends_on=agent_depends_on,
-                    ignore_changes=v['ignore_changes'],
-                )
-                agent_depends_on.append(virtual_machine) #ERROR - This is not getting item before next loop starts.
+    pause = time.Sleep(f"wait30Seconds-mid-pause-{random_char(4)}", create_duration="30s", opts=pulumi.ResourceOptions())
+    agent_depends_on.append(pause)
 
-pause = time.Sleep(f"wait30Seconds-pre-vm-create", create_duration="30s", opts=pulumi.ResourceOptions())
-agent_depends_on.append(pause)
+for agents in cluster_agents_paths:
+    # dev-lab cluster Agent builds
+    for file in agents:
+        disks = []
+        nets = []
+        ip_configs = []
+        ssh_keys = []
+        vm_ids = []
+        public_ip_addresses = [] # create an array to store the information
+        dependencies = []
+        server_init_complete = False
 
-# dev-lab cluster Agent builds
-for file in dev_cluster_data_agents:
-    disks = []
-    nets = []
-    ip_configs = []
-    ssh_keys = []
-    vm_ids = []
-    public_ip_addresses = [] # create an array to store the information
-    dependencies = []
-    server_init_complete = False
+        for v in file:
+            base_resource_name=v['environment'] + "-" + v['resource_name'] + "-" + v['vm_type']
+            name = v["environment"] + "-" + v["resource_name"] + "-" + v["vm_type"] + "-" + v["suffix"]
 
-    for v in file:
-        base_resource_name=v['environment'] + "-" + v['resource_name'] + "-" + v['vm_type']
-        name = v["environment"] + "-" + v["resource_name"] + "-" + v["vm_type"] + "-" + v["suffix"]
+            for p in providers:
+                if p["node_name"] == v["node_name"]:
+                    current_provider = p["provider"]
 
-        for p in providers:
-            if p["node_name"] == v["node_name"]:
-                current_provider = p["provider"]
-
-                virtual_machine = vm_virtual_machine(
-                    i=v,
-                    name=name,
-                    node_name=v["node_name"],
-                    provider=current_provider, 
-                    depends_on=agent_depends_on,
-                    ignore_changes=v['ignore_changes']),
+                    virtual_machine = vm_virtual_machine(
+                        i=v,
+                        name=name,
+                        node_name=v["node_name"],
+                        provider=current_provider, 
+                        depends_on=agent_depends_on,
+                        ignore_changes=v['ignore_changes']),
 
 
 
