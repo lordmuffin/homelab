@@ -1,0 +1,65 @@
+{
+    "variables": {
+      "proxmox_vm_id": "8101",
+      "proxmox_template_name": "ubuntu-22.04",
+      "iso_checksum": "md5:8f4f4a06b80962d8942fff7542d4e39a",
+      "ubuntu_iso_url": "https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img"
+    },
+    "builders": [{
+      "type": "proxmox",
+      "proxmox_url": "{{ user `proxmox_url` }}",
+      "insecure_skip_tls_verify": true,
+      "username": "{{ user `proxmox_username` }}",
+      "token": "{{ user `proxmox_password` }}",
+      "node": "{{ user `proxmox_node` }}",
+      "vm_id": "{{ user `proxmox_vm_id` }}",
+      "network_adapters": [{
+        "bridge": "vmbr0"
+      }],
+      "disks": [{
+        "type": "scsi",
+        "disk_size": "20G",
+        "storage_pool": "local-lvm",
+        "storage_pool_type": "lvm"
+      }],
+      "iso_urls": [
+        "https://www.releases.ubuntu.com/22.04/ubuntu-22.04.4-live-server-amd64.iso"
+    ],
+      "iso_storage_pool": "local",
+      "iso_checksum": "{{ user `iso_checksum` }}",
+      "iso_download_pve": false,
+      "unmount_iso": true,
+      "boot_key_interval" : "50ms",
+      "boot_wait": "10s",
+      "memory": 2048,
+      "template_name": "{{ user `proxmox_template_name` }}",
+      "http_directory": "./ubuntu-22.04/http",
+      "boot_command": [
+        "c",
+        "linux /casper/vmlinuz -- autoinstall ds='nocloud-net;s=http://{{ .HTTPIP }}:{{ .HTTPPort }}/'",
+        "<enter><wait><wait>",
+        "initrd /casper/initrd",
+        "<enter><wait><wait>",
+        "boot<enter>"
+      ],
+      "ssh_username": "ubuntu",
+      "ssh_password": "ubuntu",
+      "ssh_timeout": "20m"
+    }],
+    "provisioners": [{
+      "type": "shell",
+      "inline": [
+        "while [ ! -f /var/lib/cloud/instance/boot-finished ]; do echo 'Waiting for cloud-init...'; sleep 1; done"
+      ]
+    },
+    {
+        "type": "shell",
+        "inline": [
+          "curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg",
+          "curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list",
+          "sudo apt-get update",
+          "sudo apt-get install -y nvidia-container-toolkit nvidia-container-runtime cuda-drivers-fabricmanager-515 nvidia-headless-515-server",
+          "sudo cloud-init clean"
+        ]
+      }]
+  }

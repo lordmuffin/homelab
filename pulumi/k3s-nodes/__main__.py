@@ -45,7 +45,7 @@ def load_yaml_files_from_folder(folder_path):
 
     return loaded_data
 
-def vm_virtual_machine(i, name, node_name, provider, depends_on, ignore_changes):
+def vm_virtual_machine(i, name, node_name, hostpcis, provider, depends_on, ignore_changes):
     base_vm_id=i['vm_id'],
     username = i['cloud_init']['user_account']['username']
 
@@ -92,6 +92,18 @@ def vm_virtual_machine(i, name, node_name, provider, depends_on, ignore_changes)
                     vlan_id=net_entry[n]['vlan_id']
                 )
             )
+
+    for disk_entry in i['disks']:
+        for d in disk_entry:
+            disks.append(
+                proxmox.vm.VirtualMachineDiskArgs(
+                    interface=disk_entry[d]['interface'],
+                    datastore_id=disk_entry[d]['datastore_id'],
+                    size=disk_entry[d]['size'],
+                    file_format=disk_entry[d]['file_format'],
+                    cache=disk_entry[d]['cache']
+                )
+            )
     
     agent = proxmox.vm.VirtualMachineAgentArgs(
                         enabled=i['agent']['enabled'],
@@ -127,24 +139,51 @@ def vm_virtual_machine(i, name, node_name, provider, depends_on, ignore_changes)
                         ),
                     )
     
+    # For Mappings hostpci
+    # Need to fix a problem for using GPU across multiple environments.
+    if hostpcis != "" and i['vm_type'] == "gpu-agent":
+        hostpcis_map = proxmox.vm.VirtualMachineHostpciArgs(
+            device="hostpci0",
+            mapping=hostpcis
+        )
 
-    vm = proxmox.vm.VirtualMachine(
-        vm_id=base_vm_id[0],
-        resource_name=name,
-        node_name=node_name,
-        agent=agent,
-        bios=i['bios'],
-        cpu=cpu,
-        clone=clone,
-        disks=disks,
-        memory=memory,
-        name=name,
-        network_devices=nets,
-        initialization=initialization,
-        on_boot=i['on_boot'],
-        reboot=i['on_boot'],
-        opts=pulumi.ResourceOptions(provider=provider,ignore_changes=ignore_changes, depends_on=depends_on)
-    )
+        vm = proxmox.vm.VirtualMachine(
+            vm_id=base_vm_id[0],
+            resource_name=name,
+            node_name=node_name,
+            agent=agent,
+            bios=i['bios'],
+            cpu=cpu,
+            clone=clone,
+            disks=disks,
+            memory=memory,
+            name=name,
+            network_devices=nets,
+            hostpcis=[hostpcis_map],
+            initialization=initialization,
+            on_boot=i['on_boot'],
+            reboot=i['on_boot'],
+            opts=pulumi.ResourceOptions(provider=provider,ignore_changes=ignore_changes, depends_on=depends_on)
+        )
+
+    else:
+        vm = proxmox.vm.VirtualMachine(
+            vm_id=base_vm_id[0],
+            resource_name=name,
+            node_name=node_name,
+            agent=agent,
+            bios=i['bios'],
+            cpu=cpu,
+            clone=clone,
+            disks=disks,
+            memory=memory,
+            name=name,
+            network_devices=nets,
+            initialization=initialization,
+            on_boot=i['on_boot'],
+            reboot=i['on_boot'],
+            opts=pulumi.ResourceOptions(provider=provider,ignore_changes=ignore_changes, depends_on=depends_on)
+        )
 
     name = name
     dial_error_limit = 25
@@ -248,6 +287,8 @@ prod_cluster_data_agents = load_yaml_files_from_folder(prod_cluster_path + "agen
 
 cluster_servers_paths = [dev_cluster_data_servers, prod_cluster_data_servers]
 cluster_agents_paths = [dev_cluster_data_agents, prod_cluster_data_agents]
+# cluster_servers_paths = [dev_cluster_data_servers]
+# cluster_agents_paths = [dev_cluster_data_agents]
 
 # Build Providers
 providers = []
@@ -263,6 +304,7 @@ for p in providers_data:
         tmp_p = {}
         tmp_p["name"] = i["name"]
         tmp_p["node_name"] = i["node_name"]
+        tmp_p["hostpcis"] = i["hostpcis"]
         tmp_p["provider"] = provider
 
         providers.append(tmp_p)
@@ -296,6 +338,7 @@ for servers in cluster_servers_paths:
                         i=v,
                         name=name,
                         node_name=v["node_name"],
+                        hostpcis=p["hostpcis"],
                         provider=current_provider,
                         depends_on=agent_depends_on,
                         ignore_changes=v['ignore_changes'],
@@ -329,123 +372,8 @@ for agents in cluster_agents_paths:
                         i=v,
                         name=name,
                         node_name=v["node_name"],
+                        hostpcis=p["hostpcis"],
                         provider=current_provider, 
                         depends_on=agent_depends_on,
                         ignore_changes=v['ignore_changes']),
 
-
-
-
-# # Build VM's
-# for file in parsed_data:
-#     disks = []
-#     nets = []
-#     ip_configs = []
-#     ssh_keys = []
-#     vm_ids = []
-#     public_ip_addresses = [] # create an array to store the information
-#     dependencies = []
-#     server_init_complete = False
-
-#     for v in file:
-#         base_resource_name=v['environment'] + "-" + v['resource_name'] + "-" + v['vm_type']
-#         random4 = random_char(4)
-#         name = v["environment"] + "-" + v["resource_name"] + "-" + v["vm_type"] + "-" + v["suffix"]
-
-#         if v["vm_type"] == "server":
-#             for p in providers:
-#                 if p["node_name"] == v["node_name"]:
-#                     current_provider = p["provider"]
-
-#                     virtual_machine = vm_virtual_machine(
-#                         i=v,
-#                         name=name,
-#                         node_name=v["node_name"],
-#                         opts=pulumi.ResourceOptions(provider=current_provider,ignore_changes=v['ignore_changes']),
-#                     )
-#                     server_init_complete = True
-
-
-#         elif v["vm_type"] == "agent":
-#             for p in providers:
-#                 if p["node_name"] == v["node_name"]:
-#                     current_provider = p["provider"]
-
-#                     virtual_machine = vm_virtual_machine(
-#                         i=v,
-#                         name=name,
-#                         node_name=v["node_name"],
-#                         opts=pulumi.ResourceOptions(provider=current_provider,ignore_changes=v['ignore_changes']),
-#                     )
-
-#         elif v["vm_type"] == "gpu-agent":
-#             for p in providers:
-#                 if p["node_name"] == v["node_name"]:
-#                     current_provider = p["provider"]
-
-#                     virtual_machine = vm_virtual_machine(
-#                         i=v,
-#                         name=name,
-#                         node_name=v["node_name"],
-#                         opts=pulumi.ResourceOptions(provider=current_provider,ignore_changes=v['ignore_changes']),
-#                     )
-
-#         vm_details = Output.all(virtual_machine.name, virtual_machine.ipv4_addresses) \
-#         .apply(lambda args: {
-#             args[0]: args[1]
-#         })
-
-#         vm_ids.append(vm_details)
-
-#         dependencies.append(virtual_machine)
-
-#         pulumi.export("VM IP's", vm_details)
-#         pulumi.export(v['name'], virtual_machine.id)
-
-
-# Bootstrap
-# for file in parsed_data:
-#     environments = ["dev", "prod"]
-#     primary_server_ip = [{
-#         "environment": "dev",
-#         "ip": "192.168.10.30",
-#     },
-#     {
-#         "environment": "prod",
-#         "ip": "192.168.11.30",
-#     }]
-#     result_data = []
-
-#     for v in file:
-#         for env in environments:
-#             if env == v["environment"]:
-#                 for ip_config_entry in v['cloud_init']['ip_configs']:
-#                     ipv4 = ip_config_entry.get('ipv4')
-#                     ip, subnet = ipv4.get('address', '').split('/')
-#                     gateway = ipv4.get('gateway')
-                
-#                 for env in primary_server_ip:
-#                     if env["environment"] == v["environment"]:
-#                         server_ip = env["ip"]
-
-#                 data = {
-#                     "name": v["environment"] + "-" + v["resource_name"] + "-" + v["vm_type"] + "-" + v["suffix"],
-#                     "environment": v["environment"],
-#                     "vm_type": v["vm_type"],
-#                     "ip": ip,
-#                     "server_ip": server_ip,
-#                     "suffix": v["suffix"],
-#                     "user": v['cloud_init']['user_account']['username'],
-#                     "ssh_pub_key": os.getenv("SSH_PUB_KEY"),
-#                     "ssh_priv_key": os.getenv("SSH_PRIV_KEY"),
-#                     "tls_san": v["tls_san"]
-#                 }
-
-#                 result_data.append(data)
-#                 name = data["name"]
-#                 print(f"Adding {name} to result_data")
-
-#         # print(result_data)
-#         control_vms_bootstrap = bootstrap.bootstrap(result_data, dependencies)
-
-#     pulumi.export(f"VM ID's", vm_ids)

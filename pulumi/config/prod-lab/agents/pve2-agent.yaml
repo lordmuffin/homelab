@@ -7,7 +7,7 @@
   resource_name: "lab"
   suffix: "002"
   vm_id: 2101
-  clone_vm_id: 8001
+  clone_vm_id: 8005
   tls_san: "192.168.11.10"
   agent:
     enabled: true
