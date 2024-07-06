@@ -11,7 +11,7 @@ spec:
     helm:
       releaseName: gpu-operator
       values: |
-        driver
+        driver:
           enabled: "false"
         toolkit:
           enabled: "false"
