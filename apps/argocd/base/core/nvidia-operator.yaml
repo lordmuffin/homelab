@@ -12,9 +12,9 @@ spec:
       releaseName: gpu-operator
       values: |
         driver:
-          enabled: "true"
-        toolkit:
           enabled: "false"
+        toolkit:
+          enabled: "true"
           env:
           - name: CONTAINERD_CONFIG
             value: /etc/containerd/config.toml
