@@ -28,13 +28,13 @@ tasks:
     - sh: 'which k3sup'
       msg: 'k3sup {{.PATH_ERROR}}'
     cmds:
-      - rm ~/.kube/config
+      - rm ~/.kube/config 2> /dev/null
       - |
         export IP=192.168.10.30
         export USER=ubuntu
         export NAME=dev-lab
         export SSH_PRIV_KEY=~/.ssh/ubuntu.pem
-        rm $SSH_PRIV_KEY
+        rm $SSH_PRIV_KEY 2> /dev/null
         op read --out-file $SSH_PRIV_KEY "op://HomeLab/onarfzninuoetwe2hh2ni7m52q/private key?ssh-format=openssh"
 
         k3sup install \
@@ -50,7 +50,7 @@ tasks:
         export USER=ubuntu
         export NAME=prod-lab
         export SSH_PRIV_KEY=~/.ssh/ubuntu.pem
-        rm $SSH_PRIV_KEY
+        rm $SSH_PRIV_KEY 2> /dev/null
         op read --out-file $SSH_PRIV_KEY "op://HomeLab/onarfzninuoetwe2hh2ni7m52q/private key?ssh-format=openssh"
 
         k3sup install \
