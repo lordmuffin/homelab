@@ -1,5 +1,5 @@
 #!/bin/sh
-
+SERVER_IP=$1
 echo "cilium_install.sh script is running!!!"
 CILIUM_CLI_VERSION=$(curl -s https://raw.githubusercontent.com/cilium/cilium-cli/main/stable.txt)
 CLI_ARCH=amd64
@@ -9,4 +9,4 @@ sha256sum --check cilium-linux-${CLI_ARCH}.tar.gz.sha256sum
 sudo tar xzvfC cilium-linux-${CLI_ARCH}.tar.gz /usr/local/bin
 rm cilium-linux-${CLI_ARCH}.tar.gz{,.sha256sum}
 
-sudo KUBECONFIG=/etc/rancher/k3s/k3s.yaml cilium install --version 1.15.4 --set=ipam.operator.clusterPoolIPv4PodCIDRList="10.42.0.0/16"
+sudo KUBECONFIG=/etc/rancher/k3s/k3s.yaml cilium install --version 1.15.4 --namespace kube-system --set k8sServiceHost=$SERVER_IP --set k8sServicePort=6443 --set=ipam.operator.clusterPoolIPv4PodCIDRList="10.42.0.0/16"

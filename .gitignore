@@ -107,3 +107,7 @@ aggregated_output.json
 
 # 1Password Files
 1password-credentials.json
+
+# Packer
+secrets.json
+packer/plugins
