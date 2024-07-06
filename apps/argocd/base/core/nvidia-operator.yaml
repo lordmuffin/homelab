@@ -12,7 +12,7 @@ spec:
       releaseName: gpu-operator
       values: |
         driver:
-          enabled: "false"
+          enabled: "true"
         toolkit:
           enabled: "false"
           env:
