@@ -86,7 +86,7 @@ tasks:
     - sh: 'which kubectl'
       msg: 'kubectl {{.PATH_ERROR}}'
     cmds:
-    - kubectl config use-context {{.ENV}} --cluster={{.ENV}} --namespace=argocd
+    # - kubectl config use-context {{.ENV}} --cluster={{.ENV}} --namespace=argocd
     - kubectl create namespace argocd
     # - kubectl kustomize --enable-helm | kubectl apply -f -
     - kustomize build . | kubectl apply -f -
@@ -133,7 +133,7 @@ tasks:
     - sh: 'which kustomize'
       msg: 'kustomize {{.PATH_ERROR}}'
     cmds:
-    - kubectl config use-context {{.ENV}} --cluster={{.ENV}} --namespace=argocd
+    # - kubectl config use-context {{.ENV}} --cluster={{.ENV}} --namespace=argocd
     # - kubectl kustomize --enable-helm | kubectl delete -f -
     - kustomize build . | kubectl delete -f -
     ignore_error: true

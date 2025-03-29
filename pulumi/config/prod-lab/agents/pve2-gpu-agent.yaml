@@ -1,13 +1,13 @@
 ---
 - name: "pve2-prod-gpu-agent-nodes"
-  count: 1
+  count: 0
   node_name: "pve2"
   vm_type: "gpu-agent" # server or agent
   environment: "prod"
   resource_name: "lab"
   suffix: "002"
   vm_id: 2201
-  clone_vm_id: 8005
+  clone_vm_id: 8006
   tls_san: "192.168.11.10"
   agent:
     enabled: true

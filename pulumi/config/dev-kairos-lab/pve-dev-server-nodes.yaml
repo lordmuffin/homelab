@@ -1,0 +1,55 @@
+---
+- name: "pve-dev-server-nodes"
+  count: 1
+  node_name: "pve"
+  vm_type: "server" # server or agent
+  environment: "dev"
+  resource_name: "lab"
+  suffix: "001"
+  vm_id: 1100
+  tls_san: "192.168.10.10"
+  agent:
+    enabled: false
+    type: "virtio"
+  bios: "seabios"
+  ignore_changes:
+    - "disks"
+    - "cdrom"
+    - "started"
+  cpu:
+    cores: 4
+    sockets: 1
+  # cloud_init:
+  #   type: "nocloud"
+  #   interface: "scsi1"
+  #   datastore_id: "local-lvm"
+  #   dns:
+  #     domain: ""
+  #     servers: ["1.1.1.1","8.8.8.8"]
+  #   ip_configs:
+  #     - ipv4:
+  #         address: "192.168.10.40/24"
+  #         gateway: "192.168.10.1"
+  #   user_account:
+  #     username: "ubuntu"
+  #     password: "ubuntu"
+  #     keys:
+  #      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDPKfV6XzQM8GWzFA/S1Yxq1QYD/Ztaa70A/ciwY/lB5oPg6bTv8ZygWF2S7fSzzd4aDAgKtbuPgE5EXG3FEbB2bOjCvNGXjxcJSwQUp26ESni5D/imlINOFslBA/B3+ZivgD7PGumw01e1KYCIvFWzjNSadOwMobv2/0OVA4+o+uSsQUw1gTVQSP6rXx5cfylPNI9ZmZMl35V75akrxPEcDgkERndctVKnRaK9yEEOwSCQnrJ0VzQK/dAjCBFrWi14vRTkzl4bnvBNBK9hMraG5RzO4PMZGb4r9dflK2Ju8F6Bj6IlCD26PzLsCWxWn2sHT5sajwh/6bp1TB5+WBQnB9HX5W5vJ9v0iCY5EbE1UHt52hvzVb8JPmPFoY1SPe7cdAqM7oLrK+xnzkwD/NXwO+k7DIukWuUuuAB8yclaNf4xKH8+xN/MM1bJXtNXWaFdv6xHSwpGAd/dnLL2lVwiqa3JG0cbdIHsYZ6JFga4c/uaA56Dknp5ciYZ8UvCV6Q4G3sacNcQlixK8cQtyrX4asEpRKnAeS78R3Tc7N38K0jxFirYewyXHBSPMI3Y+aOW8juVHI660NvesALX4lmSv3ldoQyKsAhDtNjVpSODCFBN47PhSvyC2CdVV7PIM2sOz1gEs9kIaUH1zzliUAe+0AeGUXJbu+6lcHsKxyAPKw==
+  disks:
+    - disk1:
+        interface: "scsi0"
+        datastore_id: "local-lvm"
+        size: 40
+        file_format: "raw"
+        cache: "none"
+  memory:
+    dedicated: 8192
+  network_devices:
+    - net1:
+        bridge: "vmbr0"
+        model: "virtio"
+        vlan_id: 10
+  on_boot: true
+
+
+

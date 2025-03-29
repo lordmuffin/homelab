@@ -49,7 +49,7 @@ wget https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.i
 
 export IMG=jammy-server-cloudimg-amd64.img
 export IMG2=jammy-server-cloudimg-amd64-original.img
-export VM_ID=8005
+export VM_ID=8006
 export VER=22.04
 
 sudo qemu-img resize $IMG +1G
@@ -59,8 +59,9 @@ sudo virt-customize -a $IMG --run-command "curl -fsSL https://nvidia.github.io/l
   && curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
     sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
     sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list"
-sudo virt-customize -a $IMG --install qemu-guest-agent,nvidia-container-toolkit,nvidia-container-runtime,cuda-drivers-fabricmanager-515,nvidia-headless-515-server
+sudo virt-customize -a $IMG --install qemu-guest-agent,nvidia-container-toolkit,nvidia-container-runtime
 sudo virt-rescue --connect qemu:///system -a $IMG -i
+
 # SUB COMMANDS FOR VIRT-RESCUE
 chroot /sysroot
 grub-install /dev/sda
@@ -73,7 +74,7 @@ scp ubuntu@192.168.1.20:/home/ubuntu/jammy-server-cloudimg-amd64.img ./jammy-ser
 scp ./jammy-server-cloudimg-amd64.img root@192.168.1.12:/root/jammy-server-cloudimg-amd64.img
 ```
 export IMG=jammy-server-cloudimg-amd64.img
-export VM_ID=8005
+export VM_ID=8006
 export VER=22.04
 qm destroy $VM_ID
 qm create $VM_ID --memory 2048 --core 2 --name ubuntu-cloud-$VER --ostype l26 --net0 virtio,bridge=vmbr0

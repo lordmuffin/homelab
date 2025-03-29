@@ -1,0 +1,37 @@
+config_url: ""
+
+install:
+  auto: true
+  device: "auto"
+  reboot: true
+
+hostname: kairoslab-{{ trunc 4 .MachineID }}
+users:
+- name: kairos
+  passwd: kairos
+  ssh_authorized_keys:
+  - github:lordmuffin
+
+kubevip:
+  eip: "192.168.1.20"
+
+k3s:
+  enabled: true
+  args:
+  - --disable=traefik,servicelb,kube-proxy
+  - --flannel-backend=none
+  - --disable-network-policy
+  - --node-taint dedicated=control:NoSchedule
+  - --tls-san=192.168.1.20
+
+p2p:
+  disable_dht: false #Enabled by default
+  network_token: ""
+  vpn:
+    create: false # defaults to true
+    use: false # defaults to true
+  auto:
+    enable: true
+    ha:
+      enable: true
+      master_nodes: 2

@@ -180,6 +180,17 @@ docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=$ENV -ti home
 https://www.virtualizationhowto.com/2023/10/proxmox-gpu-passthrough-step-by-step-guide/
 
 
+### KAIROS INSTALL ON PROXMOX NOTES
+- Need to wait for kairos nodes to setup (requires main controls nodes to all be running).
+- Wait for Cluster
+- Install cillium via helm to turn everything green. :D
+- 
+
+CILIUM FIX FOR COREDNS:
+```
+echo 'net.ipv4.conf.lxc*.rp_filter = 0' | sudo tee -a /etc/sysctl.d/90-override.conf && sudo systemctl start systemd-sysctl
+```
+
 <br>
 <p align="center">
   <img width="220" height="100" src="./docs/assets/logos/logo.svg">
