@@ -3,19 +3,15 @@ kind: Kustomization
 
 resources:
 # - ./external-dns
-# - cilium.yaml
-# - metallb-system.yaml
 - traefik.yaml
 - traefik-kustomize.yaml
 - cert-manager.yaml
 - keda.yaml
-# - nginx-ingress.yaml
 # - headscale.yaml
 - coredns.yaml
 # - tailscale-operator.yaml
 # - tailscale.yaml
 - issuer.yaml
-# - kube-vip.yaml
 
 
 namespace: argocd
