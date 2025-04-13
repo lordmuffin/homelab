@@ -159,7 +159,7 @@ docker run --rm -v ~/.kube/:/root/.kube:ro -v ${PWD}:/launcher -ti ghcr.io/lordm
 
 #### 4. 1Password Instead of Vault??
 ```
-docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=$ENV -e TOKEN=$OP_TOKEN -ti homelab-launcher:v0.1.3 task 1password:install
+docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=$ENV -e OP_TOKEN=$(op read "op://HomeLab/6kduu4inv7zuqgiursj7yvdmfi/credential") -ti ghcr.io/lordmuffin/homelab-launcher:v0.2.0 task 1password:install
 ```
 
 #### 5. Democratic-csi
