@@ -6,6 +6,16 @@ docker run -e PULUMI_ACCESS_TOKEN=pul-38a7bac35d5395681ca58e07ef1e9e09189dd91f \
 -e PROXMOX_VE_PASSWORD="pulumi" \
 -e PROXMOX_VE_ENDPOINT="https://192.168.1.13:8006" \
 -v "$(pwd)":/pulumi/projects $IMG /bin/bash -c "cd /pulumi/projects/k3s-bootstrap && pip install -r ./requirements.txt && pulumi up -f -y -s dev"
+
+export IMG="pulumi/pulumi-python:latest"
+docker run --rm -e PULUMI_ACCESS_TOKEN=$(op read "op://HomeLab/Pulumi Access Token/password") \
+-e "GITHUB_TOKEN=$(op read "op://Private/GitHub General Access Token/password")" \
+-e "PROXMOX_VE_PASSWORD=$(op read "op://HomeLab/proxmox pulumi/password")" \
+-e "SSH_PUB_KEY=$(op read "op://HomeLab/onarfzninuoetwe2hh2ni7m52q/public key")" \
+-e "SSH_PRIV_KEY=$(op read "op://HomeLab/onarfzninuoetwe2hh2ni7m52q/private key?ssh-format=openssh")" \
+-e "VM_USER=$(op read "op://HomeLab/Ubuntu VM Default Creds/username")" \
+-e "VM_PASS=$(op read "op://HomeLab/Ubuntu VM Default Creds/password")" \
+-v "$(pwd)/pulumi:/pulumi/projects" $IMG /bin/bash -c "cd /pulumi/projects/k3s-bootstrap && pip install -r ./requirements.txt && pulumi up -f -y -s dev"
 ```
 ```
 export PROXMOX_VE_ENDPOINT="https://192.168.1.13:8006/"

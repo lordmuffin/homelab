@@ -1,0 +1,56 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: certmanager
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: networking
+  source:
+    repoURL: https://github.com/emberstack/helm-charts.git
+    chart: reflector
+    # targetRevision: v1.13.3
+    helm:
+      releaseName: reflector
+  destination:
+    namespace: cert-manager
+    name: in-cluster
+  info:
+    - name: 'Github Repository:'
+      value: >-
+        https://github.com/cert-manager/cert-manager
+    - name: 'Chart location:'
+      value: >-
+        https://github.com/cert-manager/cert-manager/tree/master/deploy/charts/cert-manager
+    - name: 'Official Website:'
+      value: >-
+        https://cert-manager.io/
+    - name: 'Documentation:'
+      value: >-
+        https://cert-manager.io/docs/
+    - name: 'Cloudflare issuer documentation:'
+      value: >-
+        https://cert-manager.io/docs/configuration/acme/dns01/cloudflare/
+    - name: 'Issuing certificates documentation:'
+      value: >-
+        https://cert-manager.io/docs/usage/certificate/
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    managedNamespaceMetadata:
+      labels:
+        prometheus: enabled
+    syncOptions:
+    - Validate=false
+    - CreateNamespace=true
+    - Prune=true
+    - RespectIgnoreDifferences=true
+    - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 60s
+        factor: 2
+        maxDuration: 15m

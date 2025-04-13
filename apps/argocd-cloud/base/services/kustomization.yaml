@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+- azure-pipelines.yaml
+# - actual.yaml
+- gitea.yaml
+# - mlops.yaml
+- n8n.yaml
+# - ofx-exporter.yaml
+# - wger.yaml
+# - onchange.yaml
+- gitea-utils.yaml
+# - homepage.yaml
+- woodpecker.yaml
+- woodpecker-utils.yaml
+
+namespace: argocd
+
+commonLabels:
+  app.kubernetes.io/category: services

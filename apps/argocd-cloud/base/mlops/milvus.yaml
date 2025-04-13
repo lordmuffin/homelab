@@ -1,0 +1,49 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: milvus-operator
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mlops
+  source:
+    repoURL: 'https://github.com/lordmuffin/homelab.git'
+    path: apps/services/mlops/milvus
+    targetRevision: main
+  destination:
+    namespace: milvus-operator
+    name: in-cluster
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    managedNamespaceMetadata:
+      labels:
+        prometheus: enabled
+    syncOptions:
+    - Validate=false
+    - CreateNamespace=true
+    - PrunePropagationPolicy=foreground
+    - ApplyOutOfSyncOnly=false
+    - Prune=true
+    - ServerSideApply=true
+  info:
+    - name: 'Github Repository:'
+      value: >-
+        https://github.com/zilliztech/milvus-operator
+    - name: 'Manifests example folder:'
+      value: >-
+        https://github.com/zilliztech/milvus-operator/tree/main/config/samples
+    - name: 'Official Website:'
+      value: >-
+        https://milvus.io
+    - name: 'Documentation:'
+      value: >-
+        https://milvus.io/docs/install_standalone-operator.md
+  retry:
+    limit: 5
+    backoff:
+      duration: 20s
+      factor: 2
+      maxDuration: 15m

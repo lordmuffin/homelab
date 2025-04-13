@@ -151,16 +151,16 @@ def vm_virtual_machine(i, name, node_name, hostpcis, provider, depends_on, ignor
         "ip": "192.168.11.30",
     }]
 
-    # for ip_config_entry in v['cloud_init']['ip_configs']:
-    #     ipv4 = ip_config_entry.get('ipv4')
-    #     ip, subnet = ipv4.get('address', '').split('/')
-    #     gateway = ipv4.get('gateway')
+    for ip_config_entry in v['cloud_init']['ip_configs']:
+        ipv4 = ip_config_entry.get('ipv4')
+        ip, subnet = ipv4.get('address', '').split('/')
+        gateway = ipv4.get('gateway')
 
-    # for env in environments:
-    #     if env == i["environment"]:
-    #         for env in primary_server_ip:
-    #             if env["environment"] == i["environment"]:
-    #                 server_ip = env["ip"]
+    for env in environments:
+        if env == i["environment"]:
+            for env in primary_server_ip:
+                if env["environment"] == i["environment"]:
+                    server_ip = env["ip"]
 
     return vm
 

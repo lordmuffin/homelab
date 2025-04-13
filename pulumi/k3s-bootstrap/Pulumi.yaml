@@ -2,7 +2,7 @@ name: homelab
 runtime:
   name: python
   options:
-    virtualenv: venv
+    virtualenv: ../venv
 description: A minimal Python Pulumi program
 config:
   pulumi:tags:

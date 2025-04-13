@@ -22,6 +22,8 @@ Find a way to access Argo with no ingress.
  - Attempt to automate them?
 
 
+echo $(op read "op://Private/GitHub General Access Token/password") | docker login ghcr.io -u lordmuffin --password-stdin
+
 #### 1Password Instead of Vault??
 ```
 docker run --rm -v ~/.kube/:/root/.kube:ro -v ${PWD}:/launcher -e TOKEN=<1Password Token> -ti homelab-launcher:v0.1.3 task 1password:install
@@ -108,7 +110,7 @@ sudo tar xzvfC cilium-linux-${CLI_ARCH}.tar.gz /usr/local/bin
 rm cilium-linux-${CLI_ARCH}.tar.gz{,.sha256sum}
 
 
-API_SERVER_IP="192.168.10.30"
+API_SERVER_IP="192.168.10.20"
 API_SERVER_PORT="6443"
 cilium install --version 1.15.5 --namespace cilium --set=ipam.operator.clusterPoolIPv4PodCIDRList="10.42.0.0/16" --set kubeProxyReplacement=strict --set k8sServiceHost=${API_SERVER_IP} --set k8sServicePort=${API_SERVER_PORT}
 cilium hubble enable --namespace cilium
@@ -152,7 +154,7 @@ docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=$ENV -e OP_TO
 ```
 #### 3. Install namespaces
 ```
-docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=$ENV -ti homelab-launcher:v0.1.3 task namespaces:create
+docker run --rm -v ~/.kube/:/root/.kube:ro -v ${PWD}:/launcher -ti ghcr.io/lordmuffin/homelab-launcher:v0.2.0 task namespaces:create
 ```
 
 #### 4. 1Password Instead of Vault??
@@ -168,7 +170,7 @@ docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=$ENV -e NAS_A
 
 #### 5. Install ArgoCD
 ```
-docker run --rm -v ~/.kube/:/root/.kube -v ${PWD}:/launcher -e ENV=$ENV -e GH_USER=$GH_USER -e GH_PASS=$GH_PASS -ti homelab-launcher:v0.1.3 task argocd:install
+docker run --rm -v ~/.kube/:/root/.kube:ro -v ${PWD}:/launcher -e ENV=$ENV -e GH_USER="lordmuffin" -e GH_PASS=$(op read "op://Private/GitHub General Access Token/password") -ti ghcr.io/lordmuffin/homelab-launcher:v0.2.0  task argocd:install
 ```
 
 #### 5. Utilities like reboot

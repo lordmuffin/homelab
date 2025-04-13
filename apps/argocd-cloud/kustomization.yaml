@@ -1,0 +1,192 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: argocd
+# helmCharts:
+# - name: argo-cd
+#   repo: https://argoproj.github.io/argo-helm
+#   version: 6.9.2
+#   releaseName: argocd
+#   namespace: argocd
+#   valuesFile: base/values.yaml
+
+resources:
+  # ArgoCD Projects
+  - base/projects/core.yaml
+  # - base/projects/arr.yaml
+  - base/projects/secrets.yaml
+  - base/projects/cluster.yaml
+  - base/projects/monitoring.yaml
+  - base/projects/networking.yaml
+  - base/projects/apps.yaml
+  # - base/projects/mlops.yaml
+  # - base/projects/matrix.yaml
+
+  # Core apps
+  - base/core/argocd.yaml
+  - base/core/1password.yaml
+  - base/core/data.yaml
+  # - base/core/democratic-csi.yaml
+  # - base/core/democratic-csi-nfs.yaml
+  # - base/core/nvidia-operator.yaml
+  # - base/core/nvidia.yaml
+  # - base/core/nvidia-extra.yaml
+  - base/core/networking.yaml
+  - base/core/services.yaml
+  - base/core/utilities.yaml
+
+  # 1Password Secrets
+  - base/secrets/secrets.yaml
+  # - base/secrets/arr-stack.yaml
+  # - base/secrets/tailscale.yaml
+  # - base/secrets/headscale.yaml
+  # - base/secrets/democratic-csi.yaml
+  # - base/secrets/certmanager.yaml
+  # - base/secrets/monitoring.yaml
+  # - base/secrets/traefik.yaml
+  # - base/secrets/gitea.yaml
+  # - base/secrets/services.yaml
+
+  # Arr Apps
+  # - base/arr/arr-stack.yaml
+
+  # Applications
+  # - base/apps/ha.yaml
+  # - base/apps/unifi.yaml
+  # - base/apps/wyze.yaml
+
+  # Monitoring
+  - base/monitoring/kuma.yaml
+  # - base/monitoring/unifi-poller.yaml
+  - base/monitoring/kube-prometheus.yaml
+  - base/monitoring/grafana.yaml
+  - base/monitoring/loki.yaml
+
+  # ArgoCD
+  - base/cmp-plugin.yaml
+  - base/repo-role.yaml
+  - base/repo-rb.yaml
+  # - base/argocd-ingress.yaml
+  - base/argocd-dashboard-1password.yaml
+
+  # - https://github.com/lordmuffin/homelab/apps/networking/tailscale
+  # - https://github.com/lordmuffin/homelab/apps/networking/cloudflared
+  - https://raw.githubusercontent.com/argoproj/argo-cd/v2.11.0/manifests/install.yaml
+  - base/styles-cm.yaml
+
+namespace: argocd
+images:
+  - name: quay.io/argoproj/argocd
+    newTag: v2.9.3
+patches:
+  # - path: overlay/argo-cd-repo-server-ksops-patch.yaml
+  #   target: 
+  #     kind: Deployment
+  #     name: argocd-repo-server
+  - patch: |-
+      - op: replace
+        path: "/metadata/namespace"
+        value: "monitoring"
+    target:
+      kind: ServiceMonitor
+  - patch: |-
+      - op: add
+        path: "/spec/strategy"
+        value:
+          type: "Recreate"
+      - op: replace
+        path: "/spec/template/spec/serviceAccountName"
+        value: "argocd-server"
+    target:
+      kind: Deployment
+      name: argocd-server
+  - patch: |-
+      - op: add
+        path: "/spec/template/spec/nodeSelector"
+        value:
+          kubernetes.io/arch: amd64
+    target:
+      kind: Deployment
+  - patch: |-
+      - op: add
+        path: "/spec/template/spec/nodeSelector"
+        value:
+          kubernetes.io/arch: amd64
+    target:
+      kind: StatefulSet
+  - patch: |-
+      - op: replace
+        path: "/spec/template/spec/containers/AUTO_RESTART"
+        value: "true"
+    target:
+      kind: Deployment
+      name: onepassword-connect-operator
+  # - patch: |-
+  #     - op: replace
+  #       path: "/spec/template/spec/volumes/0/secret/secretName"
+  #       value: "argo-tunnel"
+  #   target:
+  #     kind: Deployment
+  #     name: cloudflared
+  - patch: |-
+      - op: add
+        path: "/spec/template/spec/containers/0/args/-"
+        value: "--insecure"
+    target:
+      kind: Deployment
+      name: argocd-server
+  - path: overlay/argocd-svc.yaml
+  - path: overlay/argocd-deployment.yaml
+  - path: overlay/argocd-repo-deployment.yaml
+  - path: overlay/argocd-cm.yaml
+  # - path: overlay/cloudflared-cm.yaml
+  - path: overlay/argocd-rbac.yaml
+  - path: overlay/argocd-cr.yaml
+commonAnnotations:
+  reloader.stakater.com/auto: "true"
+# Core Applications
+# - base/core/tailscale.yaml
+# - base/core/private.yaml
+# - base/core/democratic-csi.yaml
+# - base/core/router.yaml
+# Applications
+# - base/apps/golinks.yaml
+# - base/apps/agones.yaml
+# - base/apps/agones-crd.yaml
+# - base/apps/mongodb-crds.yaml
+# - base/apps/mongodb.yaml
+# - base/apps/adguard.yaml
+# Monitoring Resources
+# - base/monitoring/botkube.yaml
+# - base/monitoring/nextdns.yaml
+# - base/monitoring/pixie.yaml
+# Media Services
+# - base/services/media/jellyfin.yaml
+# - base/services/media/prowlarr.yaml
+# - base/services/media/sonarr.yaml
+# - base/services/media/qbittorrent.yaml
+# - base/services/media/ganymede.yaml
+# - base/services/media/beets.yaml
+# - base/services/media/lidarr.yaml
+# - base/services/media/bazarr.yaml
+# Matrix & utilities
+# - base/matrix/synapse.yaml
+# - base/matrix/dbs.yaml
+# - base/matrix/dendrite.yaml
+# - base/matrix/proxies.yaml
+# Matrix bridges
+# - base/matrix/whats.yaml
+# - base/matrix/instagram.yaml
+# - base/matrix/linkedin.yaml
+# - base/matrix/discord.yaml
+# - base/matrix/telegram.yaml
+# - base/matrix/steam.yaml
+# - base/matrix/signal.yaml
+# Vault plugin
+# ArgoCD Remote Resources
+# Image Updater
+# - https://github.com/argoproj-labs/argocd-image-updater/manifests/base
+# Custom CSS Styles
+# components:
+# # Extensions controller component
+# - https://github.com/argoproj-labs/argocd-extensions/manifests

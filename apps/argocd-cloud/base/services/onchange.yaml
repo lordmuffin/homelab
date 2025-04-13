@@ -1,0 +1,45 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: changedetection
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: apps
+  source:
+    repoURL: 'https://github.com/lordmuffin/homelab.git'
+    path: apps/services/changedetection
+    targetRevision: main
+  destination:
+    namespace: services
+    name: in-cluster
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: true
+    syncOptions:
+    - Validate=false
+    - CreateNamespace=false
+    - PrunePropagationPolicy=foreground
+    - Prune=true
+    - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 20s
+        factor: 2
+        maxDuration: 5m
+  info:
+    - name: 'Github Repository:'
+      value: >-
+        https://github.com/dgtlmoon/changedetection.io
+    - name: 'Official Wiki:'
+      value: >-
+        https://github.com/dgtlmoon/changedetection.io/wiki
+    - name: 'Community Watchlist:'
+      value: >-
+        https://github.com/dgtlmoon/changedetection.io/wiki/Community-watch-list
+    - name: 'API Reference:'
+      value: >-
+        https://changedetection.io/docs/api_v1/index.html

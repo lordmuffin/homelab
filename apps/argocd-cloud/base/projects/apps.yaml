@@ -1,0 +1,94 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: apps
+spec:
+  description: Applications General Project
+  sourceRepos:
+  - '*'
+  destinations:
+  - namespace: 1password
+    server: https://kubernetes.default.svc
+  - namespace: services
+    server: https://kubernetes.default.svc
+  - namespace: apps
+    server: https://kubernetes.default.svc
+  - namespace: argocd
+    server: https://kubernetes.default.svc
+  - namespace: kube-system
+    server: https://kubernetes.default.svc
+  - namespace: changedetection
+    server: https://kubernetes.default.svc
+  - namespace: wger
+    server: https://kubernetes.default.svc
+  - namespace: homepage
+    server: https://kubernetes.default.svc
+  - namespace: databases
+    server: https://kubernetes.default.svc
+  - namespace: vault
+    server: https://kubernetes.default.svc
+  - namespace: homeassistant
+    server: https://kubernetes.default.svc
+  - namespace: unifi
+    server: https://kubernetes.default.svc
+  - namespace: media
+    server: https://kubernetes.default.svc
+  - namespace: rss
+    server: https://kubernetes.default.svc
+  - namespace: gaming
+    server: https://kubernetes.default.svc
+  - namespace: agones-system
+    server: https://kubernetes.default.svc
+  - namespace: default
+    server: https://kubernetes.default.svc
+  - namespace: milvus-system
+    server: https://kubernetes.default.svc
+  - namespace: chatgpt
+    server: https://kubernetes.default.svc
+  - namespace: mlops
+    server: https://kubernetes.default.svc
+  - namespace: gitea
+    server: https://kubernetes.default.svc
+  - namespace: gitea-utils
+    server: https://kubernetes.default.svc
+  - namespace: n8n
+    server: https://kubernetes.default.svc
+  - namespace: crossplane
+    server: https://kubernetes.default.svc
+  - namespace: actual
+    server: https://kubernetes.default.svc
+  - namespace: ofx-exporter
+    server: https://kubernetes.default.svc
+  - namespace: arr-stack
+    server: https://kubernetes.default.svc
+  - namespace: argocd
+    server: https://kubernetes.default.svc
+  - namespace: koordinator-system
+    server: https://kubernetes.default.svc
+  - namespace: cert-manager
+    server: https://kubernetes.default.svc
+  - namespace: gitea
+    server: https://kubernetes.default.svc
+  - namespace: democratic-csi
+    server: https://kubernetes.default.svc
+  - namespace: 1password
+    server: https://kubernetes.default.svc
+  - namespace: azure-pipelines
+    server: https://kubernetes.default.svc
+  - namespace: headscale
+    server: https://kubernetes.default.svc
+  - namespace: services
+    server: https://kubernetes.default.svc
+  - namespace: monitoring
+    server: https://kubernetes.default.svc
+  - namespace: traefik
+    server: https://kubernetes.default.svc
+  - namespace: tailscale
+    server: https://kubernetes.default.svc
+  - namespace: woodpecker
+    server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+  - group: '*'
+    kind: '*'
+  orphanedResources:
+    warn: false

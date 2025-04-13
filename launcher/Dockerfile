@@ -41,10 +41,10 @@ RUN set -ex; \
     unzip -o kuota-calc_linux_x86_64.zip && rm kuota-calc_linux_x86_64.zip && \
     chmod +x kuota-calc
 
-RUN set -ex; \
-    curl -fLO "https://releases.hashicorp.com/vault/1.15.4/vault_1.15.4_linux_amd64.zip" && \
-    unzip -o vault_1.15.4_linux_amd64.zip && rm vault_1.15.4_linux_amd64.zip && \
-    chmod +x vault
+# RUN set -ex; \
+#     curl -fLO "https://releases.hashicorp.com/vault/1.15.4/vault_1.15.4_linux_amd64.zip" && \
+#     unzip -o vault_1.15.4_linux_amd64.zip && rm vault_1.15.4_linux_amd64.zip && \
+#     chmod +x vault
 
 RUN set -ex; \
     curl -sLO https://github.com/argoproj/argo-workflows/releases/download/v3.5.2/argo-linux-amd64.gz && \
@@ -72,7 +72,7 @@ COPY --from=downloader /downloads/k3sup /usr/local/bin/k3sup
 COPY --from=downloader /downloads/task/task /usr/local/bin/task
 COPY --from=downloader /downloads/terraform /usr/local/bin/terraform
 COPY --from=downloader /downloads/kuota-calc /usr/local/bin/kuota-calc
-COPY --from=downloader /downloads/vault /usr/local/bin/vault
+# COPY --from=downloader /downloads/vault /usr/local/bin/vault
 COPY --from=downloader /downloads/argo-linux-amd64 /usr/local/bin/argocd
 
 # Test

@@ -1,0 +1,109 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: traefik
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: networking
+  source:
+    repoURL: https://github.com/traefik/traefik-helm-chart.git
+    path: traefik
+    targetRevision: v26.0.0
+    helm:
+      releaseName: traefik
+      values: |
+        globalArguments:
+          - "--global.sendanonymoususage=false"
+          - "--global.checknewversion=false"
+
+        additionalArguments:
+          - "--serversTransport.insecureSkipVerify=true"
+          - "--log.level=INFO"
+
+        tolerations:
+          - key: dedicated
+            operator: Equal
+            value: control
+            effect: NoSchedule
+
+        deployment:
+          enabled: true
+          replicas: 5
+          annotations: {}
+          podAnnotations: {}
+          additionalContainers: []
+          initContainers: []
+
+        ports:
+          web:
+            redirectTo:
+              port: websecure
+              priority: 10
+          websecure:
+            tls:
+              enabled: true
+            forwardedHeaders:
+              trustedIPs: [174.20.35.82]
+              insecure: false
+            middlewares:
+              - traefik-traefik-forward-auth-chain
+          web-int: 
+            port: 8080
+            redirectTo:
+              port: web-int-tls
+          web-int-tls: 
+            port: 8043
+            tls:
+              enabled: true
+        ingressRoute:
+          dashboard:
+            enabled: false
+
+        providers:
+          kubernetesCRD:
+            enabled: true
+            ingressClass: traefik-external
+            allowExternalNameServices: true
+            allowCrossNamespace: true
+          kubernetesIngress:
+            enabled: true
+            allowExternalNameServices: true
+            publishedService:
+              enabled: false
+
+        rbac:
+          enabled: true
+
+        service:
+          enabled: true
+          type: LoadBalancer
+          annotations: {}
+          labels: {}
+          spec:
+            loadBalancerIP: 192.168.11.20 # this should be an IP in the MetalLB range
+          loadBalancerSourceRanges: []
+          externalIPs: []
+  destination:
+    namespace: traefik
+    name: in-cluster
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    managedNamespaceMetadata:
+      labels:
+        prometheus: enabled
+    syncOptions:
+    - Validate=false
+    - CreateNamespace=true
+    - Prune=true
+    - RespectIgnoreDifferences=true
+    - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 60s
+        factor: 2
+        maxDuration: 15m
