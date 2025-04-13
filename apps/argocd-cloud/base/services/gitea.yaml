@@ -103,6 +103,7 @@ spec:
         redis-cluster:
           enabled: false
           usePassword: false
+          storageClass: sata-large
         persistence:
           enabled: true
           storageClass: sata-large
