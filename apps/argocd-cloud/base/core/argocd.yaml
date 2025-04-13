@@ -10,7 +10,7 @@ spec:
   project: core
   source:
     repoURL: 'https://github.com/lordmuffin/homelab.git'
-    path: apps/argocd
+    path: apps/argocd-cloud
     targetRevision: main
   destination:
     namespace: argocd

@@ -7,7 +7,7 @@ resource "spot_cloudspace" "cloud-homelab" {
   preemption_webhook = "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX"
   wait_until_ready   = true
   kubernetes_version = "1.31.1"
-  cni                = "calico"
+  cni                = "cilium"
 }
 
 # Creates a spot node pool with an autoscaling pool of 3-8 servers of class gp.vs1.large-dfw.
