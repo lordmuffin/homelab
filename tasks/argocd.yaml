@@ -167,7 +167,7 @@ tasks:
     # - kubectl config use-context {{.ENV}} --cluster={{.ENV}} --namespace=argocd
     # - kubectl kustomize --enable-helm | kubectl delete -f -
     - kustomize build . | kubectl delete -f -
-    - kubectl delete deployments,service,replicaset, --all --namespace argocd
+    - kubectl delete deployments,service,replicaset, --all --namespace arr-stack
     ignore_error: true
 
   bridge: kubectl port-forward -n argocd svc/argocd-server 8832:80

@@ -13,7 +13,6 @@ namespace: argocd
 resources:
   # ArgoCD Projects
   - base/projects/core.yaml
-  # - base/projects/arr.yaml
   - base/projects/secrets.yaml
   - base/projects/cluster.yaml
   - base/projects/monitoring.yaml
@@ -46,9 +45,6 @@ resources:
   # - base/secrets/traefik.yaml
   # - base/secrets/gitea.yaml
   # - base/secrets/services.yaml
-
-  # Arr Apps
-  # - base/arr/arr-stack.yaml
 
   # Applications
   # - base/apps/ha.yaml
@@ -160,15 +156,6 @@ commonAnnotations:
 # - base/monitoring/botkube.yaml
 # - base/monitoring/nextdns.yaml
 # - base/monitoring/pixie.yaml
-# Media Services
-# - base/services/media/jellyfin.yaml
-# - base/services/media/prowlarr.yaml
-# - base/services/media/sonarr.yaml
-# - base/services/media/qbittorrent.yaml
-# - base/services/media/ganymede.yaml
-# - base/services/media/beets.yaml
-# - base/services/media/lidarr.yaml
-# - base/services/media/bazarr.yaml
 # Matrix & utilities
 # - base/matrix/synapse.yaml
 # - base/matrix/dbs.yaml
