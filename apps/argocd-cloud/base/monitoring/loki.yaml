@@ -30,7 +30,7 @@ spec:
             reject_old_samples: false
           persistence:
             enabled: true
-            storageClassName: freenas-nfs-csi
+            storageClassName: sata-large
             size: 25Gi
   destination:
     namespace: monitoring

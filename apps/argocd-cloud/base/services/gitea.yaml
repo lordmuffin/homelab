@@ -51,6 +51,7 @@ spec:
             server:
               SSH_PORT: 22
           admin:
+            passwordMode: keepUpdated
             existingSecret: gitea-admin-creds-1password
           livenessProbe:
             enabled: true
@@ -103,10 +104,8 @@ spec:
           enabled: false
           usePassword: false
         persistence:
-          create: false
-          mount: true
           enabled: true
-          claimName: gitea-shared-storage
+          storageClass: sata-large
         podSecurityContext:
           fsGroup: 1000
         postgresql-ha:
