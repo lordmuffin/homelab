@@ -78,8 +78,10 @@ spec:
         service:
           enabled: true
           type: LoadBalancer
+          single: true
           annotations: {}
           labels: {}
+          spec: {}
   destination:
     namespace: traefik
     name: in-cluster
