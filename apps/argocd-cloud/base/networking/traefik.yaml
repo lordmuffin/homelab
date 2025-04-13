@@ -80,8 +80,6 @@ spec:
           type: LoadBalancer
           annotations: {}
           labels: {}
-          loadBalancerSourceRanges: []
-          externalIPs: []
   destination:
     namespace: traefik
     name: in-cluster
