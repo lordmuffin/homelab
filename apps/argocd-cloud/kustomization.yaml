@@ -50,7 +50,7 @@ resources:
   - base/cmp-plugin.yaml
   - base/repo-role.yaml
   - base/repo-rb.yaml
-  # - base/argocd-ingress.yaml
+  - base/argocd-ingress.yaml
   - base/argocd-dashboard-1password.yaml
 
   # - https://github.com/lordmuffin/homelab/apps/networking/tailscale

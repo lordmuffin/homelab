@@ -3,7 +3,7 @@ kind: IngressRoute
 metadata:
   name: argocd-ingress
   annotations:
-    external-dns.alpha.kubernetes.io/hostname: argocd.labs.andrewpjackson.com
+    external-dns.alpha.kubernetes.io/hostname: argocd-cloud.labs.andrewpjackson.com
     external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
     external-dns.alpha.kubernetes.io/ttl: "120"
     cert-manager.io/cluster-issuer: letsencrypt-production
@@ -15,7 +15,7 @@ spec:
   entryPoints:
     - websecure
   routes:
-    - match: Host(`argocd.labs.andrewpjackson.com`)
+    - match: Host(`argocd-cloud.labs.andrewpjackson.com`)
       kind: Rule
       middlewares:
         - name: traefik-forward-auth
