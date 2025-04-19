@@ -87,6 +87,8 @@ spec:
     server: https://kubernetes.default.svc
   - namespace: woodpecker
     server: https://kubernetes.default.svc
+  - namespace: forgejo
+    server: https://kubernetes.default.svc
   clusterResourceWhitelist:
   - group: '*'
     kind: '*'
