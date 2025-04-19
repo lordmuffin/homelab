@@ -9,7 +9,7 @@ spec:
   project: apps
   source:
     repoURL: 'https://github.com/lordmuffin/homelab.git'
-    path: apps/argocd/base/services
+    path: apps/argocd-cloud/base/services
     targetRevision: main
   destination:
     namespace: services

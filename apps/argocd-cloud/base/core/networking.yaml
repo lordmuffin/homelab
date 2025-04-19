@@ -9,7 +9,7 @@ spec:
   project: networking
   source:
     repoURL: 'https://github.com/lordmuffin/homelab.git'
-    path: apps/argocd/base/networking
+    path: apps/argocd-cloud/base/networking
     targetRevision: main
   destination:
     namespace: networking
