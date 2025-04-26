@@ -3,5 +3,6 @@ kind: Kustomization
 resources:
 - clusterIssuer.yaml
 # - postgres.yaml
+- labs-apj-dev.yaml
 - labs-andrewpjackson-com.yaml
 - svc-cluster-local.yaml
