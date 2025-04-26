@@ -1,17 +1,17 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: homepage-tailscale
+  name: homepage-internal
+  labels:
+    app: homepage
   annotations:
-    tailscale.com/hostname: "dashboard"
+    kube-vip.io/vipHost: homepage
 spec:
   ports:
-  - name: http
-    port: 80
-    targetPort: 3000
-    protocol: TCP
+    - name: dashboard-server
+      port: 80
+      targetPort: 3000
+      protocol: TCP
   selector:
-    app.kubernetes.io/instance: homepage
-    app.kubernetes.io/name: homepage
-  type: LoadBalancer
-  loadBalancerClass: tailscale
+    app: homepage
+  type: ClusterIP

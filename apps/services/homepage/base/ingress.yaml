@@ -1,26 +1,67 @@
-apiVersion: networking.k8s.io/v1
-kind: Ingress
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
 metadata:
-  name: homepage-ingress
+  name: dashboard
   annotations:
-    external-dns.alpha.kubernetes.io/hostname: dashboard.gruber.dev.br
+    external-dns.alpha.kubernetes.io/hostname: dashboard.labs.apj.dev
     external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
     external-dns.alpha.kubernetes.io/ttl: "120"
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: letsencrypt-production
+    acme.cert-manager.io/http01-edit-in-place: "true"
+    kubernetes.io/ingress.class: traefik-external
+  labels:
+    app: dashboard
 spec:
-  ingressClassName: nginx
-  rules:
-  - host: dashboard.gruber.dev.br
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: homepage-tailscale
-            port:
-              name: http
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`dashboard.labs.apj.dev`)
+      kind: Rule
+      middlewares:
+        - name: traefik-forward-auth
+          namespace: traefik
+      services:
+        - name: dashboard-server
+          port: 80
   tls:
-  - hosts:
-    - dashboard.gruber.dev.br
-    secretName: homepage-tls
+    secretName: labs-apj-dev-tls
+# data:
+#   resource.customizations: |
+#     extensions/Ingress:
+#         health.lua: |
+#           hs = {}
+#           hs.status = "Healthy"
+#           return hs
+
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: dashboard-internal
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: dashboard.labs.apj.dev
+    external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
+    external-dns.alpha.kubernetes.io/ttl: "120"
+    cert-manager.io/cluster-issuer: letsencrypt-production
+    acme.cert-manager.io/http01-edit-in-place: "true"
+    kubernetes.io/ingress.class: traefik-external
+  labels:
+    app: dashboard
+spec:
+  entryPoints:
+    - web-int-tls
+  routes:
+    - match: Host(`dashboard.labs.apj.dev`)
+      kind: Rule
+      services:
+        - name: dashboard-server
+          port: 80
+  tls:
+    secretName: labs-andrewpjackson-com-tls
+# data:
+#   resource.customizations: |
+#     extensions/Ingress:
+#         health.lua: |
+#           hs = {}
+#           hs.status = "Healthy"
+#           return hs

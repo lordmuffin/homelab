@@ -12,6 +12,8 @@ spec:
     solvers:
     - selector:
         dnsNames:
+        - '*.labs.apj.dev'
+        - labs.apj.dev
         - '*.labs.andrewpjackson.com'
         - labs.andrewpjackson.com
         - onchange.labs.andrewpjackson.com
