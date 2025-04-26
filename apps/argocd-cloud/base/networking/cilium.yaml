@@ -13,6 +13,7 @@ spec:
     helm:
       releaseName: cilium
       values: |
+        envoy.enabled: false
         hostFirewall.enabled: true
   destination:
     namespace: kube-system
