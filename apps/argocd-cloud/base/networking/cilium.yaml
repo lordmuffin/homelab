@@ -15,7 +15,7 @@ spec:
       values: |
         hostFirewall.enabled: true
   destination:
-    namespace: cilium
+    namespace: kube-system
     name: in-cluster
   syncPolicy:
     automated:
