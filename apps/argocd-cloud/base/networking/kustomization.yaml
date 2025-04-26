@@ -6,7 +6,7 @@ resources:
 - traefik.yaml
 - traefik-kustomize.yaml
 - cert-manager.yaml
-- cillium.yaml
+- cilium.yaml
 - keda.yaml
 # - headscale.yaml
 - coredns.yaml
