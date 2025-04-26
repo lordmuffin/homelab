@@ -12,7 +12,7 @@ resources:
 # - wger.yaml
 # - onchange.yaml
 - gitea-utils.yaml
-# - homepage.yaml
+- homepage.yaml
 - woodpecker.yaml
 - woodpecker-utils.yaml
 
