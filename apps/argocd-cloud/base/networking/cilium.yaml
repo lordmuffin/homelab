@@ -12,7 +12,7 @@ spec:
     targetRevision: 1.17.0
     helm:
       releaseName: cilium
-      values:
+      values: |
         hostFirewall.enabled: true
   destination:
     namespace: cilium
