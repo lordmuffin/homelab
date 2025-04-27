@@ -8,6 +8,7 @@ spec:
   project: networking
   source:
     repoURL: https://github.com/kittizz/cert-manager-technitium-webhook.git
+    chart: cert-manager-technitium-webhook
     targetRevision: cert-manager-technitium-webhook-1.0.0
     helm:
       values:
