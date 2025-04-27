@@ -13,10 +13,10 @@ spec:
     helm:
       releaseName: cilium
       values: |
-        envoy
+        envoy:
           enabled: true
           baseID: 69
-        hostFirewall
+        hostFirewall:
           enabled: true
   destination:
     namespace: kube-system
