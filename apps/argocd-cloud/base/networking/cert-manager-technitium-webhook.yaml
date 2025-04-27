@@ -7,11 +7,9 @@ metadata:
 spec:
   project: networking
   source:
-    repoURL: https://kittizz.github.io/cert-manager-technitium-webhook
-    chart: cert-manager-technitium-webhook
+    repoURL: https://github.com/kittizz/cert-manager-technitium-webhook.git
     targetRevision: cert-manager-technitium-webhook-1.0.0
     helm:
-      releaseName: cert-manager-technitium-webhook
       values:
   destination:
     namespace: cert-manager
