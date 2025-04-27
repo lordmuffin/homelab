@@ -24,12 +24,3 @@ spec:
             authTokenSecretRef:
               key: password
               name: technitium-api-key-homelab-cloud-1password    
-
----
-apiVersion: cert-manager.io/v1
-kind: ClusterIssuer
-metadata:
-  name: selfsigned-issuer
-  namespace: cert-manager
-spec:
-  selfSigned: {}
