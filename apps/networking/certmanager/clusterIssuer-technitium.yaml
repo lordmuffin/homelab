@@ -20,10 +20,10 @@ spec:
           groupName: acme.xver.cloud
           solverName: technitium
           config:
-            serverUrl: https://your-technitium-dns-server
+            serverUrl: https://172.234.198.221:53443
             authTokenSecretRef:
-              key: api-token
-              name: technitium-api-token
+              key: password
+              name: technitium-api-key-homelab-cloud-1password    
 
 ---
 apiVersion: cert-manager.io/v1
