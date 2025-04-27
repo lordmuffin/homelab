@@ -4,6 +4,6 @@ resources:
 - clusterIssuer-aws.yaml
 - clusterIssuer-technitium.yaml
 # - postgres.yaml
-- labs-apj-dev.yaml
+- lab-apj-dev.yaml
 - labs-andrewpjackson-com.yaml
 - svc-cluster-local.yaml

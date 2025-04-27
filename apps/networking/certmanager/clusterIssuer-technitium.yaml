@@ -12,9 +12,11 @@ spec:
     solvers:
     - selector:
         dnsNames:
-        - '*.labs.apj.dev'
-        - labs.apj.dev
-        - dashboard.labs.apj.dev
+        - '*.lab.apj.dev'
+        - lab.apj.dev
+        - '*.apj.dev'
+        - apj.dev
+        - dashboard.lab.apj.dev
       dns01:
         webhook:
           groupName: acme.xver.cloud
