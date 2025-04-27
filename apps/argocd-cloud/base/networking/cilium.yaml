@@ -15,7 +15,6 @@ spec:
       values: |
         envoy
           enabled: true
-        envoy
           baseID: 69
         hostFirewall
           enabled: true
