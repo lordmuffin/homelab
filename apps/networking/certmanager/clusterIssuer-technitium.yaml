@@ -15,7 +15,7 @@ spec:
         - '*.labs.apj.dev'
         - labs.apj.dev
         - dashboard.labs.apj.dev
-    - dns01:
+      dns01:
         webhook:
           groupName: acme.xver.cloud
           solverName: technitium
