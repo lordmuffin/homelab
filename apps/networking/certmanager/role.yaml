@@ -1,0 +1,24 @@
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+ namespace: cert-manager
+ name: role-read-secret
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list", "watch"]
+
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+ name: role-read-secret-binding
+ namespace: cert-manager
+subjects:
+- kind: ServiceAccount
+  name: cert-manager-technitium-webhook
+  namespace: cert-manager
+roleRef:
+ kind: Role
+ name: role-read-secret
+ apiGroup: rbac.authorization.k8s.io
