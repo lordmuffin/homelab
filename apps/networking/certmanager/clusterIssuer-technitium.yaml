@@ -1,0 +1,26 @@
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: technitium-letsencrypt
+  namespace: cert-manager
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: dorkmeisterx69@gmail.com
+    privateKeySecretRef:
+      name: acme-letsencrypt-key-prod
+    solvers:
+    - selector:
+        dnsNames:
+        - '*.labs.apj.dev'
+        - labs.apj.dev
+        - dashboard.labs.apj.dev
+    - dns01:
+        webhook:
+          groupName: acme.xver.cloud
+          solverName: technitium
+          config:
+            serverUrl: https://your-technitium-dns-server
+            authTokenSecretRef:
+              key: api-token
+              name: technitium-api-token
