@@ -58,4 +58,4 @@ spec:
       volumes:
         - name: kuma-data
           persistentVolumeClaim:
-            claimName: kuma-storage
+            claimName: kuma-storage-pvc
