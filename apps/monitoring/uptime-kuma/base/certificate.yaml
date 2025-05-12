@@ -7,6 +7,6 @@ spec:
   issuerRef:
     name: letsencrypt-production
     kind: ClusterIssuer
-  commonName: kuma.labs.andrewpjackson.com
+  commonName: kuma.lab.apj.dev
   dnsNames:
-  - kuma.labs.andrewpjackson.com
+  - kuma.lab.apj.dev

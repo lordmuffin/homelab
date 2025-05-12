@@ -6,4 +6,5 @@ resources:
 - cm.yaml
 # - ingress.yaml
 - certificate.yaml
+- pvc.yaml
 # - ingressroute.yaml

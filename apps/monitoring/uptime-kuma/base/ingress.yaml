@@ -3,7 +3,7 @@ kind: IngressRoute
 metadata:
   name: kuma
   annotations:
-    external-dns.alpha.kubernetes.io/hostname: kuma.labs.andrewpjackson.com
+    external-dns.alpha.kubernetes.io/hostname: kuma.lab.apj.dev
     external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
     external-dns.alpha.kubernetes.io/ttl: "120"
     cert-manager.io/cluster-issuer: letsencrypt-production
@@ -15,7 +15,7 @@ spec:
   entryPoints:
     - websecure
   routes:
-    - match: Host(`kuma.labs.andrewpjackson.com`)
+    - match: Host(`kuma.lab.apj.dev`)
       kind: Rule
       middlewares:
         - name: traefik-forward-auth
@@ -24,7 +24,7 @@ spec:
         - name: kuma-internal
           port: 3001
   tls:
-    secretName: labs-andrewpjackson-com-tls
+    secretName: lab-apj-dev-tls
 # data:
 #   resource.customizations: |
 #     extensions/Ingress:
