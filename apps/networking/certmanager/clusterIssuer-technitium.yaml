@@ -22,7 +22,7 @@ spec:
           groupName: acme.xver.cloud
           solverName: technitium
           config:
-            serverUrl: http://172.234.198.221:5380
+            serverUrl: https://ns1.apj.dev:53443
             authTokenSecretRef:
               key: password
               name: technitium-api-key-homelab-cloud-1password    
