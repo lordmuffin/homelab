@@ -52,14 +52,14 @@ data:
           - size: small
             widgets:
               - type: weather
-                location: London, United Kingdom
+                location: Bloomington, MN
 
               - type: markets
                 markets:
+                  - symbol: INSP
+                    name: Inspire Sleep
                   - symbol: SPY
                     name: S&P 500
-                  - symbol: BTC-USD
-                    name: Bitcoin
                   - symbol: NVDA
                     name: NVIDIA
                   - symbol: AAPL
@@ -70,5 +70,38 @@ data:
                     name: Google
                   - symbol: AMD
                     name: AMD
-                  - symbol: RDDT
-                    name: Reddit
+      - name: Bookmarks
+        columns:
+          - size: large
+            widgets:
+              - type: bookmarks
+                groups:
+                  - links:
+                      - title: Gmail
+                        url: https://mail.google.com/mail/u/0/
+                      - title: Amazon
+                        url: https://www.amazon.com/
+                      - title: Github
+                        url: https://github.com/
+                      - title: Wikipedia
+                        url: https://en.wikipedia.org/
+                  - title: Entertainment
+                    color: 10 70 50
+                    links:
+                      - title: Netflix
+                        url: https://www.netflix.com/
+                      - title: Disney+
+                        url: https://www.disneyplus.com/
+                      - title: YouTube
+                        url: https://www.youtube.com/
+                      - title: Prime Video
+                        url: https://www.primevideo.com/
+                  - title: Social
+                    color: 200 50 50
+                    links:
+                      - title: Reddit
+                        url: https://www.reddit.com/
+                      - title: Twitter
+                        url: https://twitter.com/
+                      - title: Instagram
+                        url: https://www.instagram.com/
