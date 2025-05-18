@@ -7,8 +7,8 @@ metadata:
 spec:
   project: apps
   source:
-    repoURL: oci://code.forgejo.org/forgejo-helm
-    chart: forgejo
+    repoURL: oci://code.forgejo.org
+    chart: forgejo-helm/forgejo
     targetRevision: v8.0.0
     helm:
       releaseName: forgejo
