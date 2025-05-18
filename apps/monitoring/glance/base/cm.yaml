@@ -72,13 +72,3 @@ data:
                     name: AMD
                   - symbol: RDDT
                     name: Reddit
-
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: {{ include "glance.fullname" . }}
-  labels: 
-    {{- include "glance.labels" . | nindent 4 }}
-data:
-  glance.yml: |
-    {{ .Values.config | nindent 4 }}
