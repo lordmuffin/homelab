@@ -27,15 +27,6 @@ data:
                   - url: https://ishadeed.com/feed.xml
                     title: Ahmad Shadeed
 
-              - type: twitch-channels
-                channels:
-                  - theprimeagen
-                  - cohhcarnage
-                  - christitustech
-                  - blurbs
-                  - asmongold
-                  - jembawls
-
           - size: full
             widgets:
               - type: hacker-news
@@ -45,6 +36,7 @@ data:
                   - UCR-DXc1voovS8nhAvccRZhg # Jeff Geerling
                   - UCv6J_jJa8GJqFwQNgNrMuww # ServeTheHome
                   - UCOk-gHyjcWZNj3Br4oxwh0A # Techno Tim
+                  - UCXuqSBlHAE6Xw-yeJA0Tunw # Linus Tech Tips
 
               - type: reddit
                 subreddit: selfhosted
@@ -52,7 +44,7 @@ data:
           - size: small
             widgets:
               - type: weather
-                location: Bloomington, MN
+                location: 55420
 
               - type: markets
                 markets:
