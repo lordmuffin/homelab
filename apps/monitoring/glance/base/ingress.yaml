@@ -1,28 +1,28 @@
 apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute
 metadata:
-  name: kuma
+  name: glance
   annotations:
-    external-dns.alpha.kubernetes.io/hostname: kuma.lab.apj.dev
+    external-dns.alpha.kubernetes.io/hostname: glance.lab.apj.dev
     external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
     external-dns.alpha.kubernetes.io/ttl: "120"
     cert-manager.io/cluster-issuer: letsencrypt-production
     acme.cert-manager.io/http01-edit-in-place: "true"
     kubernetes.io/ingress.class: traefik-external
   labels:
-    app: kuma-internal
+    app: glance
 spec:
   entryPoints:
     - websecure
   routes:
-    - match: Host(`kuma.lab.apj.dev`)
+    - match: Host(`glance.lab.apj.dev`)
       kind: Rule
       middlewares:
         - name: traefik-forward-auth
           namespace: traefik
       services:
-        - name: kuma-internal
-          port: 3001
+        - name: glance
+          port: 8080
   tls:
     secretName: lab-apj-dev
 # data:

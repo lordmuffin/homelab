@@ -1,0 +1,62 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: glance
+  labels:
+    app: glance
+  annotations:
+    link.argocd.argoproj.io/external-link: http://glance
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: glance
+  template:
+    metadata:
+      labels:
+        app: glance
+    spec:
+      containers:
+        - name: glance
+          image: "docker.io/glanceapp/glance:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          envFrom:
+            - configMapRef:
+                name: glance-cm
+            - secretRef:
+                name: glance-vars
+                optional: true
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          volumeMounts:
+            - name: glance-config
+              mountPath: /app/config/glance.yml
+              subPath: glance.yml
+          livenessProbe:
+            exec:
+              command:
+                - node
+                - extra/healthcheck.js
+            initialDelaySeconds: 180
+            periodSeconds: 60
+            timeoutSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3001
+              scheme: HTTP
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: 100m
+            limits:
+              memory: "256Mi"
+              cpu: 200m
+      volumes:
+        - name: glance-config
+          persistentVolumeClaim:
+            claimName: glance-storage-pvc
