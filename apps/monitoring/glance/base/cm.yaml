@@ -72,7 +72,7 @@ data:
                     name: AMD
       - name: Bookmarks
         columns:
-          - size: large
+          - size: full
             widgets:
               - type: bookmarks
                 groups:
