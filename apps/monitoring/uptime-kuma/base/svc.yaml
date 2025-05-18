@@ -15,4 +15,3 @@ spec:
   selector:
     app: kuma
   type: ClusterIP
-  loadBalancerClass: tailscale
