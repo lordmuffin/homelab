@@ -76,15 +76,12 @@ data:
             widgets:
               - type: bookmarks
                 groups:
-                  - links:
-                      - title: Gmail
-                        url: https://mail.google.com/mail/u/0/
-                      - title: Amazon
-                        url: https://www.amazon.com/
-                      - title: Github
-                        url: https://github.com/
-                      - title: Wikipedia
-                        url: https://en.wikipedia.org/
+                  - title: Nameservers
+                    links:
+                      - title: ns1.apj.dev
+                        url: https://ns1.apj.dev:53443/
+                      - title: ns2.apj.dev
+                        url: https://ns2.apj.dev:53443/
                   - title: Entertainment
                     color: 10 70 50
                     links:
