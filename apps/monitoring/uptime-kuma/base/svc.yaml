@@ -14,5 +14,5 @@ spec:
       targetPort: 3001
   selector:
     app: kuma
-  type: LoadBalancer
+  type: ClusterIP
   loadBalancerClass: tailscale
