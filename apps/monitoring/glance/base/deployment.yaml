@@ -33,7 +33,7 @@ spec:
           readinessProbe:
             httpGet:
               path: /
-              port: 3001
+              port: 8080
               scheme: HTTP
           resources:
             requests:
