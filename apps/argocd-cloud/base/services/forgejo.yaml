@@ -9,7 +9,7 @@ spec:
   source:
     repoURL: code.forgejo.org/forgejo-helm/forgejo
     chart: forgejo
-    targetRevision: 8.0.0
+    targetRevision: 12.5.0
     helm:
       releaseName: forgejo
       values: |
