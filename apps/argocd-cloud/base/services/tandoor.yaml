@@ -33,7 +33,7 @@ spec:
         # @default -- See [values.yaml](./values.yaml)
         env:
           # -- default timezone
-          TIMEZONE: CST
+          TIMEZONE: UTC
           # SECRET_KEY: changeme
 
         service:
