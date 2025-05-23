@@ -1,0 +1,67 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: tandoor
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: tandoor.lab.apj.dev
+    external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
+    external-dns.alpha.kubernetes.io/ttl: "120"
+    cert-manager.io/cluster-issuer: letsencrypt-production
+    acme.cert-manager.io/http01-edit-in-place: "true"
+    kubernetes.io/ingress.class: traefik-external
+  labels:
+    app: tandoor
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`tandoor.lab.apj.dev`)
+      kind: Rule
+      middlewares:
+        - name: traefik-forward-auth
+          namespace: traefik
+      services:
+        - name: tandoor
+          port: 8080
+  tls:
+    secretName: lab-apj-dev
+# data:
+#   resource.customizations: |
+#     extensions/Ingress:
+#         health.lua: |
+#           hs = {}
+#           hs.status = "Healthy"
+#           return hs
+
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: tandoor-internal
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: tandoor.lab.apj.dev
+    external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
+    external-dns.alpha.kubernetes.io/ttl: "120"
+    cert-manager.io/cluster-issuer: letsencrypt-production
+    acme.cert-manager.io/http01-edit-in-place: "true"
+    kubernetes.io/ingress.class: traefik-external
+  labels:
+    app: tandoor
+spec:
+  entryPoints:
+    - web-int-tls
+  routes:
+    - match: Host(`tandoor.lab.apj.dev`)
+      kind: Rule
+      services:
+        - name: tandoor
+          port: 8080
+  tls:
+    secretName: lab-apj-dev
+# data:
+#   resource.customizations: |
+#     extensions/Ingress:
+#         health.lua: |
+#           hs = {}
+#           hs.status = "Healthy"
+#           return hs
