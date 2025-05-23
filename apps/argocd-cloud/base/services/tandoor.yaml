@@ -1,0 +1,131 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tandoor
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: apps
+  source:
+    repoURL: https://charts.gabe565.com
+    chart: tandoor
+    targetRevision: 0.9.9
+    helm:
+      releaseName: tandoor
+      values: |
+        #
+        # IMPORTANT NOTE
+        #
+        # This chart inherits from our common library chart. You can check the default values/options here:
+        # https://github.com/bjw-s/helm-charts/blob/a081de5/charts/library/common/values.yaml
+        #
+
+        image:
+          # -- image repository
+          repository: ghcr.io/tandoorrecipes/recipes
+          # -- image tag
+          tag: 1.5.31
+          # -- image pull policy
+          pullPolicy: IfNotPresent
+          # -- image tag
+
+        # -- environment variables. [[ref]](https://github.com/TandoorRecipes/recipes/blob/master/.env.template).
+        # @default -- See [values.yaml](./values.yaml)
+        env:
+          # -- default timezone
+          TIMEZONE: CST
+          # SECRET_KEY: changeme
+
+        service:
+          # -- Configures service settings for the chart.
+          # @default -- See [values.yaml](./values.yaml)
+          main:
+            ports:
+              http:
+                port: 8080
+              static:
+                port: 80
+
+        ingress:
+          # -- Enable and configure ingress settings for the chart under this key.
+          # @default -- See [values.yaml](./values.yaml)
+          main:
+            enabled: false
+            # hosts:
+            #   - host: chart-example.local
+            #     paths:
+            #       - path: /
+            #       - path: /static
+            #         service:
+            #           port: 80
+            #       - path: /media
+            #         service:
+            #           port: 80
+
+        # -- Configure persistence settings for the chart under this key.
+        # @default -- See [values.yaml](./values.yaml)
+        persistence:
+          config:
+            enabled: false
+            retain: true
+            # storageClass: ""
+            # accessMode: ReadWriteOnce
+            # size: 1Gi
+          media:
+            enabled: false
+            mountPath: /opt/recipes/mediafiles
+            retain: true
+            # storageClass: ""
+            # accessMode: ReadWriteOnce
+            # size: 1Gi
+          static:
+            enabled: true
+            type: emptyDir
+            mountPath: /opt/recipes/staticfiles
+          django-js-reverse:
+            enabled: true
+            type: emptyDir
+            mountPath: /opt/recipes/cookbook/static/django_js_reverse
+
+        # -- Enable and configure postgresql database subchart under this key. [[ref]](https://github.com/bitnami/charts/tree/main/bitnami/mariadb)
+        # @default -- See [values.yaml](./values.yaml)
+        postgresql:
+          enabled: false
+          auth:
+            database: tandoor
+            postgresPassword: changeme
+          primary:
+            persistence:
+              enabled: false
+              # storageClass: ""
+              # size: 8Gi
+
+        podSecurityContext:
+          # -- Run as `nobody` user
+          runAsUser: 65534
+          # -- Run as `nobody` group
+          runAsGroup: 65534
+          # -- Volume binds will be granted to `nobody` group
+          fsGroup: 65534
+
+  destination:
+    namespace: tandoor
+    name: in-cluster
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+    - Validate=false
+    - CreateNamespace=true
+    - PrunePropagationPolicy=foreground
+    - PruneLast=true
+    - ApplyOutOfSyncOnly=false
+    - Prune=true
+    retry:
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 60m

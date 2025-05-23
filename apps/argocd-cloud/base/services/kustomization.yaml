@@ -15,6 +15,7 @@ resources:
 - homepage.yaml
 - woodpecker.yaml
 - woodpecker-utils.yaml
+- tandoor.yaml
 
 namespace: argocd
 
