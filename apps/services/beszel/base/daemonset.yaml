@@ -18,7 +18,10 @@ spec:
             - name: PORT
               value: '45876'
             - name: KEY
-              value: YOUR-KEY-HERE
+              valueFrom:
+                secretKeyRef:
+                  name: beszel-cloud-homelab-pubkey-1password
+                  key: password
           image: 'henrygd/beszel-agent:latest'
           imagePullPolicy: Always
           name: beszel-agent
