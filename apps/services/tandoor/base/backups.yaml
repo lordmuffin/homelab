@@ -53,7 +53,7 @@ spec:
                     sleep 5  
                   done
                   BACKUP_FILE=$(ls /mnt/backup/pg_backup_*.sql.gz)
-                  b2v4 file upload $B2_BUCKET_NAME "$BACKUP_FILE" "$(basename $BACKUP_FILE)"                  
+                  b2v4 file upload $B2_BUCKET_NAME "$BACKUP_FILE" tandoor/"$(basename $BACKUP_FILE)"                  
               volumeMounts:
                 - name: backup-storage
                   mountPath: /mnt/backup
