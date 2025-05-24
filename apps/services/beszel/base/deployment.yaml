@@ -1,0 +1,45 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: beszel
+  name: beszel
+spec:
+  replicas: 1
+  strategy: {}
+  selector:
+    matchLabels:
+      app: beszel
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: beszel
+    spec:
+      restartPolicy: Always
+      securityContext:
+        fsGroup: 1000
+      containers:
+      - name: beszel
+        image: henrygd/beszel
+        imagePullPolicy: Always
+        # command: ["sh", "-c", "(sleep 10 && chmod a+rwx /run/user/1000/docker.sock) & /usr/bin/supervisord -c /etc/supervisord.conf"]
+        env:
+        - name: UID
+          value: "1000"
+        - name: GID
+          value: "1000"
+        - name: TZ
+          value: "America/Chicago"
+        ports:
+          - name: web
+            containerPort: 8090
+            protocol: TCP
+        volumeMounts:
+        - name: beszel-data
+          mountPath: /beszel_data
+      volumes:
+        - name: beszel-data
+          persistentVolumeClaim:
+            claimName: beszel_data
