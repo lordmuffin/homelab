@@ -32,6 +32,11 @@ spec:
           value: "1000"
         - name: TZ
           value: "America/Chicago"
+        - name: SECRET
+          valueFrom:
+            secretKeyRef:
+              name: tandoor-secret-creds-1password
+              key: password
         - name: POSTGRES_HOST
           value: tandoor-database-rw.tandoor.svc.cluster.local
         - name: POSTGRES_DB
