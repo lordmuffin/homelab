@@ -37,6 +37,8 @@ spec:
             secretKeyRef:
               name: tandoor-secret-creds-1password
               key: password
+        - name: DB_ENGINE
+          value: django.db.backends.postgresql
         - name: POSTGRES_HOST
           value: tandoor-database-rw.tandoor.svc.cluster.local
         - name: POSTGRES_PORT
