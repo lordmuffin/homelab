@@ -32,7 +32,7 @@ spec:
           value: "1000"
         - name: TZ
           value: "America/Chicago"
-        - name: SECRET
+        - name: SECRET_KEY
           valueFrom:
             secretKeyRef:
               name: tandoor-secret-creds-1password
