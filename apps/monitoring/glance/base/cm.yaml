@@ -74,6 +74,18 @@ data:
                         url: https://ns1.apj.dev:53443/
                       - title: ns2.apj.dev
                         url: https://ns2.apj.dev:53443/
+                  - title: Monitoring
+                    color: 200 50 50
+                    links:
+                      - title: Beszel
+                        url: https://beszel.lab.apj.dev/
+                      - title: Kuma
+                        url: https://kuma.lab.apj.dev/
+                  - title: 
+                    color: 200 50 50
+                    links:
+                      - title: ArgoCD
+                        url: https://argo.lab.apj.dev/
                   - title: Entertainment
                     color: 10 70 50
                     links:
