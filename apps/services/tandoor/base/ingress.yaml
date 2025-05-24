@@ -21,8 +21,8 @@ spec:
         - name: traefik-forward-auth
           namespace: traefik
       services:
-        - name: tandoor
-          port: 8080
+        - name: tandoor-internal
+          port: 80
   tls:
     secretName: lab-apj-dev
 # data:
