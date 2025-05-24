@@ -41,3 +41,10 @@ spec:
           mountPath: /opt/recipes/staticfiles
         - name: recipes-media
           mountPath: opt/recipes/mediafiles
+      volumes:
+        - name: recipes-static
+          persistentVolumeClaim:
+            claimName: recipes-static
+        - name: recipes-media
+          persistentVolumeClaim:
+            claimName: recipes-media
