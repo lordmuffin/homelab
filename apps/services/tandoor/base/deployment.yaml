@@ -32,6 +32,20 @@ spec:
           value: "1000"
         - name: TZ
           value: "America/Chicago"
+        - name: POSTGRES_HOST
+          value: tandoor-database-rw.tandoor.svc.cluster.local
+        - name: POSTGRES_DB
+          value: tandoor
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: tandoor-db-postgres-creds-1password
+              key: username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: tandoor-db-postgres-creds-1password
+              key: password
         ports:
           - name: web
             containerPort: 8080
