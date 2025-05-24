@@ -29,7 +29,7 @@ spec:
       secret:
         name: tandoor-db-postgres-creds-1password
   storage:
-    storageClass: freenas-iscsi-csi
+    storageClass: sata
     size: 20Gi
   monitoring:
     enablePodMonitor: true
