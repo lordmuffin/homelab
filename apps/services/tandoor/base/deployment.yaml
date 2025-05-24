@@ -39,6 +39,8 @@ spec:
               key: password
         - name: POSTGRES_HOST
           value: tandoor-database-rw.tandoor.svc.cluster.local
+        - name: POSTGRES_PORT
+          value: 5432
         - name: POSTGRES_DB
           value: tandoor
         - name: POSTGRES_USER
