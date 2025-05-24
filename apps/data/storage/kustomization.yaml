@@ -6,7 +6,7 @@ resources:
 
 # Monitoring
 - base/kuma.yaml
-- base/beszel
+- base/beszel.yaml
 
 # Home Assistant
 - base/ha.yaml
