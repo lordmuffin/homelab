@@ -91,6 +91,8 @@ spec:
     server: https://kubernetes.default.svc
   - namespace: tandoor
     server: https://kubernetes.default.svc
+  - namespace: vikunja
+    server: https://kubernetes.default.svc
   clusterResourceWhitelist:
   - group: '*'
     kind: '*'
