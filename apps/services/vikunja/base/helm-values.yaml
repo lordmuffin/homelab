@@ -12,6 +12,8 @@ vikunja:
           key: password
     VIKUNJA_DATABASE_HOST:
       value: vikunja-database
+    VIKUNJA_DATABASE_PORT:
+      value: 5432
   persistence:
     data:
       enabled: true
