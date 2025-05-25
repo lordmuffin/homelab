@@ -20,17 +20,3 @@ vikunja:
       existingClaim: vikunja-data
 postgresql:
   enabled: false
-redis:
-  enabled: true
-typesense:
-  enabled: true
-  env:
-    TYPESENSE_DATA_DIR: /data
-    TYPESENSE_API_KEY: typesense
-  persistence:
-    data:
-      # Enabling typesense persistence is recommended to avoid slow reindexing
-      enabled: true
-      accessMode: ReadWriteOnce
-      size: 5Gi
-      storageClass: sata
