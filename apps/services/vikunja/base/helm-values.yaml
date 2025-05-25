@@ -32,5 +32,5 @@ vikunja:
         # Enabling typesense persistence is recommended to avoid slow reindexing
         enabled: true
         accessMode: ReadWriteOnce
-        size: 1Gi
+        size: 5Gi
         storageClass: sata
