@@ -21,7 +21,7 @@ spec:
         - name: traefik-forward-auth
           namespace: traefik
       services:
-        - name: vikunja-internal
+        - name: vikunja
           port: 80
   tls:
     secretName: lab-apj-dev
