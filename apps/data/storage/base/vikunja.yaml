@@ -10,18 +10,3 @@ spec:
   resources:
     requests:
       storage: 5Gi
-
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: vikunja-typesense-data
-  namespace: vikunja
-spec:
-  accessModes:
-    - ReadWriteOnce
-  storageClassName: sata
-  resources:
-    requests:
-      storage: 5Gi
-
