@@ -24,7 +24,7 @@ spec:
         - name: glance
           port: 8080
   tls:
-    secretName: lab-apj-dev
+    secretName: lab-apj-dev-tls
 # data:
 #   resource.customizations: |
 #     extensions/Ingress:

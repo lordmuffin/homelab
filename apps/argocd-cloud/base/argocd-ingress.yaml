@@ -25,4 +25,4 @@ spec:
         - name: argocd-server # Standard ArgoCD service name
           port: 80 # Standard HTTP port for ArgoCD server
   tls:
-    secretName: lab-apj-dev # Using the same wildcard certificate as kuma
+    secretName: lab-apj-dev-tls # Using the same wildcard certificate as kuma
