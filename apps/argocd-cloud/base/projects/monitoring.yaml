@@ -23,6 +23,11 @@ spec:
     server: https://kubernetes.default.svc
   - namespace: longhorn-system
     server: https://kubernetes.default.svc
+  - namespace: beszel
+    server: https://kubernetes.default.svc
+  - namespace: kuma
+    server: https://kubernetes.default.svc
+
   clusterResourceWhitelist:
   - group: '*'
     kind: '*'

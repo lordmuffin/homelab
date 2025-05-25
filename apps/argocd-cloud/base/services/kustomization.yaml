@@ -3,7 +3,6 @@ kind: Kustomization
 
 resources:
 - azure-pipelines.yaml
-- beszel.yaml
 # - actual.yaml
 - gitea.yaml
 - forgejo.yaml

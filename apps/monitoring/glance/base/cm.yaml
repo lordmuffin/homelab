@@ -81,7 +81,7 @@ data:
                         url: https://beszel.lab.apj.dev/
                       - title: Kuma
                         url: https://kuma.lab.apj.dev/
-                  - title: 
+                  - title: CI/CD
                     color: 200 50 50
                     links:
                       - title: ArgoCD
