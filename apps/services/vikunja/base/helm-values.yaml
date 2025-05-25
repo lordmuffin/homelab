@@ -11,7 +11,7 @@ vikunja:
           name: vikunja-db-postgres-creds-1password
           key: password
     VIKUNJA_DATABASE_HOST:
-      value: vikunja-database
+      value: vikunja-database-rw.vikunja.svc.cluster.local
     VIKUNJA_DATABASE_PORT:
       value: 5432
   persistence:
