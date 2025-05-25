@@ -3,8 +3,8 @@ kind: Kustomization
 
 resources:
 - ingress.yaml
-- db.yaml
-- backups.yaml
+# - db.yaml
+# - backups.yaml
 helmCharts:
 - name: vikunja
   repo: oci://ghcr.io/go-vikunja/helm-chart
