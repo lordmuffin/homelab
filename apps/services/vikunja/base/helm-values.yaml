@@ -10,6 +10,8 @@ vikunja:
         secretKeyRef:
           name: vikunja-db-postgres-creds-1password
           key: passsword
+    VIKUNJA_DATABASE_HOST:
+      value: vikunja-database
   persistence:
     data:
       enabled: true
