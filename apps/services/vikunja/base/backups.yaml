@@ -1,0 +1,63 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup
+spec:
+  schedule: "0 2 * * *" # Daily at 2AM
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: postgres-backup
+              image: postgres:latest
+              env:
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: vikunja-db-postgres-creds-1password
+                      key: password
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  BACKUP_FILE="pg_backup_$(date +%Y%m%d_%H%M%S).sql.gz"
+                  echo "Creating backup $BACKUP_FILE..."
+                  pg_dumpall -h postgres.default.svc.cluster.local -U vikunja | gzip > /mnt/backup/$BACKUP_FILE
+                  echo "Backup completed."
+                  # signal the next container that the dump is completed
+                  touch /mnt/backup/.done                  
+              volumeMounts:
+                - name: backup-storage
+                  mountPath: /mnt/backup
+            - name: b2-uploader
+              image: backblazeit/b2:latest
+              env:
+                - name: B2_APPLICATION_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: backblaze-cloud-homelab-creds-1password
+                      key: keyID
+                - name: B2_APPLICATION_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: backblaze-cloud-homelab-creds-1password
+                      key: applicationKey
+                - name: B2_BUCKET_NAME
+                  value: "cloud-homelab-backups"
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  # Check every 5 seconds if the dump is completed
+                  while [ ! -f /mnt/backup/.done ]; do
+                    sleep 5  
+                  done
+                  BACKUP_FILE=$(ls /mnt/backup/pg_backup_*.sql.gz)
+                  b2v4 file upload $B2_BUCKET_NAME "$BACKUP_FILE" vikunja/"$(basename $BACKUP_FILE)"                  
+              volumeMounts:
+                - name: backup-storage
+                  mountPath: /mnt/backup
+          restartPolicy: OnFailure
+          volumes:
+            - name: backup-storage
+              emptyDir: {}

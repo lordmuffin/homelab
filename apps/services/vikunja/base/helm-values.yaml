@@ -1,0 +1,16 @@
+vikunja:
+  env:
+    VIKUNJA_DATABASE_USERNAME:
+      valueFrom:
+        secretKeyRef:
+          name: vikunja-db-postgres-creds-1password
+          key: username
+    VIKUNJA_DATABASE_PASSWORD:
+      valueFrom:
+        secretKeyRef:
+          name: vikunja-db-postgres-creds-1password
+          key: passsword
+  persistence:
+    data:
+      enabled: true
+      existingClaim: vikunja-data
