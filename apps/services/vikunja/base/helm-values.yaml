@@ -14,3 +14,7 @@ vikunja:
     data:
       enabled: true
       existingClaim: vikunja-data
+  postgresql:
+    enabled: false
+  redis:
+    enabled: true
