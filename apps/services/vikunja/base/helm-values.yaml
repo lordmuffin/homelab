@@ -9,7 +9,7 @@ vikunja:
       valueFrom:
         secretKeyRef:
           name: vikunja-db-postgres-creds-1password
-          key: passsword
+          key: password
     VIKUNJA_DATABASE_HOST:
       value: vikunja-database
   persistence:
