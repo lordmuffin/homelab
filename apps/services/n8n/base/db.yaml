@@ -4,7 +4,7 @@ metadata:
   name: n8n-database
   namespace: services
 spec:
-  imageName: ghcr.io/cloudnative-pg/postgresql:16.0
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.2-10
   instances: 1
   startDelay: 35
   stopDelay: 35
@@ -29,7 +29,7 @@ spec:
       secret:
         name: n8n-db-postgres-creds-1password
   storage:
-    storageClass: freenas-iscsi-csi
+    storageClass: ssd
     size: 40Gi
   monitoring:
     enablePodMonitor: true

@@ -5,7 +5,7 @@ metadata:
   labels:
     app: n8n-server
   annotations:
-    link.argocd.argoproj.io/external-link: https://n8n.labs.andrewpjackson.com
+    link.argocd.argoproj.io/external-link: https://n8n.lab.apj.dev
 spec:
   replicas: 1
   strategy:

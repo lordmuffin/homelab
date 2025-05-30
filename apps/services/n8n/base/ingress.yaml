@@ -3,7 +3,7 @@ kind: IngressRoute
 metadata:
   name: n8n-internal
   annotations:
-    external-dns.alpha.kubernetes.io/hostname: n8n.labs.andrewpjackson.com
+    external-dns.alpha.kubernetes.io/hostname: n8n.lab.apj.dev
     external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
     external-dns.alpha.kubernetes.io/ttl: "120"
     cert-manager.io/cluster-issuer: letsencrypt-production
@@ -15,13 +15,13 @@ spec:
   entryPoints:
     - web-int-tls
   routes:
-    - match: Host(`n8n.labs.andrewpjackson.com`)
+    - match: Host(`n8n.lab.apj.dev`)
       kind: Rule
       services:
         - name: n8n
           port: 80
   tls:
-    secretName: labs-andrewpjackson-com-tls
+    secretName: lab-apj-dev-tls
 # data:
 #   resource.customizations: |
 #     extensions/Ingress:
