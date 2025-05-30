@@ -40,16 +40,16 @@ patches:
   target:
     kind: Deployment
     name: postgres-exporter
-- patch: |-
-    - op: add
-      path: "/spec/template/spec/nodeSelector"
-      value:
-        kubernetes.io/arch: amd64
-  target:
-    kind: Deployment
-    name: n8n-server
+# - patch: |-
+#     - op: add
+#       path: "/spec/template/spec/nodeSelector"
+#       value:
+#         kubernetes.io/arch: amd64
+#   target:
+#     kind: Deployment
+#     name: n8n-server
 commonAnnotations:
   reloader.stakater.com/auto: "true"
 images:
 - name: n8nio/n8n
-  newTag: 1.34.2
+  newTag: 1.94.1
