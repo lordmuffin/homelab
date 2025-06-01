@@ -1,0 +1,52 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+bases:
+- ./base
+- github.com/lordmuffin/homelab/apps/data/postgres/exporter
+namespace: services
+patches:
+- patch: |-
+    - op: replace
+      path: "/metadata"
+      value:
+        name: paperless-ngx-postgres-exporter
+  target:
+    kind: Service
+    name: postgres-exporter
+- patch: |-
+    - op: replace
+      path: "/spec/template/spec/containers/0/env/0"
+      value:
+        name: DATA_SOURCE_URI
+        value: paperless-ngx-database.services.svc.cluster.local
+  target:
+    kind: Deployment
+    name: postgres-exporter
+- patch: |-
+    - op: replace
+      path: "/spec/template/spec/containers/0/env/1"
+      value:
+        name: DATA_SOURCE_USER
+        valueFrom: { secretKeyRef: { name: paperless-db-postgres-creds-1password, key: username } }
+  target:
+    kind: Deployment
+    name: postgres-exporter
+- patch: |-
+    - op: replace
+      path: "/spec/template/spec/containers/0/env/2"
+      value:
+        name: DATA_SOURCE_PASS
+        valueFrom: { secretKeyRef: { name: paperless-db-postgres-creds-1password, key: password } }
+  target:
+    kind: Deployment
+    name: postgres-exporter
+# - patch: |-
+#     - op: add
+#       path: "/spec/template/spec/nodeSelector"
+#       value:
+#         kubernetes.io/arch: amd64
+#   target:
+#     kind: Deployment
+#     name: paperless-ngx-server
+commonAnnotations:
+  reloader.stakater.com/auto: "true"
