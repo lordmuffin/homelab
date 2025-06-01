@@ -30,7 +30,7 @@ spec:
         name: n8n-db-postgres-creds-1password
   storage:
     storageClass: ssd
-    size: 40Gi
+    size: 20Gi
   monitoring:
     enablePodMonitor: true
   # affinity:
