@@ -3,13 +3,13 @@ kind: Kustomization
 bases:
 - ./base
 - github.com/lordmuffin/homelab/apps/data/postgres/exporter
-namespace: services
+namespace: paperless
 patches:
 - patch: |-
     - op: replace
       path: "/metadata"
       value:
-        name: paperless-ngx-postgres-exporter
+        name: paperless-postgres-exporter
   target:
     kind: Service
     name: postgres-exporter
@@ -18,7 +18,7 @@ patches:
       path: "/spec/template/spec/containers/0/env/0"
       value:
         name: DATA_SOURCE_URI
-        value: paperless-ngx-database.services.svc.cluster.local
+        value: paperless-database.services.svc.cluster.local
   target:
     kind: Deployment
     name: postgres-exporter
@@ -47,6 +47,6 @@ patches:
 #         kubernetes.io/arch: amd64
 #   target:
 #     kind: Deployment
-#     name: paperless-ngx-server
+#     name: paperless-server
 commonAnnotations:
   reloader.stakater.com/auto: "true"

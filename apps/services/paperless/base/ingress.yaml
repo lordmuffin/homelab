@@ -1,16 +1,16 @@
 apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute
 metadata:
-  name: paperless-ngx-internal
+  name: paperless-internal
   annotations:
-    external-dns.alpha.kubernetes.io/hostname: paperless-ngx.lab.apj.dev
+    external-dns.alpha.kubernetes.io/hostname: paperless.lab.apj.dev
     external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
     external-dns.alpha.kubernetes.io/ttl: "120"
     cert-manager.io/cluster-issuer: letsencrypt-production
     acme.cert-manager.io/http01-edit-in-place: "true"
     kubernetes.io/ingress.class: traefik-external
   labels:
-    app: paperless-ngx
+    app: paperless
 spec:
   entryPoints:
     - websecure
@@ -18,7 +18,7 @@ spec:
     - match: Host(`paperless.lab.apj.dev`)
       kind: Rule
       services:
-        - name: paperless-ngx
+        - name: paperless
           port: 80
   tls:
     secretName: lab-apj-dev-tls

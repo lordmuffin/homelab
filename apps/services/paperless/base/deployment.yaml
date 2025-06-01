@@ -2,18 +2,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: paperless-ngx
+  name: paperless
   namespace: paperless
 spec:
   replicas: 1
   revisionHistoryLimit: 5
   selector:
     matchLabels:
-      app: paperless-ngx
+      app: paperless
   template:
     metadata:
       labels:
-        app: paperless-ngx
+        app: paperless
     spec:
       initContainers:
       - name: wait-for-db
@@ -21,8 +21,8 @@ spec:
         command: ['sh', '-c', 'until nc -z db 5432; do echo "Waiting for Postgres..."; sleep 5; done']
         imagePullPolicy: IfNotPresent
       containers:
-      - name: paperless-ngx
-        image: ghcr.io/paperless-ngx/paperless-ngx:latest
+      - name: paperless
+        image: ghcr.io/paperless/paperless:latest
         imagePullPolicy: IfNotPresent
         env:
         - name: PAPERLESS_OCR_LANGUAGES
@@ -76,7 +76,7 @@ spec:
       volumes:
       - name: media
         persistentVolumeClaim:
-          claimName: paperless-ngx-media
+          claimName: paperless-media
       - name: consume
         persistentVolumeClaim:
-          claimName: paperless-ngx-consume
+          claimName: paperless-consume

@@ -1,12 +1,12 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: paperless-ngx
+  name: paperless
   labels:
-    app: paperless-ngx
+    app: paperless
 spec:
   selector:
-    app: paperless-ngx
+    app: paperless
   ports:
     - name: web
       port: 80
