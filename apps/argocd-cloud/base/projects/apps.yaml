@@ -95,6 +95,8 @@ spec:
     server: https://kubernetes.default.svc
   - namespace: vikunja
     server: https://kubernetes.default.svc
+  - namespace: paperless
+    server: https://kubernetes.default.svc
   clusterResourceWhitelist:
   - group: '*'
     kind: '*'
