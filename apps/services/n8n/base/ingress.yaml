@@ -13,7 +13,7 @@ metadata:
     app: n8n
 spec:
   entryPoints:
-    - web-int-tls
+    - websecure
   routes:
     - match: Host(`n8n.lab.apj.dev`)
       kind: Rule
