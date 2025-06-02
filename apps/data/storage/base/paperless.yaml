@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: paperless-media
+  namespace: services
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: sata
+  resources:
+    requests:
+      storage: 20Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: paperless-consume
+  namespace: services
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: sata
+  resources:
+    requests:
+      storage: 20Gi

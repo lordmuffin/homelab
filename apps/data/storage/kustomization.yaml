@@ -45,7 +45,7 @@ resources:
 - base/turbopilot.yaml
 - base/tandoor.yaml
 - base/vikunja.yaml
-
+- base/paperless.yaml
 
 #  Postgres Storage
 - base/postgres/ha.yaml
