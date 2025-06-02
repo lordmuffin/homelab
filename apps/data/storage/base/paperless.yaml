@@ -2,7 +2,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: paperless-media
-  namespace: services
+  namespace: paperless
 spec:
   accessModes:
     - ReadWriteOnce
@@ -16,7 +16,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: paperless-consume
-  namespace: services
+  namespace: paperless
 spec:
   accessModes:
     - ReadWriteOnce
