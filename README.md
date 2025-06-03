@@ -41,6 +41,14 @@ SOLVED STEPS:
 
 # Install Steps
 
+## TF Install Rackspace
+```
+docker run --rm -v ~/.kube/:/root/.kube:ro -v ${PWD}/terraform:/terraform -e ENV=$ENV -e TF_VAR_api_key=$(op read "op://HomeLab/Rackspace API Credentials/credential") --workdir=/terraform -ti hashicorp/terraform:light plan
+```
+```
+docker run --rm -v ~/.kube/:/root/.kube:ro -v ${PWD}/terraform:/terraform -e ENV=$ENV -e TF_VAR_api_key=$(op read "op://HomeLab/Rackspace API Credentials/credential") --workdir=/terraform -ti hashicorp/terraform:light apply
+```
+
 ## Provision Kairos Virtual Machines
 Be sure to deploy the required VM's ahead of time and then run the Kairos Steps for the control nodes first.
 

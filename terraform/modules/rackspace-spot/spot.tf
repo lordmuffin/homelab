@@ -14,16 +14,16 @@ resource "spot_cloudspace" "cloud-homelab" {
 resource "spot_spotnodepool" "autoscaling-bid" {
   cloudspace_name = resource.spot_cloudspace.cloud-homelab.cloudspace_name
   # You can find the available server classes in the `serverclasses` data source.
-  server_class = "gp.vs1.large-ord"
+  server_class = "ch.vs1.large-ord"
   bid_price    = 0.010
 
 
-  desired_server_count = 3
+  # desired_server_count = 3
 
-#   autoscaling = {
-#     min_nodes = 3
-#     max_nodes = 8
-#   }
+  autoscaling = {
+    min_nodes = 3
+    max_nodes = 6
+  }
 
   labels = {
     "managed-by"         = "terraform"
