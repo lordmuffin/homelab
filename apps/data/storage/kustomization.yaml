@@ -27,12 +27,12 @@ resources:
 # Services
 - base/n8n.yaml
 - base/gitea.yaml
-- base/links.yaml
-- base/feedpushr.yaml
-- base/wger.yaml
+# - base/links.yaml
+# - base/feedpushr.yaml
+# - base/wger.yaml
 # - base/grocy.yaml
 # - base/archivebox.yaml
-- base/change.yaml
+# - base/change.yaml
 # - base/taskwarrior.yaml
 # - base/nitter.yaml
 # - base/wallabag.yaml
