@@ -8,17 +8,17 @@ resources:
 - base/beszel.yaml
 
 # Home Assistant
-- base/ha.yaml
-- base/wyze.yaml
+# - base/ha.yaml
+# - base/wyze.yaml
 
 # Networking
 # - base/adguard.yaml
-- base/unifi.yaml
-- base/unifi-poller.yaml
+# - base/unifi.yaml
+# - base/unifi-poller.yaml
 
 # Media Services
 # - base/jellyfin.yaml
-- base/tanoshi.yaml
+# - base/tanoshi.yaml
 # - base/media.yaml
 # - base/beets.yaml
 # - base/lidarr.yaml
@@ -48,8 +48,8 @@ resources:
 - base/paperless.yaml
 
 #  Postgres Storage
-- base/postgres/ha.yaml
-- base/postgres/n8n.yaml
+# - base/postgres/ha.yaml
+# - base/postgres/n8n.yaml
 # - base/postgres/wallabag.yaml
 # - base/postgres/ganymede.yaml
 
