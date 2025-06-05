@@ -18,7 +18,7 @@ spec:
       initContainers:
       - name: wait-for-db
         image: busybox:1.37
-        command: ['sh', '-c', 'until nc -z paperless-database.paperless.svc.cluster.local 5432; do echo "Waiting for Postgres..."; sleep 5; done']
+        command: ['sh', '-c', 'until nc -z paperless-database-rw.paperless.svc.cluster.local 5432; do echo "Waiting for Postgres..."; sleep 5; done']
         imagePullPolicy: IfNotPresent
       containers:
       - name: paperless
@@ -32,7 +32,7 @@ spec:
         - name: PAPERLESS_REDIS
           value: redis://redis:6379
         - name: PAPERLESS_DBHOST
-          value: paperless-database.paperless.svc.cluster.local
+          value: paperless-database-rw.paperless.svc.cluster.local
         - name: PAPERLESS_DBNAME
           value: paperless
         - name: PAPERLESS_DBUSER
