@@ -18,7 +18,7 @@ spec:
       initContainers:
       - name: wait-for-db
         image: busybox:1.37
-        command: ['sh', '-c', 'until nc -z db 5432; do echo "Waiting for Postgres..."; sleep 5; done']
+        command: ['sh', '-c', 'until nc -z paperless-database.paperless.svc.cluster.local 5432; do echo "Waiting for Postgres..."; sleep 5; done']
         imagePullPolicy: IfNotPresent
       containers:
       - name: paperless
