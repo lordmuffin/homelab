@@ -22,7 +22,7 @@ spec:
         imagePullPolicy: IfNotPresent
       containers:
       - name: paperless
-        image: ghcr.io/paperless/paperless:latest
+        image: ghcr.io/paperless-ngx/paperless-ngx:latest
         imagePullPolicy: IfNotPresent
         env:
         - name: PAPERLESS_OCR_LANGUAGES
