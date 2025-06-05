@@ -41,8 +41,8 @@ resources:
 - base/finances.yaml
 # - base/jupyterlab.yaml
 # - base/librex.yaml
-- base/local-ai.yaml
-- base/turbopilot.yaml
+# - base/local-ai.yaml
+# - base/turbopilot.yaml
 - base/tandoor.yaml
 - base/vikunja.yaml
 - base/paperless.yaml
