@@ -105,7 +105,7 @@ spec:
           usePassword: false
           storageClass: sata-large
         persistence:
-          enabled: false
+          enabled: true
           storageClass: sata
         podSecurityContext:
           fsGroup: 1000
