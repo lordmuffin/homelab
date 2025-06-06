@@ -29,7 +29,7 @@ spec:
       secret:
         name: gitea-db-postgres-creds-1password
   storage:
-    storageClass: sata-large
+    storageClass: sata
     size: 20Gi
   monitoring:
     enablePodMonitor: true

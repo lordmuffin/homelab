@@ -3,7 +3,7 @@ kind: IngressRoute
 metadata:
   name: gitea
   annotations:
-    external-dns.alpha.kubernetes.io/hostname: git.labs.andrewpjackson.com
+    external-dns.alpha.kubernetes.io/hostname: git.lab.apj.dev
     external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
     external-dns.alpha.kubernetes.io/ttl: "120"
     cert-manager.io/cluster-issuer: letsencrypt-production
@@ -15,7 +15,7 @@ spec:
   entryPoints:
     - websecure
   routes:
-    - match: Host(`git.labs.andrewpjackson.com`)
+    - match: Host(`git.lab.apj.dev`)
       kind: Rule
       middlewares:
         - name: traefik-forward-auth
@@ -24,7 +24,7 @@ spec:
         - name: gitea-internal
           port: 80
   tls:
-    secretName: labs-andrewpjackson-com-tls
+    secretName: lab-apj-dev-tls
 # data:
 #   resource.customizations: |
 #     extensions/Ingress:
@@ -39,7 +39,7 @@ kind: IngressRoute
 metadata:
   name: gitea-internal
   annotations:
-    external-dns.alpha.kubernetes.io/hostname: git.labs.andrewpjackson.com
+    external-dns.alpha.kubernetes.io/hostname: git.lab.apj.dev
     external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
     external-dns.alpha.kubernetes.io/ttl: "120"
     cert-manager.io/cluster-issuer: letsencrypt-production
@@ -51,7 +51,7 @@ spec:
   entryPoints:
     - web-int-tls
   routes:
-    - match: Host(`git.labs.andrewpjackson.com`)
+    - match: Host(`git.lab.apj.dev`)
       kind: Rule
       services:
         - name: gitea-internal
