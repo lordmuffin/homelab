@@ -5,3 +5,4 @@ resources:
 - svc.yaml
 - db.yaml
 - ingress.yaml
+- redis.yaml

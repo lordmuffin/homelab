@@ -1,0 +1,20 @@
+---
+apiVersion: redis.redis.opstreelabs.in/v1beta2
+kind: Redis
+metadata:
+  name: paperless-redis-standalone
+spec:
+  kubernetesConfig:
+    image: quay.io/opstree/redis:v7.2.7
+    imagePullPolicy: IfNotPresent
+  storage:
+    volumeClaimTemplate:
+      spec:
+        storageClassName: ssd
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi
+  securityContext:
+    runAsUser: 1000
+    fsGroup: 1000
