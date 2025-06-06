@@ -3,10 +3,23 @@ apiVersion: redis.redis.opstreelabs.in/v1beta2
 kind: Redis
 metadata:
   name: paperless-redis-standalone
+  namespace: paperless
 spec:
+  podSecurityContext:
+    runAsUser: 1000
+    fsGroup: 1000
   kubernetesConfig:
     image: quay.io/opstree/redis:v6.2.14
     imagePullPolicy: IfNotPresent
+    updateStrategy:
+      type: OnDelete
+    resources:
+      requests:
+        cpu: 150m
+        memory: 128Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
   storage:
     volumeClaimTemplate:
       spec:
