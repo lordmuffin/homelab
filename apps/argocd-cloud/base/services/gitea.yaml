@@ -106,7 +106,7 @@ spec:
           storageClass: sata-large
         persistence:
           enabled: true
-          storageClass: sata-large
+          storageClass: sata
         podSecurityContext:
           fsGroup: 1000
         postgresql-ha:
