@@ -9,9 +9,9 @@ data:
   accounts.image-updater: apiKey
   kustomize.buildOptions: "--enable-helm --enable-alpha-plugins --enable-exec"
   application.resourceTrackingMethod: annotation+label
-  url: https://argo.gruber.dev.br
+  url: https://argocd.lab.apj.dev
   statusbadge.enabled: "true"
-  statusbadge.url: "https://argo.gruber.dev.br/"
+  statusbadge.url: "https://argocd.lab.apj.dev/"
   exec.enabled: "true"
   # https://argo-cd.readthedocs.io/en/stable/operator-manual/reconcile/#system-level-configuration
   resource.ignoreResourceUpdatesEnabled: "true"
