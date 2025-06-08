@@ -30,7 +30,7 @@ spec:
             reject_old_samples: false
           persistence:
             enabled: true
-            storageClassName: sata-large
+            storageClassName: sata
             size: 25Gi
   destination:
     namespace: monitoring
