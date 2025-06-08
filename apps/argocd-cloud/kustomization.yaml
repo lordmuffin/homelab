@@ -41,6 +41,7 @@ resources:
 
   # Monitoring
   - base/monitoring/kuma.yaml
+  - base/monitoring/beszel.yaml
   - base/monitoring/glance.yaml
   # - base/monitoring/unifi-poller.yaml
   - base/monitoring/kube-prometheus.yaml
