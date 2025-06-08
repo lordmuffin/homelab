@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
       - name: vikunja
-        image: vikunjaio/vikunja
+        image: vikunja/vikunja
         env:
         - name: VIKUNJA_SERVICE_PUBLICURL
           value: "https://vikunja.lab.apj.dev"
