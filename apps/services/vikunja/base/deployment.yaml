@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vikunja
+  labels:
+    app: vikunja
+  annotations:
+    link.argocd.argoproj.io/external-link: https://vikunja.lab.apj.dev
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: vikunja
+  template:
+    metadata:
+      labels:
+        app: vikunja
+    spec:
+      initContainers:
+        - name: volume-permissions
+          image: busybox:1.36
+          command: ["sh", "-c", "chown 1000:1000 /data"]
+          volumeMounts:
+            - name: config-storage
+              mountPath: /data
+      containers:
+      - name: vikunja
+        image: vikunjaio/vikunja
+        env:
+        - name: VIKUNJA_SERVICE_PUBLICURL
+          value: "https://vikunja.lab.apj.dev"
+        - name: VIKUNJA_DATABASE_HOST
+          value: db
+        - name: POSTGRES_PASSWORD
+          valueFrom: {secretKeyRef: {name: vikunja-db-postgres-creds-1password, key: password}}
+        - name: POSTGRES_USER
+          valueFrom: {secretKeyRef: {name: vikunja-db-postgres-creds-1password, key: username}}
+        - name: VIKUNJA_SERVICE_JWTSECRET
+          valueFrom: {secretKeyRef: {name: vikunja-encryption-key-1password, key: password}}
+        envFrom:
+        - configMapRef:
+            name: vikunja-cm
+        ports:
+        - name: web
+          containerPort: 3456
+          protocol: TCP
+        resources:
+          requests:
+            cpu: 150m
+            memory: 512Mi
+          limits:
+            cpu: 550m
+            memory: 768Mi
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 5678
+          initialDelaySeconds: 60
+        startupProbe:
+          httpGet:
+            path: /healthz
+            port: 5678
+          initialDelaySeconds: 120
+        volumeMounts:
+        - name: config-storage
+          mountPath: /home/node/.vikunja
+      volumes:
+      - name: config-storage
+        persistentVolumeClaim:
+          claimName: vikunja-storage

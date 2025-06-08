@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: vikunja
+  labels:
+    app: vikunja
+spec:
+  selector:
+    app: vikunja
+  ports:
+    - name: web
+      port: 80
+      targetPort: 3456
+      protocol: TCP
+  type: ClusterIP
