@@ -122,7 +122,7 @@ patches:
       kind: Deployment
       name: argocd-server
   - patch: |-
-      - op: replace
+      - op: add
         path: "/spec/template/spec/containers/0/env/-"
         value: "password"
 # - op: replace
