@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: vikunja-data
+  name: vikunja-storage
   namespace: vikunja
 spec:
   accessModes:

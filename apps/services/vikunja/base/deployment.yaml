@@ -64,9 +64,9 @@ spec:
             port: 5678
           initialDelaySeconds: 120
         volumeMounts:
-        - name: config-storage
-          mountPath: /home/node/.vikunja
+        - name: files
+          mountPath: /app/vikunja/files
       volumes:
-      - name: config-storage
+      - name: files
         persistentVolumeClaim:
           claimName: vikunja-storage
