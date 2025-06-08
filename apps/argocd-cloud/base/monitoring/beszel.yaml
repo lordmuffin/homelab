@@ -5,13 +5,13 @@ metadata:
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
-  project: apps
+  project: monitoring
   source:
     repoURL: 'https://github.com/lordmuffin/homelab.git'
     path: apps/monitoring/beszel
     targetRevision: main
   destination:
-    namespace: beszel
+    namespace: monitoring
     name: in-cluster
   syncPolicy:
     automated:
