@@ -30,8 +30,8 @@ spec:
             reject_old_samples: false
           persistence:
             enabled: true
-            storageClassName: sata
-            size: 25Gi
+            storageClassName: sata-large
+            size: 75Gi
   destination:
     namespace: monitoring
     name: in-cluster
