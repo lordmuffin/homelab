@@ -62,11 +62,19 @@ spec:
           periodSeconds: 10
           failureThreshold: 6
         livenessProbe:
-          tcpSocket:
-            port: 8000
+          command:
+            - curl
+            - -f
+            - http://localhost:8000
+          failureThreshold: 5
+          periodSeconds: 30
         readinessProbe:
-          tcpSocket:
-            port: 8000
+          command:
+            - curl
+            - -f
+            - http://localhost:8000
+          failureThreshold: 5
+          periodSeconds: 30
         resources:
           requests:
             memory: "512Mi"
