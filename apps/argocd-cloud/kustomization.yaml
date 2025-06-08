@@ -123,10 +123,10 @@ patches:
       name: argocd-server
   - patch: |-
       - op: replace
-        path: "/spec/template/spec/containers/0/env/0/valueFrom/secretKeyRef/key/-"
+        path: "/spec/template/spec/containers/0/env/-"
         value: "password"
       - op: replace
-        path: "/spec/template/spec/containers/0/env/0/valueFrom/secretKeyRef/name/-"
+        path: "/spec/template/spec/containers/0/env/-"
         value: "argocd-redis-1password"
     target:
       kind: Deployment
