@@ -24,10 +24,6 @@ helmCharts:
     service:
       name: webhook-service
       namespace: redis-operator
-    certificate:
-      name: serving-cert
-      secretName: webhook-server-cert
-
     issuer:
       # Whether to create the issuer or not. You might want to disable this if instead you
       # want to use a ClusterIssuer that you simply want to provide.
