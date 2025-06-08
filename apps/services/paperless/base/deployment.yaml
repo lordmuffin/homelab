@@ -48,7 +48,8 @@ spec:
         - name: PAPERLESS_ADMIN_PASSWORD
           valueFrom: {secretKeyRef: {name: paperless-admin-creds-1password, key: password}}
         ports:
-        - containerPort: 8000
+          - name: web
+            containerPort: 8000
         volumeMounts:
         - name: media
           mountPath: /usr/src/paperless/media
