@@ -26,9 +26,9 @@ spec:
           value: "https://vikunja.lab.apj.dev"
         - name: VIKUNJA_DATABASE_HOST
           value: vikunja-database.vikunja.svc.cluster.local
-        - name: POSTGRES_PASSWORD
+        - name: VIKUNJA_DATABASE_PASSWORD
           valueFrom: {secretKeyRef: {name: vikunja-db-postgres-creds-1password, key: password}}
-        - name: POSTGRES_USER
+        - name: VIKUNJA_DATABASE_USER
           valueFrom: {secretKeyRef: {name: vikunja-db-postgres-creds-1password, key: username}}
         - name: VIKUNJA_SERVICE_JWTSECRET
           valueFrom: {secretKeyRef: {name: vikunja-encryption-key-1password, key: password}}
