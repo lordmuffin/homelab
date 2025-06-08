@@ -10,3 +10,16 @@ spec:
   resources:
     requests:
       storage: 5Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vikunja-database
+  namespace: vikunja
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ssd
+  resources:
+    requests:
+      storage: 5Gi

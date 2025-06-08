@@ -3,7 +3,7 @@ kind: Kustomization
 
 resources:
 - ingress.yaml
-- db.yaml
+# - db.yaml
 - deployment.yaml
 - svc.yaml
 # - backups.yaml
