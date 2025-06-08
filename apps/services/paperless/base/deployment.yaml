@@ -29,6 +29,8 @@ spec:
           value: jpn
         - name: PAPERLESS_OCR_LANGUAGE
           value: eng+jpn
+        - name: PAPERLESS_PORT
+          value: 8000
         - name: PAPERLESS_REDIS
           value: redis://paperless-redis-standalone.paperless.svc.cluster.local:6379
         - name: PAPERLESS_DBHOST
