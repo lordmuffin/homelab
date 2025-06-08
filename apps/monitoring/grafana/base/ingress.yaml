@@ -14,12 +14,12 @@ metadata:
     app: grafana
 spec:
   entryPoints:
-    - web-int-tls
+    - websecure
   routes:
-    - match: Host(`grafana.labs.andrewpjackson.com`)
+    - match: Host(`grafana.lab.apj.dev`)
       kind: Rule
       services:
         - name: grafana
           port: 3000
   tls:
-    secretName: labs-andrewpjackson-com-tls
+    secretName: lab-apj-dev-tls
