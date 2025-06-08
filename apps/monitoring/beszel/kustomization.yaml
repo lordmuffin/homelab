@@ -3,7 +3,7 @@ kind: Kustomization
 bases:
 - ./base
 
-namespace: beszel
+namespace: monitoring
 
 commonAnnotations:
   reloader.stakater.com/auto: "true"
