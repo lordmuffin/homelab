@@ -30,7 +30,7 @@ spec:
         - name: PAPERLESS_OCR_LANGUAGE
           value: eng+jpn
         - name: PAPERLESS_REDIS
-          value: redis://paperless-redis-standalone:6379
+          value: redis://paperless-redis-standalone.paperless.svc.cluster.local:6379
         - name: PAPERLESS_DBHOST
           value: paperless-database-rw.paperless.svc.cluster.local
         - name: PAPERLESS_DBNAME
