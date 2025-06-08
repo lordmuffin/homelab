@@ -44,7 +44,7 @@ helmCharts:
       # Whether to use cert-manager for certificate management
       # Only effective when webhook=true
       # If webhook=true and certmanager.enabled=false, you need to manually create certificate secret
-      enabled: false
+      enabled: true
       # API version of the cert-manager CRDs
       apiVersion: "cert-manager.io/v1"
   releaseName: redis-operator
