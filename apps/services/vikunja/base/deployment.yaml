@@ -32,9 +32,9 @@ spec:
           valueFrom: {secretKeyRef: {name: vikunja-db-postgres-creds-1password, key: username}}
         - name: VIKUNJA_SERVICE_JWTSECRET
           valueFrom: {secretKeyRef: {name: vikunja-encryption-key-1password, key: password}}
-        envFrom:
-        - configMapRef:
-            name: vikunja-cm
+        # envFrom:
+        # - configMapRef:
+        #     name: vikunja-cm
         ports:
         - name: web
           containerPort: 3456
