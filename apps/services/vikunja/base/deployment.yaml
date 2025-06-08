@@ -62,6 +62,12 @@ spec:
         - name: db
           mountPath: /db
       initContainers:
+        - name: volume-permissions-db
+          image: busybox:1.36
+          command: ["sh", "-c", "chown 1000:1000 /db"]
+          volumeMounts:
+            - name: db
+              mountPath: /db
       volumes:
       - name: files
         persistentVolumeClaim:
