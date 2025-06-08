@@ -9,7 +9,7 @@ spec:
     app: paperless
   ports:
     - name: web
-      port: 80
+      port: 8000
       targetPort: 8000
       protocol: TCP
   type: ClusterIP
