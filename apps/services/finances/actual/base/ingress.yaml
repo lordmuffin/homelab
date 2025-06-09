@@ -18,8 +18,8 @@ spec:
     - match: Host(`actual.lab.apj.dev`)
       kind: Rule
       services:
-        - name: http
-          port: 5006
+        - name: web
+          port: 80
   tls:
     secretName: lab-apj-dev-tls
 # data:
