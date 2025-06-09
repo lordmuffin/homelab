@@ -3,7 +3,7 @@ kind: Kustomization
 
 resources:
 - azure-pipelines.yaml
-# - actual.yaml
+- actual.yaml
 - gitea.yaml
 - forgejo.yaml
 # - mlops.yaml

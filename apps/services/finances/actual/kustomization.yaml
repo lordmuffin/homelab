@@ -5,15 +5,5 @@ bases:
 
 namespace: services
 
-patches:
-- patch: |-
-    - op: add
-      path: "/spec/template/spec/nodeSelector"
-      value:
-        kubernetes.io/arch: amd64
-  target:
-    kind: Deployment
-    name: actual
-
 commonAnnotations:
   reloader.stakater.com/auto: "true"
