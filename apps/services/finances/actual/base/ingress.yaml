@@ -1,25 +1,25 @@
 apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute
 metadata:
-  name: lab.apj.dev-internal
+  name: actual-internal
   annotations:
-    external-dns.alpha.kubernetes.io/hostname: lab.apj.dev.lab.apj.dev
+    external-dns.alpha.kubernetes.io/hostname: actual.lab.apj.dev
     external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
     external-dns.alpha.kubernetes.io/ttl: "120"
     cert-manager.io/cluster-issuer: letsencrypt-production
     acme.cert-manager.io/http01-edit-in-place: "true"
     kubernetes.io/ingress.class: traefik-external
   labels:
-    app: lab.apj.dev
+    app: actual
 spec:
   entryPoints:
     - websecure
   routes:
-    - match: Host(`lab.apj.dev.lab.apj.dev`)
+    - match: Host(`actual.lab.apj.dev`)
       kind: Rule
       services:
-        - name: lab.apj.dev
-          port: 80
+        - name: actual
+          port: 5006
   tls:
     secretName: lab-apj-dev-tls
 # data:
