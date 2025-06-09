@@ -21,7 +21,7 @@ spec:
     spec:
       containers:
         - name: actual
-          image: ghcr.io/actualbudget/actual-server:23.8.1
+          image: ghcr.io/actualbudget/actual-server:25.6.1
           envFrom:
             - configMapRef:
                 name: actual-cm
