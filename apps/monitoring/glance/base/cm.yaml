@@ -99,6 +99,8 @@ data:
                         url: https://vikunja.lab.apj.dev/
                       - title: actual
                         url: https://actual.lab.apj.dev/
+                      - title: paperless
+                        url: https://paperless.lab.apj.dev/
                   - title: Entertainment
                     color: 10 70 50
                     links:
