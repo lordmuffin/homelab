@@ -81,11 +81,24 @@ data:
                         url: https://beszel.lab.apj.dev/
                       - title: Kuma
                         url: https://kuma.lab.apj.dev/
+                      - title: Grafana
+                        url: https://grafana.lab.apj.dev/
                   - title: CI/CD
                     color: 200 50 50
                     links:
                       - title: ArgoCD
                         url: https://argo.lab.apj.dev/
+                  - title: Services
+                    color: 200 50 50
+                    links:
+                      - title: Tandoor
+                        url: https://tandoor.lab.apj.dev/
+                      - title: n8n
+                        url: https://n8n.lab.apj.dev/
+                      - title: vikunja
+                        url: https://vikunja.lab.apj.dev/
+                      - title: actual
+                        url: https://actual.lab.apj.dev/
                   - title: Entertainment
                     color: 10 70 50
                     links:
