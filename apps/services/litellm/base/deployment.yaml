@@ -64,13 +64,13 @@ spec:
               mountPath: /data # For SQLite DB, logs, and disk cache
           livenessProbe:
             httpGet:
-              path: /health # LiteLLM health check endpoint
+              path: /health/liveliness # LiteLLM health check endpoint
               port: http
             initialDelaySeconds: 60
             periodSeconds: 30
           readinessProbe:
             httpGet:
-              path: /health
+              path: /health/liveliness
               port: http
             initialDelaySeconds: 30
             periodSeconds: 15
