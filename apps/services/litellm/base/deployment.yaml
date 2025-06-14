@@ -50,6 +50,11 @@ spec:
           volumeMounts:
             - name: litellm-data
               mountPath: /data
+            - name: config-volume
+              mountPath: /app/config.yaml # Mount the config.yaml file
+              subPath: config.yaml        # Specify the key from ConfigMap
+            - name: litellm-data
+              mountPath: /data # For SQLite DB, logs, and disk cache
           envFrom:
             - configMapRef: # For TZ, LITELLM_DATABASE_URL etc.
                 name: litellm-config
@@ -92,12 +97,6 @@ spec:
             #     secretKeyRef:
             #       name: litellm-anthropic-api-key-1password
             #       key: password
-          volumeMounts:
-            - name: config-volume
-              mountPath: /app/config.yaml # Mount the config.yaml file
-              subPath: config.yaml        # Specify the key from ConfigMap
-            - name: litellm-data
-              mountPath: /data # For SQLite DB, logs, and disk cache
           livenessProbe:
             httpGet:
               path: /health/liveliness # LiteLLM health check endpoint
