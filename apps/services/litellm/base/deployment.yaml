@@ -46,11 +46,11 @@ spec:
                   name: litellm-master-key-1password
                   key: password
             # Example: Add API keys from secrets
-            - name: OPENAI_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: litellm-openai-api-key-1password # Ensure this secret exists
-                  key: password # Assuming the key in 1Password item is 'password'
+            # - name: OPENAI_API_KEY
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: litellm-openai-api-key-1password # Ensure this secret exists
+            #       key: password # Assuming the key in 1Password item is 'password'
             # - name: ANTHROPIC_API_KEY
             #   valueFrom:
             #     secretKeyRef:
