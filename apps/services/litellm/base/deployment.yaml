@@ -28,7 +28,7 @@ spec:
               mountPath: /data
       containers:
         - name: litellm
-          image: ghcr.io/berriai/litellm:v1.36.6 # Use a specific version
+          image: ghcr.io/berriai/litellm:v1.72.2-stable # Use a specific version
           imagePullPolicy: IfNotPresent
           # Default CMD: ["--config", "/app/config.yaml", "--port", "4000", "--host", "0.0.0.0"]
           # We provide config.yaml via ConfigMap mount. Port and host are fine.
