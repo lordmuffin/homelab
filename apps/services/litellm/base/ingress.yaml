@@ -1,0 +1,28 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: litellm
+  namespace: services
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: litellm.lab.apj.dev
+    external-dns.alpha.kubernetes.io/cloudflare-proxied: "false" # Or "true" as per your setup
+    external-dns.alpha.kubernetes.io/ttl: "120"
+    cert-manager.io/cluster-issuer: letsencrypt-production
+    acme.cert-manager.io/http01-edit-in-place: "true"
+    kubernetes.io/ingress.class: traefik-external
+  labels:
+    app: litellm
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`litellm.lab.apj.dev`)
+      kind: Rule
+      middlewares:
+        - name: traefik-forward-auth # Assuming you want to protect it
+          namespace: traefik
+      services:
+        - name: litellm # K8s service name
+          port: 80     # K8s service port
+  tls:
+    secretName: lab-apj-dev-tls # Your wildcard certificate

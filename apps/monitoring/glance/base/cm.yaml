@@ -101,6 +101,8 @@ data:
                         url: https://actual.lab.apj.dev/
                       - title: paperless
                         url: https://paperless.lab.apj.dev/
+                      - title: LiteLLM
+                        url: https://litellm.lab.apj.dev/ui
                   - title: Entertainment
                     color: 10 70 50
                     links:

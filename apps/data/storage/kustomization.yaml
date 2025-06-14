@@ -46,6 +46,7 @@ resources:
 - base/tandoor.yaml
 - base/vikunja.yaml
 - base/paperless.yaml
+- base/litellm.yaml
 
 #  Postgres Storage
 # - base/postgres/ha.yaml

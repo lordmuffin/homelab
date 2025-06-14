@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: litellm-config
+  namespace: services
+data:
+  TZ: "America/Chicago"
+  LITELLM_PROXY_NUM_WORKERS: "1" # Default is 1, adjust as needed
+  LITELLM_DATABASE_URL: "sqlite:////data/litellm.db" # For storing logs, keys, spend
+  LITELLM_STORE_LOGS: "True"
+  LITELLM_LOG_FILE: "/data/litellm.log"
+  LITELLM_CACHE_DIR: "/data/.litellm_cache" # For persistent caching
+
+  # config.yaml will be mounted into the pod at /app/config.yaml
+  # LiteLLM's default CMD uses --config /app/config.yaml
+  config.yaml: |
+    model_list:
+      # --- EXAMPLE MODELS ---
+      # Add your models here. API keys should be set as environment variables
+      # and LiteLLM will pick them up automatically if set (e.g., OPENAI_API_KEY).
+      # You can explicitly reference them using "os.environ/YOUR_ENV_VAR_NAME" if needed.
+
+      # - model_name: gpt-3.5-turbo # User-defined alias for the model
+      #   litellm_params:
+      #     model: openai/gpt-3.5-turbo # Actual provider model name
+      #     # api_key: "os.environ/OPENAI_API_KEY" # LiteLLM automatically picks up OPENAI_API_KEY
+
+      # - model_name: claude-3-opus
+      #   litellm_params:
+      #     model: anthropic/claude-3-opus-20240229
+      #     # api_key: "os.environ/ANTHROPIC_API_KEY" # LiteLLM automatically picks up ANTHROPIC_API_KEY
+    litellm_settings:
+      set_verbose: True
+      # drop_params: True # Set to True to drop unsupported parameters, preventing errors.
+      # telemetry: False # Telemetry is on by default. Set to False to disable.
+      
+      # Cache settings (using persistent disk cache via LITELLM_CACHE_DIR env var)
+      cache_responses: True 
+      cache_kwargs:
+        type: "disk" # Supported types: "redis", "local" (in-memory), "disk"
+        # For "disk" cache, LITELLM_CACHE_DIR env var defines the path.
+        # For "redis" cache:
+        # host: "your-redis-host"
+        # port: "your-redis-port"
+        # password: "your-redis-password" # Optional
+        ttl: 3600 # 1 hour in seconds
+
+    general_settings:
+      master_key: "os.environ/LITELLM_MASTER_KEY" # For securing admin endpoints like /config, /key/generate
+      # database_url is set via ENV var above
+      # store_logs is set via ENV var above
+      # log_file is set via ENV var above
+      health_check_url: "/health/ready" # Default is /health, but /health/ready is better for k8s
+    ui_settings:
+      enable_ui: True # UI is enabled by default at /ui
+      admin_only_ui: False # If True, requires master_key for UI access via /config endpoint

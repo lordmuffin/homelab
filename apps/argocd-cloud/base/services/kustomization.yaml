@@ -18,6 +18,7 @@ resources:
 - woodpecker-utils.yaml
 - tandoor.yaml
 - vikunja.yaml
+- litellm.yaml
 
 namespace: argocd
 
