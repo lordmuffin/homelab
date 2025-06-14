@@ -4,13 +4,12 @@ metadata:
   name: litellm-config
   namespace: services
 data:
-  TZ: "America/Chicago"
-  LITELLM_PROXY_NUM_WORKERS: "1" # Default is 1, adjust as needed
-  LITELLM_DATABASE_URL: "sqlite:////data/litellm.db" # For storing logs, keys, spend
+  TZ: "America/Chicago" # Timezone
+  LITELLM_PROXY_NUM_WORKERS: "1" # Default is 1, adjust as needed for LiteLLM proxy
+  # DATABASE_URL for PostgreSQL will be set as an environment variable in the deployment
   LITELLM_STORE_LOGS: "True"
   LITELLM_LOG_FILE: "/data/litellm.log"
-  LITELLM_CACHE_DIR: "/data/.litellm_cache" # For persistent caching
-
+  LITELLM_CACHE_DIR: "/data/.litellm_cache" # For persistent disk caching
   # config.yaml will be mounted into the pod at /app/config.yaml
   # LiteLLM's default CMD uses --config /app/config.yaml
   config.yaml: |
@@ -47,7 +46,7 @@ data:
 
     general_settings:
       master_key: "os.environ/LITELLM_MASTER_KEY" # For securing admin endpoints like /config, /key/generate
-      # database_url is set via ENV var above
+      # database_url will be set via DATABASE_URL environment variable for PostgreSQL
       # store_logs is set via ENV var above
       # log_file is set via ENV var above
       health_check_url: "/health/ready" # Default is /health, but /health/ready is better for k8s

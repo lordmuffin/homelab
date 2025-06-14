@@ -26,16 +26,30 @@ spec:
           volumeMounts:
             - name: litellm-data
               mountPath: /data
+        - name: wait-for-db
+          image: busybox:1.36 # Using same busybox version
+          command: ['sh', '-c', 'until nc -zv litellm-database-rw.services.svc.cluster.local 5432; do echo "Waiting for LiteLLM PostgreSQL DB..."; sleep 5; done']
+          imagePullPolicy: IfNotPresent
       containers:
         - name: litellm
           image: ghcr.io/berriai/litellm:v1.72.2-stable # Use a specific version
           imagePullPolicy: IfNotPresent
-          # Default CMD: ["--config", "/app/config.yaml", "--port", "4000", "--host", "0.0.0.0"]
-          # We provide config.yaml via ConfigMap mount. Port and host are fine.
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e # Exit immediately if a command exits with a non-zero status.
+              # Construct DATABASE_URL from individual environment variables
+              export DATABASE_URL="postgresql://${LITELLM_DB_USER}:${LITELLM_DB_PASSWORD}@${LITELLM_DB_HOST}:${LITELLM_DB_PORT}/${LITELLM_DB_NAME}"
+              echo "DATABASE_URL set for LiteLLM"
+              # Original LiteLLM entrypoint and command
+              exec litellm --config /app/config.yaml --port 4000 --host 0.0.0.0
           ports:
             - name: http
               containerPort: 4000
               protocol: TCP
+          volumeMounts:
+            - name: litellm-data
+              mountPath: /data
           envFrom:
             - configMapRef: # For TZ, LITELLM_DATABASE_URL etc.
                 name: litellm-config
@@ -44,6 +58,28 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: litellm-master-key-1password
+                  key: password
+            - name: LITELLM_DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: litellm-db-postgres-creds-1password
+                  key: username
+            - name: LITELLM_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: litellm-db-postgres-creds-1password
+                  key: password
+            - name: LITELLM_DB_HOST
+              value: "litellm-database-rw.services.svc.cluster.local"
+            - name: LITELLM_DB_PORT
+              value: "5432"
+            - name: LITELLM_DB_NAME
+              value: "litellm"
+            # Example: Add API keys from secrets (if not already present)
+            # - name: OPENAI_API_KEY
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: litellm-openai-api-key-1password # Ensure this secret exists
                   key: password
             # Example: Add API keys from secrets
             # - name: OPENAI_API_KEY

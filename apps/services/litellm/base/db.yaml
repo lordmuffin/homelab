@@ -1,0 +1,36 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: litellm-database
+  namespace: services # Ensure this matches LiteLLM's namespace
+spec:
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.2-10 # Use a consistent PG version
+  instances: 1
+  startDelay: 300 # Standard start delay
+  stopDelay: 300  # Standard stop delay
+  primaryUpdateStrategy: unsupervised # Or "supervised" if preferred
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  postgresql:
+    parameters:
+      shared_buffers: "128MB" # Adjust based on memory
+      timezone: "America/Chicago"
+      pg_stat_statements.max: "10000"
+      pg_stat_statements.track: "all"
+      auto_explain.log_min_duration: "10s"
+  bootstrap:
+    initdb:
+      database: litellm
+      owner: litellm
+      secret:
+        name: litellm-db-postgres-creds-1password # K8s secret created by 1Password
+  storage:
+    storageClass: ssd # Or your preferred storage class for databases
+    size: 5Gi # Adjust as needed
+  monitoring:
+    enablePodMonitor: true # If you have Prometheus monitoring for CNPG
