@@ -19,6 +19,12 @@ data:
       # and LiteLLM will pick them up automatically if set (e.g., OPENAI_API_KEY).
       # You can explicitly reference them using "os.environ/YOUR_ENV_VAR_NAME" if needed.
 
+      - model_name: gemini/gemini-pro # User-defined alias for the model
+        litellm_params:
+          model: gemini/gemini-pro # Actual provider model name
+          api_key: "test" # LiteLLM automatically picks up OPENAI_API_KEY
+
+
       # - model_name: gpt-3.5-turbo # User-defined alias for the model
       #   litellm_params:
       #     model: openai/gpt-3.5-turbo # Actual provider model name
