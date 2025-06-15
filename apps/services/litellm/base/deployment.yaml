@@ -80,12 +80,11 @@ spec:
               value: "5432"
             - name: LITELLM_DB_NAME
               value: "litellm"
-            # Example: Add API keys from secrets (if not already present)
-            # - name: OPENAI_API_KEY
-            #   valueFrom:
-            #     secretKeyRef:
-            #       name: litellm-openai-api-key-1password # Ensure this secret exists
-                  # key: password
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: litellm-gemini-1password # Ensure this secret exists
+                  key: password
             # Example: Add API keys from secrets
             # - name: OPENAI_API_KEY
             #   valueFrom:

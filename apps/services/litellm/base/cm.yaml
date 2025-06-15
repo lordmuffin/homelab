@@ -22,8 +22,7 @@ data:
       - model_name: gemini/gemini-pro # User-defined alias for the model
         litellm_params:
           model: gemini/gemini-pro # Actual provider model name
-          api_key: "test" # LiteLLM automatically picks up OPENAI_API_KEY
-
+          api_key: "os.environ/GEMINI_API_KEY" # LiteLLM automatically picks up OPENAI_API_KEY
 
       # - model_name: gpt-3.5-turbo # User-defined alias for the model
       #   litellm_params:
