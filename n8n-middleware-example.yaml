@@ -1,0 +1,115 @@
+# Example middleware configuration for n8n to bypass auth on /api paths
+# This would go in: apps/networking/traefik-kustomize/auth/middleware.yaml
+
+---
+# New middleware specifically for n8n API bypass
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: n8n-conditional-auth
+  namespace: traefik
+spec:
+  forwardAuth:
+    address: http://traefik-forward-auth:4181
+    trustForwardHeader: true
+    authResponseHeaders:
+      - X-Forwarded-User
+    # This middleware will be applied selectively via route rules
+
+---
+# Example updated ingress route for n8n
+# This would replace: apps/services/n8n/base/ingress.yaml
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: n8n-internal
+  namespace: n8n
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: n8n.lab.apj.dev
+    external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
+    external-dns.alpha.kubernetes.io/ttl: "120"
+    cert-manager.io/cluster-issuer: letsencrypt-production
+    acme.cert-manager.io/http01-edit-in-place: "true"
+    kubernetes.io/ingress.class: traefik-external
+  labels:
+    app: n8n
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    # Route 1: API endpoints without authentication
+    - match: Host(`n8n.lab.apj.dev`) && PathPrefix(`/webhook-test`)
+      kind: Rule
+      services:
+        - name: n8n
+          port: 80
+      # No middlewares = no authentication required
+    
+    # Route 2: Webhook endpoints without authentication (if needed)
+    - match: Host(`n8n.lab.apj.dev`) && PathPrefix(`/webhook`)
+      kind: Rule
+      services:
+        - name: n8n
+          port: 80
+      # No middlewares = no authentication required
+    
+    # Route 3: All other paths require authentication
+    - match: Host(`n8n.lab.apj.dev`)
+      kind: Rule
+      services:
+        - name: n8n
+          port: 80
+      middlewares:
+        - name: traefik-forward-auth
+          namespace: traefik
+  tls:
+    secretName: lab-apj-dev-tls
+
+---
+# Alternative approach: Using a single route with conditional middleware
+# This is more complex but can be done with Traefik plugins
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: n8n-internal-alternative
+  namespace: n8n
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: n8n-alt.lab.apj.dev
+    external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
+    external-dns.alpha.kubernetes.io/ttl: "120"
+    cert-manager.io/cluster-issuer: letsencrypt-production
+    acme.cert-manager.io/http01-edit-in-place: "true"
+    kubernetes.io/ingress.class: traefik-external
+  labels:
+    app: n8n
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`n8n-alt.lab.apj.dev`)
+      kind: Rule
+      services:
+        - name: n8n
+          port: 80
+      middlewares:
+        - name: n8n-path-based-auth
+          namespace: traefik
+  tls:
+    secretName: lab-apj-dev-tls
+
+---
+# Custom middleware that conditionally applies auth based on path
+# This requires a custom Traefik plugin or script
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: n8n-path-based-auth
+  namespace: traefik
+spec:
+  plugin:
+    pathBasedAuth:
+      # This would require a custom plugin
+      excludePaths:
+        - "/api"
+        - "/webhook"
+      authMiddleware: "traefik-forward-auth"
