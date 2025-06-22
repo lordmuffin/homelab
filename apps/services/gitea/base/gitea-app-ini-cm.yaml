@@ -25,7 +25,7 @@ data:
   service: |
     DISABLE_REGISTRATION=true
   server: |
-    ROOT_URL=https://git.labs.andrewpjackson.com
+    ROOT_URL=https://git.lab.apj.dev
   mirror: |
     DEFAULT_INTERVAL=3h
     ENABLED=true
@@ -39,7 +39,7 @@ data:
   packages: |
     ENABLED=true
   webhook: |
-    ALLOWED_HOST_LIST=*.labs.andrewpjackson.com,private
+    ALLOWED_HOST_LIST=*.lab.apj.dev,private
   ui: |
     THEMES=auto,gitea,arc-green,catppuccin-mocha-blue
     DEFAULT_THEME=catppuccin-mocha-blue
