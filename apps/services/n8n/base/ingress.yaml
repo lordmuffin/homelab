@@ -15,11 +15,31 @@ spec:
   entryPoints:
     - websecure
   routes:
+    # Route 1: API endpoints without authentication
+    - match: Host(`n8n.lab.apj.dev`) && PathPrefix(`/webhook-test`)
+      kind: Rule
+      services:
+        - name: n8n
+          port: 80
+      # No middlewares = no authentication required
+    
+    # Route 2: Webhook endpoints without authentication (if needed)
+    - match: Host(`n8n.lab.apj.dev`) && PathPrefix(`/webhook`)
+      kind: Rule
+      services:
+        - name: n8n
+          port: 80
+      # No middlewares = no authentication required
+    
+    # Route 3: All other paths require authentication
     - match: Host(`n8n.lab.apj.dev`)
       kind: Rule
       services:
         - name: n8n
           port: 80
+      middlewares:
+        - name: traefik-forward-auth
+          namespace: traefik
   tls:
     secretName: lab-apj-dev-tls
 # data:
