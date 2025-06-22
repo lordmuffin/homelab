@@ -4,14 +4,14 @@ kind: Kustomization
 resources:
 - azure-pipelines.yaml
 - actual.yaml
-- gitea.yaml
+# - gitea.yaml
 - forgejo.yaml
 # - mlops.yaml
 - n8n.yaml
 # - ofx-exporter.yaml
 # - wger.yaml
 # - onchange.yaml
-- gitea-utils.yaml
+# - gitea-utils.yaml
 - homepage.yaml
 - paperless.yaml
 - woodpecker.yaml
