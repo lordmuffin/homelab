@@ -11,7 +11,7 @@ resources:
 # - ofx-exporter.yaml
 # - wger.yaml
 # - onchange.yaml
-# - gitea-utils.yaml
+- gitea-utils.yaml
 - homepage.yaml
 - paperless.yaml
 - woodpecker.yaml
