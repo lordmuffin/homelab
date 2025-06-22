@@ -4,7 +4,7 @@ metadata:
   name: argocd
   namespace: argocd # Assuming ArgoCD is in the 'argocd' namespace
   annotations:
-    external-dns.alpha.kubernetes.io/hostname: argocd.lab.apj.dev
+    external-dns.alpha.kubernetes.io/hostname: argo.lab.apj.dev
     external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
     external-dns.alpha.kubernetes.io/ttl: "120"
     cert-manager.io/cluster-issuer: letsencrypt-production
@@ -16,7 +16,7 @@ spec:
   entryPoints:
     - websecure
   routes:
-    - match: Host(`argocd.lab.apj.dev`)
+    - match: Host(`argo.lab.apj.dev`)
       kind: Rule
       middlewares:
         - name: traefik-forward-auth
