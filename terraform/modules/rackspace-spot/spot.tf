@@ -10,12 +10,12 @@ resource "spot_cloudspace" "cloud-homelab" {
   cni                = "cilium"
 }
 
-# Creates a spot node pool with an autoscaling pool of 3-8 servers of class gp.vs1.large-dfw.
+# Creates a spot node pool with an autoscaling pool of 3-8 servers of class gp.vs1.xlarge-ord (Extra Large).
 resource "spot_spotnodepool" "autoscaling-bid" {
   cloudspace_name = resource.spot_cloudspace.cloud-homelab.cloudspace_name
   # You can find the available server classes in the `serverclasses` data source.
-  server_class = "ch.vs1.large-ord"
-  bid_price    = 0.010
+  server_class = "gp.vs1.xlarge-ord"
+  bid_price    = 0.025
 
 
   # desired_server_count = 3
