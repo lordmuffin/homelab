@@ -18,6 +18,7 @@ spec:
     # Route for webhook endpoints - no auth required
     - match: Host(`n8n.lab.apj.dev`) && (PathPrefix(`/webhook`) || PathPrefix(`/form`) || PathPrefix(`/test-webhook`))
       kind: Rule
+      priority: 10
       services:
         - name: n8n
           port: 80
