@@ -29,6 +29,9 @@ spec:
       services:
         - name: n8n
           port: 80
+      middlewares:
+        - name: traefik-forward-auth
+          namespace: traefik
       priority: 1
   tls:
     secretName: lab-apj-dev-tls
