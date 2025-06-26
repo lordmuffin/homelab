@@ -57,7 +57,7 @@ spec:
         - name: gitea-internal
           port: 80
   tls:
-    secretName: labs-andrewpjackson-com-tls
+    secretName: lab-apj-dev-tls
 # data:
 #   resource.customizations: |
 #     extensions/Ingress:
