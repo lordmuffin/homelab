@@ -46,13 +46,6 @@ spec:
         - name: web
           containerPort: 5678
           protocol: TCP
-        resources:
-          requests:
-            cpu: 150m
-            memory: 512Mi
-          limits:
-            cpu: 550m
-            memory: 768Mi
         livenessProbe:
           httpGet:
             path: /healthz
