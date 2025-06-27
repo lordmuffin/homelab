@@ -24,30 +24,3 @@ spec:
       priority: 1
   tls:
     secretName: lab-apj-dev-tls
----
-apiVersion: traefik.containo.us/v1alpha1
-kind: IngressRoute
-metadata:
-  name: n8n-webhooks
-  annotations:
-    external-dns.alpha.kubernetes.io/hostname: n8n.lab.apj.dev
-    external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
-    external-dns.alpha.kubernetes.io/ttl: "120"
-    cert-manager.io/cluster-issuer: letsencrypt-production
-    acme.cert-manager.io/http01-edit-in-place: "true"
-    kubernetes.io/ingress.class: traefik-external
-  labels:
-    app: n8n
-spec:
-  entryPoints:
-    - web-int-tls
-  routes:
-    # Route for webhook endpoints - no auth required (using internal entrypoint)
-    - match: Host(`n8n.lab.apj.dev`) && (PathPrefix(`/webhook`) || PathPrefix(`/form`) || PathPrefix(`/webhook-test`))
-      kind: Rule
-      services:
-        - name: n8n
-          port: 80
-      middlewares: []
-  tls:
-    secretName: lab-apj-dev-tls
