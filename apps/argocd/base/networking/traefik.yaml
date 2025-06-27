@@ -46,8 +46,6 @@ spec:
             forwardedHeaders:
               trustedIPs: [174.20.35.82]
               insecure: false
-            middlewares:
-              - traefik-traefik-forward-auth-chain
           web-int: 
             port: 8080
             redirectTo:
