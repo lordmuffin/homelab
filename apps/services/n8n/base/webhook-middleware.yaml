@@ -1,0 +1,23 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: webhook-bypass-auth
+  namespace: services
+spec:
+  forwardAuth:
+    address: http://traefik-forward-auth.traefik:4181
+    authResponseHeaders:
+    - X-Forwarded-User
+    trustForwardHeader: true
+    authRequestHeaders:
+    - X-Webhook-Bypass
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: webhook-headers
+  namespace: services
+spec:
+  headers:
+    customRequestHeaders:
+      X-Webhook-Bypass: "true"

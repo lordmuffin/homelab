@@ -21,6 +21,11 @@ spec:
     trustForwardHeader: true
     authResponseHeaders:
       - X-Forwarded-User
+    # Add custom headers to help the auth service identify webhook requests
+    authRequestHeaders:
+      - Host
+      - X-Forwarded-Host
+      - X-Forwarded-Uri
 
 ---
 apiVersion: traefik.io/v1alpha1

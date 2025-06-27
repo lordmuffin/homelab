@@ -54,6 +54,8 @@ spec:
               key: jwtsecret
         - name: LOG_LEVEL
           value: trace
+        - name: WHITELIST
+          value: "/webhook,/form,/webhook-test,/test-webhook"
       resources:
         limits:
           memory: "512Mi"
