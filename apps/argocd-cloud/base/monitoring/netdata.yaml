@@ -40,10 +40,10 @@ spec:
         parent:
           alarms: 
             persistence: "true"
-              storageclass: "sata"
+            storageclass: "sata"
           database: 
             persistence: "true"
-              storageclass: "sata"
+            storageclass: "sata"
           claiming:
             enabled: "true"
             token: "5T4Sq9sF9I6RetItLOvvEkEd6tH6YZzIQ_MwpJSMsXAAkObqBmz_bSQHEXumvC1tl4gcBNmtNW6i5ZyUBwhdQ8-lTnrX8IbvUA1za3EcQhgXsMZUuqc6vJrYM1I7QKisJyrPFCc"
