@@ -39,8 +39,10 @@ spec:
             storageclass: "sata"
         parent:
           alarms: 
-            persistence:
-              enabled: "true"
+            persistence: "true"
+              storageclass: "sata"
+          database: 
+            persistence: "true"
               storageclass: "sata"
           claiming:
             enabled: "true"
