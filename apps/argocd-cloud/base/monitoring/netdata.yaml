@@ -15,6 +15,13 @@ spec:
       values: |
         image:
           tag: stable
+        ingress:
+          spec:
+            ingressClassName: "traefik-external"
+            restarter:
+              enabled: "true"
+        k8sState:
+          enabled: "true"      
         parent:
           claiming:
             enabled: "true"
