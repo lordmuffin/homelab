@@ -36,11 +36,11 @@ spec:
           enabled: "true"
           persistence:
             enabled: "true"
-            storageclass: "sata"
+            storageclass: "ssd"
         parent:
           alarms: 
             persistence: "true"
-            storageclass: "sata"
+            storageclass: "ssd"
           database: 
             persistence: "true"
             storageclass: "sata"
