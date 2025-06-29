@@ -33,7 +33,10 @@ spec:
             restarter:
               enabled: "true"
         k8sState:
-          enabled: "true"      
+          enabled: "true"
+          persistence:
+            enabled: "true"
+            storageclass: "sata"
         parent:
           claiming:
             enabled: "true"
