@@ -1,0 +1,217 @@
+const { PromptTemplate } = require('@langchain/core/prompts');
+
+// --- Your Input Data ---
+// Validate and extract user input with fallback
+const userInput = $input?.item?.json?.chatInput || "";
+
+// Validate user input is not empty
+if (!userInput || userInput.trim() === "") {
+  return [{ json: { 
+    error: "No user input provided", 
+    shouldCreateCalendar: false,
+    user_input: userInput,
+    timestamp: new Date().toISOString()
+  }}];
+}
+
+const currentDateTime = new Date().toISOString();
+
+// Convert current time to CST for context
+let cstTime;
+try {
+  cstTime = new Date().toLocaleString("en-US", {
+    timeZone: "America/Chicago",
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  });
+} catch (timeError) {
+  // Fallback if timezone conversion fails
+  cstTime = new Date().toISOString();
+}
+
+// Helper function to calculate end time
+function calculateEndTime(date, time, duration) {
+  try {
+    // Parse the start time components
+    const [hours, minutes] = time.split(':').map(Number);
+    let durationMinutes = 30; // Default 30 minutes
+    
+    if (duration && duration !== "Not specified") {
+      const durationMatch = duration.match(/(\d+(?:\.\d+)?)\s*(hour|minute|hr|min)/i);
+      if (durationMatch) {
+        const value = parseFloat(durationMatch[1]);
+        const unit = durationMatch[2].toLowerCase();
+        if (unit.startsWith('hour') || unit === 'hr') {
+          durationMinutes = value * 60;
+        } else if (unit.startsWith('minute') || unit === 'min') {
+          durationMinutes = value;
+        }
+      }
+    }
+    
+    // Calculate end time by adding duration to start time
+    const totalMinutes = hours * 60 + minutes + durationMinutes;
+    const endHours = Math.floor(totalMinutes / 60) % 24;
+    const endMinutes = totalMinutes % 60;
+    
+    // Format as HH:MM
+    const endTime = `${endHours.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`;
+    
+    // Return in the same format as input: YYYY-MM-DDTHH:MM
+    return `${date}T${endTime}`;
+    
+  } catch (error) {
+    // Fallback: add 30 minutes to start time
+    const [hours, minutes] = time.split(':').map(Number);
+    const totalMinutes = hours * 60 + minutes + 30;
+    const endHours = Math.floor(totalMinutes / 60) % 24;
+    const endMinutes = totalMinutes % 60;
+    const endTime = `${endHours.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`;
+    return `${date}T${endTime}`;
+  }
+}
+
+// --- Calendar Item Creation Logic ---
+const calendarDecisionPrompt = PromptTemplate.fromTemplate(`
+Analyze the following user input and determine if it's appropriate to create a calendar item.
+
+User Input: {user_input}
+Current Date/Time (UTC): {current_datetime}
+Current Date/Time (CST): {cst_time}
+
+IMPORTANT: All times should be interpreted in Central Standard Time (CST) timezone.
+
+A calendar item should be created if the input contains:
+- A specific date or time reference (future events)
+- Meeting or appointment requests
+- Reminders for future tasks
+- Event planning or scheduling
+- Deadlines or due dates
+
+A calendar item should NOT be created if the input:
+- Is a general question or request for information
+- Is about past events
+- Contains no temporal references
+- Is a translation request
+- Is purely conversational
+
+Respond with either:
+"CREATE_CALENDAR_ITEM" if a calendar item should be created
+"NO_CALENDAR_ITEM" if no calendar item should be created
+
+Then provide a brief explanation of your decision.
+
+Decision:
+`);
+
+const calendarDetailsPrompt = PromptTemplate.fromTemplate(
+"Extract calendar event details from the following user input:\n\n" +
+"User Input: {user_input}\n" +
+"Current Date/Time (UTC): {current_datetime}\n" +
+"Current Date/Time (CST): {cst_time}\n\n" +
+"IMPORTANT: All times should be interpreted in Central Standard Time (CST).\n" +
+"Use 24-hour format for times and YYYY-MM-DD format for dates.\n\n" +
+"Extract the following fields and respond with valid JSON only:\n" +
+"- Event Title\n" +
+"- Date (YYYY-MM-DD format)\n" +
+"- Time (HH:MM format)\n" +
+"- Duration\n" +
+"- Location\n" +
+"- Description\n" +
+"- Attendees\n" +
+"- Timezone (always CST)\n\n" +
+"Respond with valid JSON only, no other text."
+);
+
+// --- LangChain Logic ---
+const llmObject = await this.getInputConnectionData('ai_languageModel', 0);
+const llm = llmObject[0];
+
+if (!llm) {
+  throw new Error("The Language Model connection returned an empty or invalid object.");
+}
+
+const templateVars = {
+  user_input: String(userInput || "No input provided"),
+  current_datetime: String(currentDateTime || new Date().toISOString()),
+  cst_time: String(cstTime || new Date().toISOString())
+};
+
+// Step 1: Determine if calendar item should be created
+const decisionChain = calendarDecisionPrompt.pipe(llm);
+let decisionOutput;
+try {
+  decisionOutput = await decisionChain.invoke(templateVars);
+} catch (decisionError) {
+  return [{ json: { 
+    error: `Decision phase failed: ${decisionError.message}`,
+    templateVars: templateVars,
+    shouldCreateCalendar: false
+  }}];
+}
+
+const shouldCreateCalendar = decisionOutput.content.includes('CREATE_CALENDAR_ITEM');
+
+let result = {
+  shouldCreateCalendar: shouldCreateCalendar,
+  decision_explanation: decisionOutput.content,
+  user_input: userInput,
+  timestamp: currentDateTime
+};
+
+// Step 2: If calendar creation is appropriate, extract event details
+if (shouldCreateCalendar) {
+  const detailsChain = calendarDetailsPrompt.pipe(llm);
+  let detailsOutput;
+  
+  try {
+    detailsOutput = await detailsChain.invoke(templateVars);
+  } catch (detailsError) {
+    result.calendar_event_error = `Details extraction failed: ${detailsError.message}`;
+    result.templateVars = templateVars;
+    return [ {json: result } ];
+  }
+  
+  try {
+    let jsonContent = detailsOutput.content.trim();
+    const firstBrace = jsonContent.indexOf('{');
+    const lastBrace = jsonContent.lastIndexOf('}');
+    
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      jsonContent = jsonContent.substring(firstBrace, lastBrace + 1);
+    }
+    
+    const eventDetails = JSON.parse(jsonContent);
+    result.calendar_event = eventDetails;
+    
+    // Add calendar creation parameters with proper timezone detection
+    const now = new Date();
+    const isDST = now.getTimezoneOffset() < new Date(now.getFullYear(), 0, 1).getTimezoneOffset();
+    const timezoneOffset = isDST ? "-05:00" : "-06:00"; // CDT vs CST
+    
+    result.calendar_creation_params = {
+      summary: eventDetails["Event Title"] || "New Event",
+      start: {
+        dateTime: `${eventDetails.Date}T${eventDetails.Time}:00${timezoneOffset}`,
+        timeZone: "America/Chicago"
+      },
+      end: {
+        dateTime: calculateEndTime(eventDetails.Date, eventDetails.Time, eventDetails.Duration) + timezoneOffset,
+        timeZone: "America/Chicago"
+      },
+      description: eventDetails.Description || "",
+      location: eventDetails.Location || ""
+    };
+    
+  } catch (parseError) {
+    result.calendar_event_raw = detailsOutput.content;
+    result.parse_error = `Failed to parse calendar details as JSON: ${parseError.message}`;
+  }
+}
+
+return [ {json: result } ];
