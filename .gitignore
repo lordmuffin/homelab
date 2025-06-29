@@ -111,3 +111,6 @@ aggregated_output.json
 # Packer
 secrets.json
 packer/plugins
+
+# Windows installer files
+*.msi
