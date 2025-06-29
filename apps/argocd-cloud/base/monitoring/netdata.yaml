@@ -14,7 +14,7 @@ spec:
       releaseName: netdata
       values: |
         image:
-          tag=stable
+          tag: stable
         parent:
           claiming:
             enabled: "true"
