@@ -40,6 +40,7 @@ resources:
   # - base/apps/wyze.yaml
 
   # Monitoring
+  - base/monitoring/netdata.yaml
   - base/monitoring/kuma.yaml
   - base/monitoring/beszel.yaml
   - base/monitoring/glance.yaml

@@ -1,0 +1,48 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: netdata
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: monitoring
+  source:
+    repoURL: https://netdata.github.io/helmchart/
+    chart: netdata
+    targetRevision: netdata-3.7.140
+    helm:
+      releaseName: netdata
+      values: |
+        image:
+          tag=stable
+        parent:
+          claiming:
+            enabled: "true"
+            token: "5T4Sq9sF9I6RetItLOvvEkEd6tH6YZzIQ_MwpJSMsXAAkObqBmz_bSQHEXumvC1tl4gcBNmtNW6i5ZyUBwhdQ8-lTnrX8IbvUA1za3EcQhgXsMZUuqc6vJrYM1I7QKisJyrPFCc"
+            rooms: "785e80c6-98f8-44d3-b68f-b786bd497932"
+        child:
+          claiming:
+            enabled:: "true"
+            token: "5T4Sq9sF9I6RetItLOvvEkEd6tH6YZzIQ_MwpJSMsXAAkObqBmz_bSQHEXumvC1tl4gcBNmtNW6i5ZyUBwhdQ8-lTnrX8IbvUA1za3EcQhgXsMZUuqc6vJrYM1I7QKisJyrPFCc"
+            rooms: "785e80c6-98f8-44d3-b68f-b786bd497932"
+  destination:
+    namespace: monitoring
+    name: in-cluster
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: true
+    syncOptions:
+    - Validate=false
+    - CreateNamespace=false
+    - PrunePropagationPolicy=foreground
+    - PruneLast=false
+    - ApplyOutOfSyncOnly=false
+    - Prune=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 20s
+        factor: 2
+        maxDuration: 15m
