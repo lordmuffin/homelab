@@ -18,8 +18,16 @@ spec:
         ingress:
           annotations:
             kubernetes.io/ingress.class: traefik-external
+            cert-manager.io/cluster-issuer: letsencrypt-production
+            external-dns.alpha.kubernetes.io/hostname: netdata.lab.apj.dev
+            external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
+            external-dns.alpha.kubernetes.io/ttl: "120"
           hosts:
             - netdata.lab.apj.dev
+          tls:
+            - secretName: lab-apj-dev-tls
+              hosts:
+                - netdata.lab.apj.dev
           spec:
             ingressClassName: "traefik-external"
             restarter:
