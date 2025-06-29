@@ -16,6 +16,7 @@ spec:
         image:
           tag: stable
         ingress:
+          hosts: "netdata.lab.apj.dev"
           spec:
             ingressClassName: "traefik-external"
             restarter:
