@@ -17,7 +17,7 @@ spec:
           tag: stable
         ingress:
           annotations: "kubernetes.io/ingress.class: traefik-external"
-          hosts: ["netdata.lab.apj.dev"]
+          hosts: netdata.lab.apj.dev
           spec:
             ingressClassName: "traefik-external"
             restarter:
