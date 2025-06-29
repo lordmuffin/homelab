@@ -31,7 +31,7 @@ spec:
             rooms: "785e80c6-98f8-44d3-b68f-b786bd497932"
         child:
           claiming:
-            enabled:: "true"
+            enabled: "true"
             token: "5T4Sq9sF9I6RetItLOvvEkEd6tH6YZzIQ_MwpJSMsXAAkObqBmz_bSQHEXumvC1tl4gcBNmtNW6i5ZyUBwhdQ8-lTnrX8IbvUA1za3EcQhgXsMZUuqc6vJrYM1I7QKisJyrPFCc"
             rooms: "785e80c6-98f8-44d3-b68f-b786bd497932"
   destination:
