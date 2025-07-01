@@ -5,9 +5,100 @@ metadata:
 spec:
   project: cluster
   source:
-    repoURL: 'https://github.com/lordmuffin/homelab.git'
-    path: apps/data/couchdb
-    targetRevision: main
+    repoURL: https://couchdb.github.io/helm
+    targetRevision: 4.5.3
+    chart: couchdb
+    helm:
+      releaseName: couchdb
+      values: |
+        # Cluster configuration
+        clusterSize: 3
+        
+        # Security settings - disable admin party for security
+        allowAdminParty: false
+        
+        # Auto setup cluster after installation
+        autoSetup:
+          enabled: true
+          defaultDatabases:
+            - _global_changes
+        
+        # Use existing secret for admin credentials
+        createAdminSecret: false
+        
+        # Admin credentials will come from 1Password secret
+        adminUsername: admin
+        
+        # CouchDB configuration
+        couchdbConfig:
+          chttpd:
+            bind_address: any
+            require_valid_user: false
+        
+        # Persistence configuration
+        persistentVolume:
+          enabled: true
+          accessModes:
+            - ReadWriteOnce
+          size: 10Gi
+          storageClass: "ssd"
+        
+        # Resource limits
+        resources:
+          limits:
+            cpu: 500m
+            memory: 1Gi
+          requests:
+            cpu: 100m
+            memory: 256Mi
+        
+        # Service configuration
+        service:
+          enabled: true
+          type: ClusterIP
+          externalPort: 5984
+        
+        # Enable search capabilities
+        enableSearch: false
+        
+        # Enable network policy for security
+        networkPolicy:
+          enabled: true
+        
+        # Service account
+        serviceAccount:
+          enabled: true
+          create: true
+        
+        # DNS configuration
+        dns:
+          clusterDomainSuffix: cluster.local
+        
+        # Erlang flags for clustering
+        erlangFlags:
+          name: couchdb
+        
+        # Health probes
+        livenessProbe:
+          enabled: true
+          failureThreshold: 3
+          initialDelaySeconds: 0
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        
+        readinessProbe:
+          enabled: true
+          failureThreshold: 3
+          initialDelaySeconds: 0
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        
+        # Pod disruption budget
+        podDisruptionBudget:
+          enabled: false
+          maxUnavailable: 1
   destination:
     namespace: couchdb
     name: in-cluster
