@@ -8,7 +8,7 @@ CouchDB is a NoSQL document database that uses JSON for documents, HTTP for an A
 
 ## Configuration
 
-- **Helm Chart**: Apache CouchDB official Helm chart from https://apache.github.io/couchdb-helm
+- **Helm Chart**: Apache CouchDB official Helm chart from https://couchdb.github.io/helm
 - **Version**: 4.5.3
 - **Namespace**: couchdb
 - **Cluster Size**: 3 nodes for high availability
@@ -18,7 +18,8 @@ CouchDB is a NoSQL document database that uses JSON for documents, HTTP for an A
 
 Admin credentials are managed through 1Password integration:
 - **1Password Item**: `couchdb-admin-creds-1password` in HomeLab vault
-- **Secret**: `couchdb-admin-secret` in couchdb namespace
+- **Secret**: `couchdb-couchdb` in couchdb namespace (follows Helm chart naming convention)
+- **Required Fields**: `adminUsername`, `adminPassword`, `cookieAuthSecret`
 
 ## Access
 

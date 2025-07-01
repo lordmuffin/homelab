@@ -5,17 +5,24 @@ helmCharts:
   namespace: couchdb
   includeCRDs: true
   valuesInline:
-    # CouchDB configuration
-    couchdbConfig:
-      couchdb:
-        uuid: "00000000-0000-0000-0000-000000000000" # Generate a proper UUID in production
-    
-    # Admin user configuration - using 1Password
-    adminUsername: admin
-    adminPassword: "admin"  # This will be overridden by the secret
-    
     # Cluster configuration
     clusterSize: 3
+    
+    # Security settings - disable admin party for security
+    allowAdminParty: false
+    
+    # Use existing secret for admin credentials
+    createAdminSecret: false
+    
+    # Admin credentials will come from 1Password secret
+    adminUsername: admin
+    # adminPassword will be provided by the secret
+    
+    # CouchDB configuration
+    couchdbConfig:
+      chttpd:
+        bind_address: any
+        require_valid_user: false
     
     # Persistence configuration
     persistentVolume:
@@ -40,15 +47,21 @@ helmCharts:
       type: ClusterIP
       externalPort: 5984
     
-    # Enable metrics for monitoring
-    enableSearch: true
+    # Enable search capabilities
+    enableSearch: false  # Keep disabled unless needed
     
-    # Security settings
-    allowAdminParty: false
+    # Enable network policy for security
+    networkPolicy:
+      enabled: true
+    
+    # Service account
+    serviceAccount:
+      enabled: true
+      create: true
     
   releaseName: couchdb
   version: 4.5.3
-  repo: https://apache.github.io/couchdb-helm
+  repo: https://couchdb.github.io/helm
 
 resources:
 - secret.yaml
