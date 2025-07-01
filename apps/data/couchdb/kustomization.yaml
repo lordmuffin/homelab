@@ -1,0 +1,54 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+helmCharts:
+- name: couchdb
+  namespace: couchdb
+  includeCRDs: true
+  valuesInline:
+    # CouchDB configuration
+    couchdbConfig:
+      couchdb:
+        uuid: "00000000-0000-0000-0000-000000000000" # Generate a proper UUID in production
+    
+    # Admin user configuration - using 1Password
+    adminUsername: admin
+    adminPassword: "admin"  # This will be overridden by the secret
+    
+    # Cluster configuration
+    clusterSize: 3
+    
+    # Persistence configuration
+    persistentVolume:
+      enabled: true
+      accessModes:
+        - ReadWriteOnce
+      size: 10Gi
+      storageClass: "ssd"  # Use SSD storage class like other apps
+    
+    # Resource limits
+    resources:
+      limits:
+        cpu: 500m
+        memory: 1Gi
+      requests:
+        cpu: 100m
+        memory: 256Mi
+    
+    # Service configuration
+    service:
+      enabled: true
+      type: ClusterIP
+      externalPort: 5984
+    
+    # Enable metrics for monitoring
+    enableSearch: true
+    
+    # Security settings
+    allowAdminParty: false
+    
+  releaseName: couchdb
+  version: 4.5.3
+  repo: https://apache.github.io/couchdb-helm
+
+resources:
+- secret.yaml

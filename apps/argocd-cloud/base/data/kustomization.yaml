@@ -5,6 +5,7 @@ resources:
 - cloudnative.yaml
 - redis.yaml
 - storage.yaml
+- couchdb.yaml
 
 namespace: argocd
 
