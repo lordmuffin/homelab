@@ -29,7 +29,7 @@ spec:
         # a valid adminPassword in the secret. Also set the --wait flag when you install to
         # avoid first jobs failure (helm install --wait ...)
         autoSetup:
-          enabled: true
+          enabled: false
           image:
             repository: curlimages/curl
             tag: latest
