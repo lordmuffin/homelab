@@ -1,8 +1,10 @@
 namespace: headscale
 resources:
+  - namespace.yaml
   - configmap.yaml
   - ingress.yaml
   - service.yaml
+  - statefulset.yaml
 generatorOptions:
   disableNameSuffixHash: true
 configMapGenerator:
