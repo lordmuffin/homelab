@@ -1,0 +1,124 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: obsidian-manual-restore
+  namespace: services
+spec:
+  template:
+    spec:
+      containers:
+      - name: obsidian-restore
+        image: backblazeit/b2:latest
+        env:
+        - name: B2_APPLICATION_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: backblaze-cloud-homelab-creds-1password
+              key: keyID
+        - name: B2_APPLICATION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: backblaze-cloud-homelab-creds-1password
+              key: applicationKey
+        - name: B2_BUCKET_NAME
+          value: "cloud-homelab-backups"
+        - name: FORCE_RESTORE
+          value: "false"  # Set to "true" to force restore even if data exists
+        - name: BACKUP_DATE
+          value: ""  # Optional: specify date in format YYYYMMDD to restore specific backup
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            # Install required tools
+            apk add --no-cache tar gzip curl jq
+            
+            echo "Starting manual restoration process..."
+            echo "Force restore: $FORCE_RESTORE"
+            echo "Backup date filter: $BACKUP_DATE"
+            
+            # Check if we should restore (force or empty directory)
+            SHOULD_RESTORE="false"
+            if [ "$FORCE_RESTORE" = "true" ]; then
+              echo "Force restore enabled, will restore regardless of existing data"
+              SHOULD_RESTORE="true"
+            elif [ "$(find /config -mindepth 1 -maxdepth 1 | wc -l)" -le 1 ]; then
+              echo "Data directory is empty or minimal, will restore"
+              SHOULD_RESTORE="true"
+            else
+              echo "Data directory contains files and force restore is not enabled"
+            fi
+            
+            if [ "$SHOULD_RESTORE" = "true" ]; then
+              # List backups and find the one to restore
+              echo "Fetching list of backups from B2..."
+              
+              if [ -n "$BACKUP_DATE" ]; then
+                echo "Looking for backup from date: $BACKUP_DATE"
+                BACKUP_TO_RESTORE=$(b2v4 file list --json $B2_BUCKET_NAME obsidian/ | jq -r '.[] | select(.fileName | startswith("obsidian/obsidian_backup_'$BACKUP_DATE'")) | .fileName' | sort -r | head -n1)
+              else
+                echo "Looking for latest backup..."
+                BACKUP_TO_RESTORE=$(b2v4 file list --json $B2_BUCKET_NAME obsidian/ | jq -r '.[] | select(.fileName | startswith("obsidian/obsidian_backup_")) | .fileName' | sort -r | head -n1)
+              fi
+              
+              if [ -n "$BACKUP_TO_RESTORE" ] && [ "$BACKUP_TO_RESTORE" != "null" ]; then
+                echo "Found backup to restore: $BACKUP_TO_RESTORE"
+                BACKUP_FILE="/tmp/$(basename $BACKUP_TO_RESTORE)"
+                
+                # Create backup of current data if it exists and we're forcing restore
+                if [ "$FORCE_RESTORE" = "true" ] && [ "$(find /config -mindepth 1 -maxdepth 1 | wc -l)" -gt 1 ]; then
+                  echo "Creating backup of current data before restore..."
+                  CURRENT_BACKUP="/tmp/current_backup_$(date +%Y%m%d_%H%M%S).tar.gz"
+                  cd /config
+                  tar -czf "$CURRENT_BACKUP" .
+                  echo "Current data backed up to: $CURRENT_BACKUP"
+                fi
+                
+                # Clear existing data if force restore
+                if [ "$FORCE_RESTORE" = "true" ]; then
+                  echo "Clearing existing data..."
+                  rm -rf /config/*
+                  rm -rf /config/.[!.]*  # Remove hidden files but keep . and ..
+                fi
+                
+                # Download the backup
+                echo "Downloading backup..."
+                b2v4 file download-file-by-name $B2_BUCKET_NAME "$BACKUP_TO_RESTORE" "$BACKUP_FILE"
+                
+                # Extract backup to config directory
+                echo "Extracting backup to /config..."
+                cd /config
+                tar -xzf "$BACKUP_FILE"
+                
+                # Clean up downloaded file
+                rm -f "$BACKUP_FILE"
+                
+                echo "Restoration completed successfully!"
+                echo "Restored from: $BACKUP_TO_RESTORE"
+              else
+                echo "No suitable backup found for restoration"
+                if [ -n "$BACKUP_DATE" ]; then
+                  echo "No backup found for date: $BACKUP_DATE"
+                else
+                  echo "No backups found in B2"
+                fi
+                exit 1
+              fi
+            else
+              echo "Restoration skipped - data directory contains files and force restore is not enabled"
+            fi
+        volumeMounts:
+        - name: obsidian-data
+          mountPath: /config
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+      restartPolicy: Never
+      volumes:
+      - name: obsidian-data
+        persistentVolumeClaim:
+          claimName: obsidian-pvc
+  backoffLimit: 3
