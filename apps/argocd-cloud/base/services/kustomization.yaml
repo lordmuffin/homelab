@@ -19,6 +19,7 @@ resources:
 - tandoor.yaml
 - vikunja.yaml
 - litellm.yaml
+- obsidian.yaml
 
 namespace: argocd
 

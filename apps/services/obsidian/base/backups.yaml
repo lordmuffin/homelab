@@ -1,0 +1,73 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: obsidian-backup
+  namespace: services
+spec:
+  schedule: "0 3 * * *" # Daily at 3AM
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: obsidian-backup
+              image: alpine:latest
+              env:
+                - name: BACKUP_NAME
+                  value: "obsidian"
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  apk add --no-cache tar gzip
+                  BACKUP_FILE="obsidian_backup_$(date +%Y%m%d_%H%M%S).tar.gz"
+                  echo "Creating backup $BACKUP_FILE..."
+                  cd /mnt/obsidian-data
+                  tar -czf /mnt/backup/$BACKUP_FILE .
+                  echo "Backup completed: $(du -h /mnt/backup/$BACKUP_FILE | cut -f1)"
+                  # Signal the next container that the backup is completed
+                  touch /mnt/backup/.done
+              volumeMounts:
+                - name: obsidian-data
+                  mountPath: /mnt/obsidian-data
+                  readOnly: true
+                - name: backup-storage
+                  mountPath: /mnt/backup
+            - name: b2-uploader
+              image: backblazeit/b2:latest
+              env:
+                - name: B2_APPLICATION_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: backblaze-cloud-homelab-creds-1password
+                      key: keyID
+                - name: B2_APPLICATION_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: backblaze-cloud-homelab-creds-1password
+                      key: applicationKey
+                - name: B2_BUCKET_NAME
+                  value: "cloud-homelab-backups"
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  # Check every 5 seconds if the backup is completed
+                  while [ ! -f /mnt/backup/.done ]; do
+                    sleep 5
+                  done
+                  BACKUP_FILE=$(ls /mnt/backup/obsidian_backup_*.tar.gz)
+                  echo "Uploading $BACKUP_FILE to B2..."
+                  b2v4 file upload $B2_BUCKET_NAME "$BACKUP_FILE" obsidian/"$(basename $BACKUP_FILE)"
+                  echo "Upload completed successfully"
+                  # Clean up local backup file
+                  rm -f "$BACKUP_FILE" /mnt/backup/.done
+              volumeMounts:
+                - name: backup-storage
+                  mountPath: /mnt/backup
+          restartPolicy: OnFailure
+          volumes:
+            - name: obsidian-data
+              persistentVolumeClaim:
+                claimName: obsidian-pvc
+            - name: backup-storage
+              emptyDir: {}
