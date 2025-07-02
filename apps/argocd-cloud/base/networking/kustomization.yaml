@@ -9,7 +9,7 @@ resources:
 - cilium.yaml
 - cert-manager-technitium-webhook.yaml
 - keda.yaml
-# - headscale.yaml
+- headscale.yaml
 - coredns.yaml
 # - tailscale-operator.yaml
 # - tailscale.yaml
