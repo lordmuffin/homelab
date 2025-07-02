@@ -10,7 +10,7 @@ resources:
 - cert-manager.yaml
 - keda.yaml
 - nginx-ingress.yaml
-# - headscale.yaml
+- headscale.yaml
 - coredns.yaml
 # - tailscale-operator.yaml
 # - tailscale.yaml
