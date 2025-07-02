@@ -33,6 +33,7 @@ resources:
 
   # 1Password Secrets
   - base/secrets/secrets.yaml
+  - base/secrets/headscale.yaml
 
   # Applications
   # - base/apps/ha.yaml
