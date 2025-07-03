@@ -4,9 +4,9 @@ resources:
   - ingress.yaml
   - service.yaml
   - statefulset.yaml
+  - secret-pvc.yaml
+  - tailscale-subnet-router.yaml
   - db.yaml
-generatorOptions:
-  disableNameSuffixHash: true
 configMapGenerator:
   - name: headscale-site
     files:
