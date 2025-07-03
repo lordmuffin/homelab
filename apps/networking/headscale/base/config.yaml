@@ -33,6 +33,14 @@ node_update_check_interval: 10s
 
 private_key_path: /vol/secret/private.key
 
+database:
+  type: postgres
+  postgres:
+    host: headscale-database-rw
+    port: 5432
+    name: headscale
+    user: headscale
+
 log:
   level: info
 
