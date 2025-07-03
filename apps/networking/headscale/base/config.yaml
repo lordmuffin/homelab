@@ -53,6 +53,3 @@ dns:
       - 1.1.1.1
       - 8.8.8.8
   search_domains: []
-
-# Policy configuration removed - using default allow-all for simplicity
-# Routes will be manually approved via headscale CLI
