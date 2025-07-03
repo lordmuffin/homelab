@@ -18,11 +18,9 @@ spec:
   routes:
     - match: Host(`hs.lab.apj.dev`)
       kind: Rule
-      middlewares:
-        - name: traefik-forward-auth # Assuming you want to protect it
-          namespace: traefik
+      middlewares: []
       services:
         - name: headscale # K8s service name
-          port: 80     # K8s service port
+          port: 8080     # K8s service port
   tls:
     secretName: lab-apj-dev-tls # Your wildcard certificate
