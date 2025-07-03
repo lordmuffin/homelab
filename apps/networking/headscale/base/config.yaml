@@ -1,10 +1,16 @@
 server_url: https://hs.lab.apj.dev
 listen_addr: 0.0.0.0:8080
 metrics_listen_addr: 127.0.0.1:9090
+grpc_listen_addr: 127.0.0.1:50443
+grpc_allow_insecure: false
 
 ip_prefixes:
   - 100.64.0.0/10
   - fd7a:115c:a1e0::/48
+
+prefixes:
+  v4: 100.64.0.0/10
+  v6: fd7a:115c:a1e0::/48
 
 noise:
   private_key_path: /vol/secret/noise_private.key
@@ -23,6 +29,9 @@ derp:
   update_frequency: 24h
 
 ephemeral_node_inactivity_timeout: 30m
+node_update_check_interval: 10s
+
+private_key_path: /vol/secret/private.key
 
 log:
   level: info
