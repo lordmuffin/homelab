@@ -5,7 +5,7 @@ resources:
   - service.yaml
   - statefulset.yaml
   - tailscale-subnet-router.yaml
-  - db.yamls
+  - db.yaml
 configMapGenerator:
   - name: headscale-site
     files:
