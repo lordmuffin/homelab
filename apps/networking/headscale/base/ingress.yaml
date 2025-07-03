@@ -1,18 +1,28 @@
-apiVersion: networking.k8s.io/v1
-kind: Ingress
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
 metadata:
   name: headscale
+  namespace: headscale
   annotations:
-    kubernetes.io/ingress.class: traefik
+    external-dns.alpha.kubernetes.io/hostname: hs.lab.apj.dev
+    external-dns.alpha.kubernetes.io/cloudflare-proxied: "false" # Or "true" as per your setup
+    external-dns.alpha.kubernetes.io/ttl: "120"
+    cert-manager.io/cluster-issuer: letsencrypt-production
+    acme.cert-manager.io/http01-edit-in-place: "true"
+    kubernetes.io/ingress.class: traefik-external
+  labels:
+    app: headscale
 spec:
-  rules:
-    - host: $(PUBLIC_HOSTNAME)
-      http:
-        paths:
-          - backend:
-              service:
-                name: headscale
-                port:
-                  number: 8080
-            path: /
-            pathType: Prefix
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`hs.lab.apj.dev`)
+      kind: Rule
+      middlewares:
+        - name: traefik-forward-auth # Assuming you want to protect it
+          namespace: traefik
+      services:
+        - name: headscale # K8s service name
+          port: 80     # K8s service port
+  tls:
+    secretName: lab-apj-dev-tls # Your wildcard certificate
