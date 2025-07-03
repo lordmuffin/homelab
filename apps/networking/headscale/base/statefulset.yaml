@@ -55,7 +55,7 @@ spec:
           mountPath: /vol/secret
       containers:
         - name: headscale
-          image: "headscale/headscale:v0.23.0"
+          image: "headscale/headscale:v0.26.1"
           imagePullPolicy: IfNotPresent
           command: ["headscale"]
           args: ["serve", "-c", "/etc/headscale/config.yaml"]

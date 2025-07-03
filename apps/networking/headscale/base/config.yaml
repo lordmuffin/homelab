@@ -54,7 +54,7 @@ dns:
       - 8.8.8.8
   search_domains: []
 
-# ACL policy configuration
+# ACL policy configuration for v0.26.1
 policy:
   mode: inline
   data: |
