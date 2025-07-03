@@ -107,12 +107,6 @@ spec:
           secret:
             secretName: hs-privatekey-pw-1password
             optional: true
-  volumeClaimTemplates:
-    - metadata:
-        name: data
-      spec:
-        storageClassName: "sata"
-        accessModes: ["ReadWriteOnce"]
-        resources:
-          requests:
-            storage: 5Gi
+        - name: data
+          persistentVolumeClaim:
+            claimName: headscale-data-pvc
