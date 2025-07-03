@@ -19,19 +19,30 @@ spec:
         command: ["/bin/sh", "-c"]
         args:
           - |
-            apk add --no-cache openssl
+            apk add --no-cache curl
+            
+            # Download headscale binary to generate proper keys
+            curl -L https://github.com/juanfont/headscale/releases/download/v0.23.0/headscale_0.23.0_linux_amd64 -o /tmp/headscale
+            chmod +x /tmp/headscale
             
             # Generate noise private key if it doesn't exist
             if [ ! -f /vol/secret/noise_private.key ]; then
               echo "Generating noise private key..."
-              openssl genpkey -algorithm x25519 -out /vol/secret/noise_private.key
+              /tmp/headscale generate private-key > /vol/secret/noise_private.key
               chmod 600 /vol/secret/noise_private.key
+            fi
+            
+            # Generate main private key if it doesn't exist
+            if [ ! -f /vol/secret/private.key ]; then
+              echo "Generating main private key..."
+              /tmp/headscale generate private-key > /vol/secret/private.key
+              chmod 600 /vol/secret/private.key
             fi
             
             # Generate DERP server private key if it doesn't exist
             if [ ! -f /vol/secret/derp_server_private.key ]; then
               echo "Generating DERP server private key..."
-              openssl genpkey -algorithm x25519 -out /vol/secret/derp_server_private.key
+              /tmp/headscale generate private-key > /vol/secret/derp_server_private.key
               chmod 600 /vol/secret/derp_server_private.key
             fi
             
@@ -46,6 +57,16 @@ spec:
           command: ["headscale"]
           args: ["serve", "-c", "/etc/headscale/config.yaml"]
           env:
+            - name: HEADSCALE_DB_TYPE
+              value: postgres
+            - name: HEADSCALE_DB_HOST
+              value: headscale-database-rw
+            - name: HEADSCALE_DB_PORT
+              value: "5432"
+            - name: HEADSCALE_DB_NAME
+              value: headscale
+            - name: HEADSCALE_DB_USER
+              value: headscale
             - name: HEADSCALE_DB_PASS
               valueFrom:
                 secretKeyRef:
