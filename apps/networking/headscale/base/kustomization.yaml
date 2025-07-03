@@ -15,7 +15,7 @@ configMapGenerator:
       - site/public.env
   - name: headscale-etc
     literals:
-      - config.yaml=|
+      - config.yaml: |
           server_url: https://hs.lab.apj.dev
           listen_addr: 0.0.0.0:8080
           metrics_listen_addr: 127.0.0.1:9090
