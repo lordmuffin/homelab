@@ -13,46 +13,40 @@ spec:
       labels:
         app: headscale
     spec:
+      initContainers:
+      - name: key-generator
+        image: alpine:latest
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            apk add --no-cache openssl
+            
+            # Generate noise private key if it doesn't exist
+            if [ ! -f /vol/secret/noise_private.key ]; then
+              echo "Generating noise private key..."
+              openssl genpkey -algorithm x25519 -out /vol/secret/noise_private.key
+              chmod 600 /vol/secret/noise_private.key
+            fi
+            
+            # Generate DERP server private key if it doesn't exist
+            if [ ! -f /vol/secret/derp_server_private.key ]; then
+              echo "Generating DERP server private key..."
+              openssl genpkey -algorithm x25519 -out /vol/secret/derp_server_private.key
+              chmod 600 /vol/secret/derp_server_private.key
+            fi
+            
+            echo "Key generation completed"
+        volumeMounts:
+        - name: secret
+          mountPath: /vol/secret
       containers:
         - name: headscale
           image: "headscale/headscale:v0.23.0"
           imagePullPolicy: IfNotPresent
           command: ["headscale"]
-          args: ["serve"]
+          args: ["serve", "-c", "/etc/headscale/config.yaml"]
           env:
-            - name: SERVER_URL
-              value: https://hs.lab.apj.dev
-            - name: LISTEN_ADDR
-              valueFrom:
-                configMapKeyRef:
-                  name: headscale-config
-                  key: listen_addr
-            - name: METRICS_LISTEN_ADDR
-              valueFrom:
-                configMapKeyRef:
-                  name: headscale-config
-                  key: metrics_listen_addr
-            - name: DERP_MAP_PATH
-              value: /vol/config/derp.yaml
-            - name: EPHEMERAL_NODE_INACTIVITY_TIMEOUT
-              valueFrom:
-                configMapKeyRef:
-                  name: headscale-config
-                  key: ephemeral_node_inactivity_timeout
-            - name: DB_TYPE
-              value: postgres
-            - name: DB_HOST
-              value: headscale-database-rw
-            - name: DB_PORT
-              value: "5432"
-            - name: DB_NAME
-              value: headscale
-            - name: DB_USER
-              valueFrom:
-                secretKeyRef:
-                  name: headscale-db-postgres-creds-1password
-                  key: username
-            - name: DB_PASS
+            - name: HEADSCALE_DB_PASS
               valueFrom:
                 secretKeyRef:
                   name: headscale-db-postgres-creds-1password
@@ -104,10 +98,14 @@ spec:
         - name: etc
           configMap:
             name: headscale-etc
-        - name: secret
-          secret:
-            secretName: hs-privatekey-pw-1password
-            optional: true
         - name: data
           persistentVolumeClaim:
             claimName: headscale-data-pvc
+  volumeClaimTemplates:
+    - metadata:
+        name: secret
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi

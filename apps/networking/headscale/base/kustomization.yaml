@@ -15,7 +15,48 @@ configMapGenerator:
       - site/public.env
   - name: headscale-etc
     literals:
-      - config.json={}
+      - config.yaml=|
+          server_url: https://hs.lab.apj.dev
+          listen_addr: 0.0.0.0:8080
+          metrics_listen_addr: 127.0.0.1:9090
+          
+          noise:
+            private_key_path: /vol/secret/noise_private.key
+          
+          derp:
+            server:
+              enabled: true
+              region_id: 999
+              region_code: "headscale"
+              region_name: "Headscale Embedded DERP"
+              stun_listen_addr: "0.0.0.0:3478"
+              private_key_path: /vol/secret/derp_server_private.key
+            urls:
+              - https://controlplane.tailscale.com/derpmap/default
+            auto_update_enabled: true
+            update_frequency: 24h
+          
+          ephemeral_node_inactivity_timeout: 30m
+          
+          database:
+            type: postgres
+            postgres:
+              host: headscale-database-rw
+              port: 5432
+              name: headscale
+              user: headscale
+          
+          log:
+            level: info
+          
+          dns_config:
+            override_local_dns: true
+            nameservers:
+              - 1.1.1.1
+              - 8.8.8.8
+            domains: []
+            magic_dns: true
+            base_domain: headscale.local
 # secretGenerator:
 #   - name: headscale
 #     files:
