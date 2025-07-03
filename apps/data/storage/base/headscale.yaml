@@ -10,3 +10,17 @@ spec:
   resources:
     requests:
       storage: 5Gi # Adjust as needed for logs, db, and cache
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: headscale-secret-pvc
+  namespace: headscale
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: sata # Or 'ssd' or your preferred storage class
+  resources:
+    requests:
+      storage: 5Gi # Adjust as needed for private keys and secrets

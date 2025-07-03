@@ -101,11 +101,6 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: headscale-data-pvc
-  volumeClaimTemplates:
-    - metadata:
-        name: secret
-      spec:
-        accessModes: ["ReadWriteOnce"]
-        resources:
-          requests:
-            storage: 1Gi
+        - name: secret
+          persistentVolumeClaim:
+            claimName: headscale-secret-pvc
