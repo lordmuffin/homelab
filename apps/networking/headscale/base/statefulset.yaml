@@ -41,7 +41,7 @@ spec:
             - name: DB_TYPE
               value: postgres
             - name: DB_HOST
-              value: postgres-service
+              value: headscale-database-rw
             - name: DB_PORT
               value: "5432"
             - name: DB_NAME
@@ -49,12 +49,12 @@ spec:
             - name: DB_USER
               valueFrom:
                 secretKeyRef:
-                  name: hs-postgres-pw-1password
+                  name: headscale-db-postgres-creds-1password
                   key: username
             - name: DB_PASS
               valueFrom:
                 secretKeyRef:
-                  name: hs-postgres-pw-1password
+                  name: headscale-db-postgres-creds-1password
                   key: password
           ports:
             - name: http
