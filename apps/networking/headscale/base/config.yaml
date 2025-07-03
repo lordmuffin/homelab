@@ -40,7 +40,7 @@ database:
     port: 5432
     name: headscale
     user: headscale
-    pass: ${HEADSCALE_DB_PASS}
+    # Password will be provided via environment variable
 
 log:
   level: info
