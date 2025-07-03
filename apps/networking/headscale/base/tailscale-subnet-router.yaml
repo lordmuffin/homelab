@@ -22,21 +22,13 @@ spec:
           value: "tailscale-subnet-router-state"
         - name: TS_USERSPACE
           value: "false"
-        - name: TS_AUTH_KEY
+        - name: TS_AUTHKEY
           valueFrom:
             secretKeyRef:
               name: tailscale-auth
               key: TS_AUTH_KEY
-        - name: TS_ROUTES
-          value: "10.0.0.0/8,10.21.0.0/16,172.16.0.0/12,192.168.0.0/16"
-        - name: TS_DEST_IP
-          value: "0.0.0.0"
-        - name: TS_TAILNET
-          value: "headscale.local"
-        - name: TS_HOSTNAME
-          value: "k8s-subnet-router"
-        - name: TS_LOGIN_SERVER
-          value: "https://hs.lab.apj.dev"
+        - name: TS_EXTRA_ARGS
+          value: "--login-server=https://hs.lab.apj.dev --advertise-routes=10.0.0.0/8,10.21.0.0/16,172.16.0.0/12,192.168.0.0/16 --accept-routes --hostname=k8s-subnet-router"
         securityContext:
           capabilities:
             add:
