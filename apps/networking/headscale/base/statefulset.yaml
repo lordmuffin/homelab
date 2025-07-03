@@ -46,6 +46,16 @@ spec:
           command: ["headscale"]
           args: ["serve", "-c", "/etc/headscale/config.yaml"]
           env:
+            - name: HEADSCALE_DB_TYPE
+              value: postgres
+            - name: HEADSCALE_DB_HOST
+              value: headscale-database-rw
+            - name: HEADSCALE_DB_PORT
+              value: "5432"
+            - name: HEADSCALE_DB_NAME
+              value: headscale
+            - name: HEADSCALE_DB_USER
+              value: headscale
             - name: HEADSCALE_DB_PASS
               valueFrom:
                 secretKeyRef:

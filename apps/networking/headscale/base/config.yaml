@@ -24,15 +24,6 @@ derp:
 
 ephemeral_node_inactivity_timeout: 30m
 
-database:
-  type: postgres
-  postgres:
-    host: headscale-database-rw
-    port: 5432
-    name: headscale
-    user: headscale
-    pass: "${HEADSCALE_DB_PASS}"
-
 log:
   level: info
 
