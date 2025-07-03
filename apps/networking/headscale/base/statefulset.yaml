@@ -19,30 +19,33 @@ spec:
         command: ["/bin/sh", "-c"]
         args:
           - |
-            apk add --no-cache curl
+            apk add --no-cache openssl
             
-            # Download headscale binary to generate proper keys
-            curl -L https://github.com/juanfont/headscale/releases/download/v0.23.0/headscale_0.23.0_linux_amd64 -o /tmp/headscale
-            chmod +x /tmp/headscale
+            # Function to generate headscale compatible private key
+            generate_headscale_key() {
+              # Generate 32 random bytes and encode as hex
+              KEY_HEX=$(openssl rand -hex 32)
+              echo "privkey:${KEY_HEX}"
+            }
             
             # Generate noise private key if it doesn't exist
             if [ ! -f /vol/secret/noise_private.key ]; then
               echo "Generating noise private key..."
-              /tmp/headscale generate private-key > /vol/secret/noise_private.key
+              generate_headscale_key > /vol/secret/noise_private.key
               chmod 600 /vol/secret/noise_private.key
             fi
             
             # Generate main private key if it doesn't exist
             if [ ! -f /vol/secret/private.key ]; then
               echo "Generating main private key..."
-              /tmp/headscale generate private-key > /vol/secret/private.key
+              generate_headscale_key > /vol/secret/private.key
               chmod 600 /vol/secret/private.key
             fi
             
             # Generate DERP server private key if it doesn't exist
             if [ ! -f /vol/secret/derp_server_private.key ]; then
               echo "Generating DERP server private key..."
-              /tmp/headscale generate private-key > /vol/secret/derp_server_private.key
+              generate_headscale_key > /vol/secret/derp_server_private.key
               chmod 600 /vol/secret/derp_server_private.key
             fi
             
