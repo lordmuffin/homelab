@@ -53,3 +53,28 @@ dns:
       - 1.1.1.1
       - 8.8.8.8
   search_domains: []
+
+# ACL policy configuration
+policy:
+  mode: inline
+  data: |
+    {
+      "groups": {
+        "group:admin": ["username"]
+      },
+      "acls": [
+        {
+          "action": "accept",
+          "src": ["*"],
+          "dst": ["*:*"]
+        }
+      ],
+      "autoApprovers": {
+        "routes": {
+          "10.0.0.0/8": ["group:admin"],
+          "10.21.0.0/16": ["group:admin"],
+          "172.16.0.0/12": ["group:admin"],
+          "192.168.0.0/16": ["group:admin"]
+        }
+      }
+    }
