@@ -37,6 +37,7 @@ resources:
 
   # 1Password Secrets
   - base/secrets/secrets.yaml
+  - base/secrets/couchdb.yaml
   # - base/secrets/arr-stack.yaml
   # - base/secrets/tailscale.yaml
   # - base/secrets/headscale.yaml
