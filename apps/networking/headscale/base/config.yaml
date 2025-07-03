@@ -31,15 +31,16 @@ database:
     port: 5432
     name: headscale
     user: headscale
+    pass: "${HEADSCALE_DB_PASS}"
 
 log:
   level: info
 
-dns_config:
-  override_local_dns: true
-  nameservers:
-    - 1.1.1.1
-    - 8.8.8.8
-  domains: []
+dns:
   magic_dns: true
   base_domain: headscale.local
+  nameservers:
+    global:
+      - 1.1.1.1
+      - 8.8.8.8
+  search_domains: []
