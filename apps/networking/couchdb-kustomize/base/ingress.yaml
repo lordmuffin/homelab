@@ -18,7 +18,7 @@ spec:
     - match: Host(`couchdb.lab.apj.dev`)
       kind: Rule
       services:
-        - name: couchdb
+        - name: couchdb-svc-couchdb
           port: 5984
       priority: 1
   tls:
