@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(kubectl logs:*)",
-      "Bash(kubectl get:*)"
+      "Bash(kubectl get:*)",
+      "Bash(git push:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
