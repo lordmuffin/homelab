@@ -14,7 +14,7 @@ resources:
 # - tailscale-operator.yaml
 # - tailscale.yaml
 - issuer.yaml
-
+- couchdb-kustomize.yaml
 
 namespace: argocd
 
