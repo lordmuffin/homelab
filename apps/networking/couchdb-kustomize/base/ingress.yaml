@@ -21,7 +21,7 @@ spec:
         - name: couchdb-svc-couchdb
           port: 5984
       middlewares:
-        - name: traefik-forward-auth
+        - name: traefik-forward-auth-chain
           namespace: traefik
       priority: 1
   tls:
