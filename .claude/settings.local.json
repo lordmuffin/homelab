@@ -3,7 +3,22 @@
     "allow": [
       "Bash(kubectl logs:*)",
       "Bash(kubectl get:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(kubectl describe:*)",
+      "Bash(~/.local/bin/kubectl get pods -n kube-system -l k8s-app=kube-dns -o wide)",
+      "Bash(~/.local/bin/kubectl get events -n kube-system --sort-by='.lastTimestamp')",
+      "Bash(~/.local/bin/kubectl describe pod -n kube-system coredns-58fdf84b74-zcp99)",
+      "Bash(~/.local/bin/kubectl logs -n kube-system coredns-58fdf84b74-zcp99 --previous)",
+      "Bash(~/.local/bin/kubectl get nodes -o wide)",
+      "Bash(~/.local/bin/kubectl get pods -n kube-system -l k8s-app=kube-dns)",
+      "Bash(~/.local/bin/kubectl describe deployment -n kube-system coredns)",
+      "Bash(~/.local/bin/kubectl logs -n kube-system coredns-58fdf84b74-vnlbr)",
+      "Bash(~/.local/bin/kubectl get configmap -n kube-system coredns -o yaml)",
+      "Bash(~/.local/bin/kubectl describe pod -n kube-system coredns-58fdf84b74-tl9hw)",
+      "Bash(~/.local/bin/kubectl top nodes)",
+      "Bash(~/.local/bin/kubectl describe node prod-instance-1750937833184)",
+      "Bash(~/.local/bin/kubectl get pods -n kube-system -l k8s-app=kube-dns -o yaml)",
+      "Bash(kubectl exec:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
