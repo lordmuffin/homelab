@@ -20,6 +20,7 @@ resources:
 - vikunja.yaml
 - litellm.yaml
 - obsidian.yaml
+- grill-stats.yaml
 
 namespace: argocd
 
