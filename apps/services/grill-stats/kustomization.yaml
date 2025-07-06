@@ -3,4 +3,4 @@ kind: Kustomization
 
 resources:
 - base
-- overlays/dev/kustomization.yaml
+- overlays/dev/
