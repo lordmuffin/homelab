@@ -1,0 +1,127 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grill-stats
+  namespace: grill-monitoring
+  labels:
+    app: grill-stats
+    component: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grill-stats
+  template:
+    metadata:
+      labels:
+        app: grill-stats
+        component: monitoring
+    spec:
+      imagePullSecrets:
+      - name: gitea-registry
+      containers:
+      - name: grill-stats
+        image: gitea-internal/lordmuffin/grill-stats:latest
+        ports:
+        - containerPort: 5000
+          name: http
+        env:
+        - name: THERMOWORKS_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: grill-monitoring-secrets
+              key: thermoworks-api-key
+        - name: HOMEASSISTANT_URL
+          valueFrom:
+            configMapKeyRef:
+              name: grill-monitoring-config
+              key: homeassistant-url
+        - name: HOMEASSISTANT_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: grill-monitoring-secrets
+              key: homeassistant-token
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: grill-monitoring-db-credentials
+              key: username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: grill-monitoring-db-credentials
+              key: password
+        - name: POSTGRES_DB
+          value: grillstats
+        - name: DATABASE_URL
+          value: postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@grill-stats-db.$(NAMESPACE).svc.cluster.local:5432/$(POSTGRES_DB)
+        - name: SYNC_INTERVAL
+          valueFrom:
+            configMapKeyRef:
+              name: grill-monitoring-config
+              key: SYNC_INTERVAL
+              optional: true
+        resources:
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grill-stats
+  namespace: grill-monitoring
+  labels:
+    app: grill-stats
+    component: monitoring
+spec:
+  selector:
+    app: grill-stats
+  ports:
+  - port: 80
+    targetPort: http
+    name: http
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grill-stats
+  namespace: grill-monitoring
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    kubernetes.io/ingress.class: nginx
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  tls:
+  - hosts:
+    - grills.lab.apj.dev  # Will be patched by overlay
+    secretName: grill-stats-tls
+  rules:
+  - host: grills.lab.apj.dev  # Will be patched by overlay
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: grill-stats
+            port:
+              number: 80

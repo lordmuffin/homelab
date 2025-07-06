@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grill-stats
+  namespace: grill-monitoring
+spec:
+  tls:
+  - hosts:
+    - grills.lab.apj.dev
+    secretName: grill-stats-tls
+  rules:
+  - host: grills.lab.apj.dev
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: grill-stats
+            port:
+              number: 80

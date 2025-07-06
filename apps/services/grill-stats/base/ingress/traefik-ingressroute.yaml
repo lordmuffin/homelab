@@ -1,0 +1,104 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: device-service-ingress
+  namespace: grill-monitoring
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`grill-stats.example.com`) && PathPrefix(`/api/devices`)
+      kind: Rule
+      services:
+        - name: device-service
+          port: 8080
+      middlewares:
+        - name: grill-stats-headers
+        - name: grill-stats-compress
+        - name: grill-stats-ratelimit
+  tls:
+    secretName: grill-stats-tls
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: temperature-service-ingress
+  namespace: grill-monitoring
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`grill-stats.example.com`) && PathPrefix(`/api/temperature`)
+      kind: Rule
+      services:
+        - name: temperature-service
+          port: 8080
+      middlewares:
+        - name: grill-stats-headers
+        - name: grill-stats-compress
+        - name: grill-stats-ratelimit
+  tls:
+    secretName: grill-stats-tls
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: homeassistant-service-ingress
+  namespace: grill-monitoring
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`grill-stats.example.com`) && PathPrefix(`/api/homeassistant`)
+      kind: Rule
+      services:
+        - name: homeassistant-service
+          port: 8080
+      middlewares:
+        - name: grill-stats-headers
+        - name: grill-stats-compress
+        - name: grill-stats-ratelimit
+  tls:
+    secretName: grill-stats-tls
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: notification-service-ingress
+  namespace: grill-monitoring
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`grill-stats.example.com`) && PathPrefix(`/api/notifications`)
+      kind: Rule
+      services:
+        - name: notification-service
+          port: 8080
+      middlewares:
+        - name: grill-stats-headers
+        - name: grill-stats-compress
+        - name: grill-stats-ratelimit
+  tls:
+    secretName: grill-stats-tls
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: data-processing-service-ingress
+  namespace: grill-monitoring
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`grill-stats.example.com`) && PathPrefix(`/api/data`)
+      kind: Rule
+      services:
+        - name: data-processing-service
+          port: 8080
+      middlewares:
+        - name: grill-stats-headers
+        - name: grill-stats-compress
+        - name: grill-stats-ratelimit
+  tls:
+    secretName: grill-stats-tls

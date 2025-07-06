@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: grill-monitoring-dev
+  labels:
+    name: grill-monitoring-dev
+    app.kubernetes.io/name: grill-monitoring
+    app.kubernetes.io/part-of: grill-stats
+    environment: development

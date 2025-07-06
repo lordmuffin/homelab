@@ -1,0 +1,28 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: grill-monitoring
+
+bases:
+- ../../base
+
+patches:
+- path: patches/hpa-patch.yaml
+- path: patches/pdb-patch.yaml
+- path: patches/resources-patch.yaml
+- path: patches/grill-stats-ingress-patch.yaml
+
+resources:
+- patches/grill-stats-hpa.yaml
+
+configMapGenerator:
+- name: grill-monitoring-config
+  behavior: merge
+  literals:
+  - SYNC_INTERVAL="300"  # 5 minutes for production
+
+secretGenerator:
+- name: grill-monitoring-secrets
+  behavior: merge
+  envs:
+  - secrets/prod.env  # Will contain production environment secrets

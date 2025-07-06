@@ -1,0 +1,84 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grill-stats-db
+  namespace: grill-monitoring
+  labels:
+    app: grill-stats-db
+    component: database
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grill-stats-db
+  template:
+    metadata:
+      labels:
+        app: grill-stats-db
+        component: database
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:14-alpine
+        ports:
+        - containerPort: 5432
+          name: postgres
+        env:
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: grill-monitoring-db-credentials
+              key: username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: grill-monitoring-db-credentials
+              key: password
+        - name: POSTGRES_DB
+          value: grillstats
+        volumeMounts:
+        - name: postgres-data
+          mountPath: /var/lib/postgresql/data
+          subPath: postgres
+        resources:
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+      volumes:
+      - name: postgres-data
+        persistentVolumeClaim:
+          claimName: grill-stats-db-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grill-stats-db
+  namespace: grill-monitoring
+  labels:
+    app: grill-stats-db
+    component: database
+spec:
+  selector:
+    app: grill-stats-db
+  ports:
+  - port: 5432
+    targetPort: postgres
+    name: postgres
+  type: ClusterIP
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grill-stats-db-pvc
+  namespace: grill-monitoring
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: local-path  # Adjust to match your homelab's storage class
