@@ -5,3 +5,5 @@ resources:
 - namespace.yaml
 - resourcequota.yaml
 - networkpolicy.yaml
+- configmap.yaml
+- secret.yaml
