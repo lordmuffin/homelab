@@ -101,6 +101,8 @@ spec:
     server: https://kubernetes.default.svc
   - namespace: grill-monitoring
     server: https://kubernetes.default.svc
+  - namespace: grill-monitoring-dev
+    server: https://kubernetes.default.svc
   clusterResourceWhitelist:
   - group: '*'
     kind: '*'

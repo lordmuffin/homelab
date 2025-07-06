@@ -8,10 +8,10 @@ spec:
   project: apps
   source:
     repoURL: 'https://github.com/lordmuffin/homelab.git'
-    path: apps/services/grill-stats
+    path: apps/services/grill-stats/overlays/dev
     targetRevision: main
   destination:
-    namespace: grill-monitoring
+    namespace: grill-monitoring-dev
     name: in-cluster
   syncPolicy:
     automated:
