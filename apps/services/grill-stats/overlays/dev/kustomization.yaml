@@ -3,27 +3,14 @@ kind: Kustomization
 
 namespace: grill-monitoring-dev
 
-bases:
+resources:
 - ../../base
 
-resources:
-- namespace.yaml
-
 patches:
-- path: patches/replicas-patch.yaml
-- path: patches/resources-patch.yaml
-- path: patches/ingress-patch.yaml
-- path: patches/grill-stats-ingress-patch.yaml
-- path: patches/grill-stats-replicas-patch.yaml
-
-configMapGenerator:
-- name: grill-monitoring-config
-  behavior: merge
-  literals:
-  - SYNC_INTERVAL="60"  # Faster sync for dev environment
-
-secretGenerator:
-- name: grill-monitoring-secrets
-  behavior: merge
-  envs:
-  - secrets/dev.env  # Will contain dev environment secrets
+- target:
+    kind: ConfigMap
+    name: grill-monitoring-config
+  patch: |-
+    - op: replace
+      path: /data/SYNC_INTERVAL
+      value: "60"
