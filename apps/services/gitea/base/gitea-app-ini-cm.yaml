@@ -5,6 +5,8 @@ metadata:
 data:
   actions: |
     ENABLED=true
+  api: |
+    ENABLE_BASIC_AUTHENTICATION=true
   database: |
     DB_TYPE=postgres
     NAME=gitea
