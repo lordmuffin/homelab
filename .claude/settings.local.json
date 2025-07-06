@@ -19,7 +19,8 @@
       "Bash(~/.local/bin/kubectl describe node prod-instance-1750937833184)",
       "Bash(~/.local/bin/kubectl get pods -n kube-system -l k8s-app=kube-dns -o yaml)",
       "Bash(kubectl exec:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
