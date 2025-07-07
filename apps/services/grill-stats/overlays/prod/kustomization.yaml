@@ -13,4 +13,65 @@ resources:
 patches:
 - path: patches/resources-patch.yaml
 - path: patches/grill-stats-ingress-patch.yaml
-- path: patches/grill-stats-env-patch.yaml
+- target:
+    kind: Deployment
+    name: grill-stats
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/env
+      value:
+      # ThermoWorks Configuration
+      - name: THERMOWORKS_API_KEY
+        valueFrom:
+          secretKeyRef:
+            name: grill-stats-prod-creds-1password
+            key: thermoworks-client-id
+      
+      # Home Assistant Configuration  
+      - name: HOMEASSISTANT_URL
+        value: "http://homeassistant.home.svc.cluster.local:8123"
+      - name: HOMEASSISTANT_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: grill-stats-prod-creds-1password
+            key: homeassistant-token
+      
+      # Database Configuration
+      - name: POSTGRES_USER
+        valueFrom:
+          secretKeyRef:
+            name: grill-stats-prod-creds-1password
+            key: db-username
+      - name: POSTGRES_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: grill-stats-prod-creds-1password
+            key: db-password
+      - name: POSTGRES_DB
+        value: grillstats
+      - name: DATABASE_URL
+        value: postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@grill-stats-db.grill-monitoring.svc.cluster.local:5432/$(POSTGRES_DB)
+      
+      # Redis Configuration
+      - name: REDIS_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: grill-stats-prod-creds-1password
+            key: redis-password
+      - name: REDIS_URL
+        value: redis://:$(REDIS_PASSWORD)@redis.grill-monitoring.svc.cluster.local:6379/0
+      
+      # Flask Configuration
+      - name: SECRET_KEY
+        valueFrom:
+          secretKeyRef:
+            name: grill-stats-prod-creds-1password
+            key: secret-key
+      - name: FLASK_ENV
+        value: production
+      
+      # Application Configuration
+      - name: SYNC_INTERVAL
+        value: "300"
+      - name: THERMOWORKS_POLLING_INTERVAL
+        value: "300"
