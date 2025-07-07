@@ -41,7 +41,7 @@ spec:
           valueFrom:
             secretKeyRef:
               name: grill-monitoring-secrets
-              key: homeassistant-token
+              key: HOMEASSISTANT_TOKEN
         - name: POSTGRES_USER
           valueFrom:
             secretKeyRef:
