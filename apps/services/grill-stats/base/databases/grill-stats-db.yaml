@@ -80,5 +80,5 @@ spec:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 1Gi
-  storageClassName: local-path  # Adjust to match your homelab's storage class
+      storage: 5Gi
+  storageClassName: ssd  # Adjust to match your homelab's storage class
