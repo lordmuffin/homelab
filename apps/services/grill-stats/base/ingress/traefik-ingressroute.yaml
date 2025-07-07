@@ -7,7 +7,7 @@ spec:
   entryPoints:
     - websecure
   routes:
-    - match: Host(`grill-stats.example.com`) && PathPrefix(`/api/devices`)
+    - match: Host(`grill-stats.lab.apj.dev`) && PathPrefix(`/api/devices`)
       kind: Rule
       services:
         - name: device-service
@@ -28,7 +28,7 @@ spec:
   entryPoints:
     - websecure
   routes:
-    - match: Host(`grill-stats.example.com`) && PathPrefix(`/api/temperature`)
+    - match: Host(`grill-stats.lab.apj.dev`) && PathPrefix(`/api/temperature`)
       kind: Rule
       services:
         - name: temperature-service
@@ -49,7 +49,7 @@ spec:
   entryPoints:
     - websecure
   routes:
-    - match: Host(`grill-stats.example.com`) && PathPrefix(`/api/homeassistant`)
+    - match: Host(`grill-stats.lab.apj.dev`) && PathPrefix(`/api/homeassistant`)
       kind: Rule
       services:
         - name: homeassistant-service
@@ -70,7 +70,7 @@ spec:
   entryPoints:
     - websecure
   routes:
-    - match: Host(`grill-stats.example.com`) && PathPrefix(`/api/notifications`)
+    - match: Host(`grill-stats.lab.apj.dev`) && PathPrefix(`/api/notifications`)
       kind: Rule
       services:
         - name: notification-service
@@ -91,7 +91,7 @@ spec:
   entryPoints:
     - websecure
   routes:
-    - match: Host(`grill-stats.example.com`) && PathPrefix(`/api/data`)
+    - match: Host(`grill-stats.lab.apj.dev`) && PathPrefix(`/api/data`)
       kind: Rule
       services:
         - name: data-processing-service
