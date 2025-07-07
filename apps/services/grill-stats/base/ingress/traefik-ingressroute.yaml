@@ -102,3 +102,24 @@ spec:
         - name: grill-stats-ratelimit
   tls:
     secretName: lab-apj-dev-tls
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: grill-stats-main-ingress
+  namespace: grill-monitoring
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`grill-stats.lab.apj.dev`)
+      kind: Rule
+      services:
+        - name: grill-stats
+          port: 80
+      middlewares:
+        - name: grill-stats-headers
+        - name: grill-stats-compress
+        - name: grill-stats-ratelimit
+  tls:
+    secretName: lab-apj-dev-tls

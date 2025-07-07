@@ -5,12 +5,9 @@ namespace: grill-monitoring-dev
 
 resources:
 - ../../base
+- ./secrets/grill-stats-dev-creds-1password.yaml
 
 patches:
-- target:
-    kind: ConfigMap
-    name: grill-monitoring-config
-  patch: |-
-    - op: replace
-      path: /data/SYNC_INTERVAL
-      value: "60"
+- path: ./patches/grill-stats-env-patch.yaml
+- path: ./patches/device-service-env-patch.yaml  
+- path: ./patches/temperature-service-env-patch.yaml
