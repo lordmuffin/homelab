@@ -18,8 +18,6 @@ spec:
         app: grill-stats
         component: monitoring
     spec:
-      imagePullSecrets:
-      - name: gitea-registry
       containers:
       - name: grill-stats
         image: lordmuffin/grill-stats:latest
