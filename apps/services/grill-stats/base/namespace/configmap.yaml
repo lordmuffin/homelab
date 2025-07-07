@@ -10,3 +10,8 @@ data:
   DB_HOST: "postgresql-service"
   REDIS_HOST: "redis-service"
   INFLUXDB_HOST: "influxdb-service"
+  # Redis Streams for messaging (replaces Kafka)
+  REDIS_STREAM_TEMPERATURE_DATA: "temperature-data"
+  REDIS_STREAM_DEVICE_EVENTS: "device-events"
+  REDIS_STREAM_TEMPERATURE_ALERTS: "temperature-alerts"
+  MESSAGE_BROKER_TYPE: "redis"

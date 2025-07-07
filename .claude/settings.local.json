@@ -20,7 +20,11 @@
       "Bash(~/.local/bin/kubectl get pods -n kube-system -l k8s-app=kube-dns -o yaml)",
       "Bash(kubectl exec:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(kustomize build:*)",
+      "Bash(kubectl kustomize:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
