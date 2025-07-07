@@ -3,24 +3,17 @@ kind: Kustomization
 
 namespace: grill-monitoring-staging
 
-bases:
-- ../../base
-
 resources:
+- ../../base
 - namespace.yaml
 
 patches:
 - path: patches/ingress-patch.yaml
 - path: patches/grill-stats-ingress-patch.yaml
-
-configMapGenerator:
-- name: grill-monitoring-config
-  behavior: merge
-  literals:
-  - SYNC_INTERVAL="180"  # 3 minutes for staging environment
-
-secretGenerator:
-- name: grill-monitoring-secrets
-  behavior: merge
-  envs:
-  - secrets/staging.env  # Will contain staging environment secrets
+- target:
+    kind: ConfigMap
+    name: grill-monitoring-config
+  patch: |-
+    - op: replace
+      path: /data/SYNC_INTERVAL
+      value: "180"

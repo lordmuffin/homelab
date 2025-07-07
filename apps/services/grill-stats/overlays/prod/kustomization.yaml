@@ -3,8 +3,9 @@ kind: Kustomization
 
 namespace: grill-monitoring
 
-bases:
+resources:
 - ../../base
+- patches/grill-stats-hpa.yaml
 
 patches:
 - path: patches/hpa-patch.yaml
@@ -12,17 +13,12 @@ patches:
 - path: patches/resources-patch.yaml
 - path: patches/grill-stats-ingress-patch.yaml
 
-resources:
-- patches/grill-stats-hpa.yaml
 
-configMapGenerator:
-- name: grill-monitoring-config
-  behavior: merge
-  literals:
-  - SYNC_INTERVAL="300"  # 5 minutes for production
-
-secretGenerator:
-- name: grill-monitoring-secrets
-  behavior: merge
-  envs:
-  - secrets/prod.env  # Will contain production environment secrets
+patches:
+- target:
+    kind: ConfigMap
+    name: grill-monitoring-config
+  patch: |-
+    - op: replace
+      path: /data/SYNC_INTERVAL
+      value: "300"
