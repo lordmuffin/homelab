@@ -17,7 +17,7 @@ spec:
         - name: grill-stats-compress
         - name: grill-stats-ratelimit
   tls:
-    secretName: grill-stats-tls
+    secretName: lab-apj-dev-tls
 ---
 apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute
@@ -38,7 +38,7 @@ spec:
         - name: grill-stats-compress
         - name: grill-stats-ratelimit
   tls:
-    secretName: grill-stats-tls
+    secretName: lab-apj-dev-tls
 ---
 apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute
@@ -59,7 +59,7 @@ spec:
         - name: grill-stats-compress
         - name: grill-stats-ratelimit
   tls:
-    secretName: grill-stats-tls
+    secretName: lab-apj-dev-tls
 ---
 apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute
@@ -80,7 +80,7 @@ spec:
         - name: grill-stats-compress
         - name: grill-stats-ratelimit
   tls:
-    secretName: grill-stats-tls
+    secretName: lab-apj-dev-tls
 ---
 apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute
@@ -101,4 +101,4 @@ spec:
         - name: grill-stats-compress
         - name: grill-stats-ratelimit
   tls:
-    secretName: grill-stats-tls
+    secretName: lab-apj-dev-tls
