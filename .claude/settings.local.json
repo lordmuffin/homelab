@@ -25,7 +25,11 @@
       "Bash(kubectl kustomize:*)",
       "Bash(find:*)",
       "Bash(grep:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(kubectl delete:*)",
+      "Bash(argocd app sync:*)",
+      "Bash(docker pull:*)",
+      "Bash(podman inspect:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
