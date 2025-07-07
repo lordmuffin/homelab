@@ -52,6 +52,16 @@ spec:
             secretKeyRef:
               name: grill-monitoring-secrets
               key: DB_PASSWORD
+        - name: HOMEASSISTANT_URL
+          valueFrom:
+            secretKeyRef:
+              name: grill-monitoring-secrets
+              key: HOMEASSISTANT_URL
+        - name: HOMEASSISTANT_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: grill-monitoring-secrets
+              key: HOMEASSISTANT_TOKEN
         - name: OTEL_SERVICE_NAME
           value: device-service
         - name: OTEL_EXPORTER_OTLP_ENDPOINT
