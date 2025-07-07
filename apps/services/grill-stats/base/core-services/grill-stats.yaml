@@ -22,7 +22,7 @@ spec:
       - name: gitea-registry
       containers:
       - name: grill-stats
-        image: gitea-internal/lordmuffin/grill-stats:latest
+        image: lordmuffin/grill-stats:latest
         ports:
         - containerPort: 5000
           name: http
