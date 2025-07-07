@@ -24,7 +24,8 @@
       "Bash(kustomize build:*)",
       "Bash(kubectl kustomize:*)",
       "Bash(find:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(ls:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
