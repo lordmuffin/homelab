@@ -5,6 +5,7 @@ namespace: grill-monitoring
 
 resources:
 - ../../base
+- ./secrets/grill-stats-prod-creds-1password.yaml
 - patches/grill-stats-hpa.yaml
 - patches/hpa-patch.yaml
 - patches/pdb-patch.yaml
@@ -12,3 +13,4 @@ resources:
 patches:
 - path: patches/resources-patch.yaml
 - path: patches/grill-stats-ingress-patch.yaml
+- path: patches/grill-stats-env-patch.yaml
