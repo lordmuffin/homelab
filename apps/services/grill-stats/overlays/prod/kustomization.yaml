@@ -6,19 +6,9 @@ namespace: grill-monitoring
 resources:
 - ../../base
 - patches/grill-stats-hpa.yaml
+- patches/hpa-patch.yaml
+- patches/pdb-patch.yaml
 
 patches:
-- path: patches/hpa-patch.yaml
-- path: patches/pdb-patch.yaml
 - path: patches/resources-patch.yaml
 - path: patches/grill-stats-ingress-patch.yaml
-
-
-patches:
-- target:
-    kind: ConfigMap
-    name: grill-monitoring-config
-  patch: |-
-    - op: replace
-      path: /data/SYNC_INTERVAL
-      value: "300"
