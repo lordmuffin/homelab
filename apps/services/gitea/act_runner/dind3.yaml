@@ -14,19 +14,19 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app: act-act-runner-3
-  name: act-act-runner-3
+    app: act-runner-3
+  name: act-runner-3
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: act-act-runner-3
+      app: act-runner-3
   strategy: {}
   template:
     metadata:
       creationTimestamp: null
       labels:
-        app: act-act-runner-3
+        app: act-runner-3
     spec:
       restartPolicy: Always
       volumes:
