@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: temperature-service
+  namespace: grill-monitoring-dev
+spec:
+  template:
+    spec:
+      containers:
+      - name: temperature-service
+        env:
+        # Database Configuration
+        - name: DATABASE_URL
+          value: postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@grill-stats-db.grill-monitoring-dev.svc.cluster.local:5432/grillstats
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: grill-stats-dev-creds-1password
+              key: db-username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: grill-stats-dev-creds-1password
+              key: db-password
+        
+        # Redis Configuration
+        - name: REDIS_URL
+          value: redis://:$(REDIS_PASSWORD)@redis.grill-monitoring-dev.svc.cluster.local:6379/0
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: grill-stats-dev-creds-1password
+              key: redis-password
+        
+        # InfluxDB Configuration
+        - name: INFLUXDB_URL
+          value: "http://influxdb.grill-monitoring-dev.svc.cluster.local:8086"
+        - name: INFLUXDB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: grill-stats-dev-creds-1password
+              key: influxdb-token
+        - name: INFLUXDB_ORG
+          value: "grill-monitoring"
+        - name: INFLUXDB_BUCKET
+          value: "temperature-data"
+        
+        # Application Configuration
+        - name: TEMPERATURE_RETENTION_POLICY
+          value: "7d"
+        - name: AGGREGATION_INTERVAL
+          value: "1m"
