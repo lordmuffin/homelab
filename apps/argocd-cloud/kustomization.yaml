@@ -175,7 +175,7 @@ commonAnnotations:
 # Vault plugin
 # ArgoCD Remote Resources
 # Image Updater
-# - https://github.com/argoproj-labs/argocd-image-updater/manifests/base
+- https://github.com/argoproj-labs/argocd-image-updater/manifests/base
 # Custom CSS Styles
 # components:
 # # Extensions controller component

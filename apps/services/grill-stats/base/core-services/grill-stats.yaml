@@ -23,6 +23,7 @@ spec:
       containers:
       - name: grill-stats
         image: lordmuffin/grill-stats:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 5000
           name: http
