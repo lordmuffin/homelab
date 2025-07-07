@@ -31,7 +31,7 @@ spec:
           valueFrom:
             secretKeyRef:
               name: grill-monitoring-secrets
-              key: thermoworks-api-key
+              key: THERMOWORKS_API_KEY
         - name: HOMEASSISTANT_URL
           valueFrom:
             configMapKeyRef:
