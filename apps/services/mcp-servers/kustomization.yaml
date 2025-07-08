@@ -8,8 +8,6 @@ bases:
   - ./gitea-mcp
   - ./kubernetes-mcp
   - ./postgresql-mcp
-  - ./redis-mcp
-  - ./sequential-thinking-mcp
 
 commonAnnotations:
   reloader.stakater.com/auto: "true"
