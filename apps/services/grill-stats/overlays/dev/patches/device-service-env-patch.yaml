@@ -14,12 +14,12 @@ spec:
           valueFrom:
             secretKeyRef:
               name: grill-stats-dev-creds-1password
-              key: thermoworks-client-id
+              key: THERMOWORKS_API_KEY
         - name: THERMOWORKS_CLIENT_SECRET
           valueFrom:
             secretKeyRef:
               name: grill-stats-dev-creds-1password
-              key: thermoworks-client-secret
+              key: SECRET_KEY
         - name: THERMOWORKS_REDIRECT_URI
           value: "http://localhost:8080/api/auth/thermoworks/callback"
         - name: THERMOWORKS_POLLING_INTERVAL
@@ -32,7 +32,7 @@ spec:
           valueFrom:
             secretKeyRef:
               name: grill-stats-dev-creds-1password
-              key: homeassistant-token
+              key: HOMEASSISTANT_TOKEN
         
         # Database Configuration
         - name: DATABASE_URL
@@ -41,12 +41,12 @@ spec:
           valueFrom:
             secretKeyRef:
               name: grill-stats-dev-creds-1password
-              key: db-username
+              key: DB_USERNAME
         - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
               name: grill-stats-dev-creds-1password
-              key: db-password
+              key: DB_PASSWORD
         
         # Redis Configuration
         - name: REDIS_URL
@@ -55,7 +55,7 @@ spec:
           valueFrom:
             secretKeyRef:
               name: grill-stats-dev-creds-1password
-              key: redis-password
+              key: REDIS_PASSWORD
         
         # RFX Gateway Configuration
         - name: RFX_SCAN_DURATION
