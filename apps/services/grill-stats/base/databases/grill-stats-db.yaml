@@ -4,6 +4,9 @@ kind: Cluster
 metadata:
   name: grill-stats-db
   namespace: grill-monitoring
+  labels:
+    app: grill-stats-db
+    component: database
 spec:
   imageName: ghcr.io/cloudnative-pg/postgresql:16.2-10
   instances: 1
