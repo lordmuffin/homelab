@@ -1,0 +1,48 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: mcp-servers
+  namespace: mcp-servers
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  labels:
+    app.kubernetes.io/name: mcp-servers
+    app.kubernetes.io/component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: mcp-servers
+      monitoring: "enabled"
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      honorLabels: true
+  namespaceSelector:
+    matchNames:
+      - mcp-servers
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-servers-metrics-aggregator
+  namespace: mcp-servers
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  labels:
+    app.kubernetes.io/name: mcp-servers
+    app.kubernetes.io/component: metrics-aggregator
+    monitoring: "enabled"
+spec:
+  type: ClusterIP
+  ports:
+    - name: metrics
+      port: 9090
+      targetPort: 9090
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: mcp-servers-metrics
+    app.kubernetes.io/component: aggregator

@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: mcp-servers
+
+bases:
+  - ./base
+
+commonAnnotations:
+  reloader.stakater.com/auto: "true"
+
+commonLabels:
+  app.kubernetes.io/name: postgresql-mcp
+  app.kubernetes.io/component: mcp-server
+  app.kubernetes.io/part-of: mcp-servers

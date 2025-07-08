@@ -1,0 +1,135 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgresql-mcp
+  namespace: mcp-servers
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgresql-mcp
+      app.kubernetes.io/component: mcp-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgresql-mcp
+        app.kubernetes.io/component: mcp-server
+        monitoring: "enabled"
+    spec:
+      serviceAccountName: mcp-server-base
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: postgresql-mcp
+          image: node:20-alpine
+          imagePullPolicy: IfNotPresent
+          workingDir: /app
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              
+              # Install required packages
+              apk add --no-cache postgresql-client curl
+              
+              # Install MCP server dependencies
+              npm install -g @modelcontextprotocol/server-postgres
+              
+              # Create startup script
+              cat > /app/start.sh << 'EOF'
+              #!/bin/sh
+              set -e
+              
+              # Test PostgreSQL connectivity
+              echo "Testing PostgreSQL connectivity..."
+              export PGPASSWORD="$POSTGRES_PASSWORD"
+              pg_isready -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+              
+              echo "Starting PostgreSQL MCP Server..."
+              exec node /usr/local/lib/node_modules/@modelcontextprotocol/server-postgres/dist/index.js
+              EOF
+              
+              chmod +x /app/start.sh
+              exec /app/start.sh
+          env:
+            - name: POSTGRES_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: postgresql-mcp-config
+                  key: POSTGRES_HOST
+            - name: POSTGRES_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: postgresql-mcp-config
+                  key: POSTGRES_PORT
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: postgresql-mcp-config
+                  key: POSTGRES_DB
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: gitea-db-postgres-creds-1password
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: gitea-db-postgres-creds-1password
+                  key: password
+            - name: MCP_SERVER_NAME
+              value: "postgresql-mcp"
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: mcp-servers-shared-config
+                  key: LOG_LEVEL
+          ports:
+            - name: mcp
+              containerPort: 3000
+              protocol: TCP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - pg_isready -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - pg_isready -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            capabilities:
+              drop:
+                - ALL

@@ -1,0 +1,226 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: claude-code-mcp-config
+  namespace: mcp-servers
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+data:
+  # Production Configuration (using Kubernetes services)
+  claude-code-production.json: |
+    {
+      "mcpServers": {
+        "gitea": {
+          "command": "stdio",
+          "args": [],
+          "env": {
+            "GITEA_BASE_URL": "http://gitea-mcp.mcp-servers.svc.cluster.local:3000",
+            "MCP_SERVER_NAME": "gitea-mcp",
+            "LOG_LEVEL": "INFO"
+          }
+        },
+        "kubernetes": {
+          "command": "stdio", 
+          "args": [],
+          "env": {
+            "KUBERNETES_SERVICE_HOST": "kubernetes-mcp.mcp-servers.svc.cluster.local",
+            "KUBERNETES_SERVICE_PORT": "3000",
+            "MCP_SERVER_NAME": "kubernetes-mcp",
+            "LOG_LEVEL": "INFO"
+          }
+        },
+        "postgresql": {
+          "command": "stdio",
+          "args": [],
+          "env": {
+            "POSTGRES_HOST": "postgresql-mcp.mcp-servers.svc.cluster.local",
+            "POSTGRES_PORT": "3000",
+            "MCP_SERVER_NAME": "postgresql-mcp",
+            "LOG_LEVEL": "INFO"
+          }
+        },
+        "redis": {
+          "command": "stdio",
+          "args": [],
+          "env": {
+            "REDIS_HOST": "redis-mcp.mcp-servers.svc.cluster.local",
+            "REDIS_PORT": "3000", 
+            "MCP_SERVER_NAME": "redis-mcp",
+            "LOG_LEVEL": "INFO"
+          }
+        },
+        "sequential-thinking": {
+          "command": "stdio",
+          "args": [],
+          "env": {
+            "MCP_SERVER_HOST": "sequential-thinking-mcp.mcp-servers.svc.cluster.local",
+            "MCP_SERVER_PORT": "3000",
+            "MCP_SERVER_NAME": "sequential-thinking-mcp",
+            "LOG_LEVEL": "INFO"
+          }
+        }
+      }
+    }
+
+  # Development Configuration (using port-forward)
+  claude-code-development.json: |
+    {
+      "mcpServers": {
+        "gitea": {
+          "command": "stdio",
+          "args": [],
+          "env": {
+            "GITEA_BASE_URL": "http://localhost:8001",
+            "MCP_SERVER_NAME": "gitea-mcp",
+            "LOG_LEVEL": "DEBUG"
+          }
+        },
+        "kubernetes": {
+          "command": "stdio",
+          "args": [],
+          "env": {
+            "KUBERNETES_SERVICE_HOST": "localhost",
+            "KUBERNETES_SERVICE_PORT": "8002", 
+            "MCP_SERVER_NAME": "kubernetes-mcp",
+            "LOG_LEVEL": "DEBUG"
+          }
+        },
+        "postgresql": {
+          "command": "stdio",
+          "args": [],
+          "env": {
+            "POSTGRES_HOST": "localhost",
+            "POSTGRES_PORT": "8003",
+            "MCP_SERVER_NAME": "postgresql-mcp",
+            "LOG_LEVEL": "DEBUG"
+          }
+        },
+        "redis": {
+          "command": "stdio",
+          "args": [],
+          "env": {
+            "REDIS_HOST": "localhost",
+            "REDIS_PORT": "8004",
+            "MCP_SERVER_NAME": "redis-mcp", 
+            "LOG_LEVEL": "DEBUG"
+          }
+        },
+        "sequential-thinking": {
+          "command": "stdio",
+          "args": [],
+          "env": {
+            "MCP_SERVER_HOST": "localhost",
+            "MCP_SERVER_PORT": "8005",
+            "MCP_SERVER_NAME": "sequential-thinking-mcp",
+            "LOG_LEVEL": "DEBUG"
+          }
+        }
+      }
+    }
+
+  # External Access Configuration (using ingress)
+  claude-code-external.json: |
+    {
+      "mcpServers": {
+        "gitea": {
+          "command": "stdio",
+          "args": [],
+          "env": {
+            "GITEA_BASE_URL": "https://gitea-mcp.home.andrewpjackson.com",
+            "MCP_SERVER_NAME": "gitea-mcp",
+            "LOG_LEVEL": "INFO"
+          }
+        },
+        "kubernetes": {
+          "command": "stdio",
+          "args": [],
+          "env": {
+            "KUBERNETES_SERVICE_HOST": "k8s-mcp.home.andrewpjackson.com",
+            "KUBERNETES_SERVICE_PORT": "443",
+            "MCP_SERVER_NAME": "kubernetes-mcp",
+            "LOG_LEVEL": "INFO"
+          }
+        },
+        "postgresql": {
+          "command": "stdio",
+          "args": [],
+          "env": {
+            "POSTGRES_HOST": "postgres-mcp.home.andrewpjackson.com",
+            "POSTGRES_PORT": "443",
+            "MCP_SERVER_NAME": "postgresql-mcp",
+            "LOG_LEVEL": "INFO"
+          }
+        },
+        "redis": {
+          "command": "stdio",
+          "args": [],
+          "env": {
+            "REDIS_HOST": "redis-mcp.home.andrewpjackson.com",
+            "REDIS_PORT": "443",
+            "MCP_SERVER_NAME": "redis-mcp",
+            "LOG_LEVEL": "INFO"
+          }
+        },
+        "sequential-thinking": {
+          "command": "stdio",
+          "args": [],
+          "env": {
+            "MCP_SERVER_HOST": "sequential-mcp.home.andrewpjackson.com",
+            "MCP_SERVER_PORT": "443",
+            "MCP_SERVER_NAME": "sequential-thinking-mcp",
+            "LOG_LEVEL": "INFO"
+          }
+        }
+      }
+    }
+
+  # Port-forward setup script
+  setup-port-forward.sh: |
+    #!/bin/bash
+    set -e
+    
+    echo "Setting up port-forwarding for MCP servers..."
+    
+    # Kill any existing port-forwards
+    pkill -f "kubectl.*port-forward.*mcp" || true
+    
+    # Start port-forwards in background
+    kubectl port-forward -n mcp-servers svc/gitea-mcp 8001:3000 &
+    kubectl port-forward -n mcp-servers svc/kubernetes-mcp 8002:3000 &
+    kubectl port-forward -n mcp-servers svc/postgresql-mcp 8003:3000 &
+    kubectl port-forward -n mcp-servers svc/redis-mcp 8004:3000 &
+    kubectl port-forward -n mcp-servers svc/sequential-thinking-mcp 8005:3000 &
+    
+    echo "Port-forwards started:"
+    echo "  Gitea MCP:               http://localhost:8001"
+    echo "  Kubernetes MCP:          http://localhost:8002"
+    echo "  PostgreSQL MCP:          http://localhost:8003"
+    echo "  Redis MCP:               http://localhost:8004"
+    echo "  Sequential Thinking MCP: http://localhost:8005"
+    echo ""
+    echo "To stop all port-forwards, run: pkill -f 'kubectl.*port-forward.*mcp'"
+
+  # Health check script
+  health-check.sh: |
+    #!/bin/bash
+    set -e
+    
+    echo "Checking MCP server health..."
+    
+    # Check if all pods are running
+    kubectl get pods -n mcp-servers -l app.kubernetes.io/part-of=mcp-servers
+    
+    # Check services
+    kubectl get svc -n mcp-servers -l app.kubernetes.io/part-of=mcp-servers
+    
+    # Check if services are responding
+    services=("gitea-mcp" "kubernetes-mcp" "postgresql-mcp" "redis-mcp" "sequential-thinking-mcp")
+    
+    for service in "${services[@]}"; do
+      echo "Checking $service..."
+      if kubectl exec -n mcp-servers deployment/$service -- curl -f http://localhost:3000/health > /dev/null 2>&1; then
+        echo "  ✓ $service is healthy"
+      else
+        echo "  ✗ $service is not responding"
+      fi
+    done

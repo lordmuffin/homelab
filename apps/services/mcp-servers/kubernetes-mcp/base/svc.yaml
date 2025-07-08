@@ -1,0 +1,49 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kubernetes-mcp
+  namespace: mcp-servers
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  labels:
+    app.kubernetes.io/name: kubernetes-mcp
+    app.kubernetes.io/component: mcp-server
+    monitoring: "enabled"
+spec:
+  type: ClusterIP
+  ports:
+    - name: mcp
+      port: 3000
+      targetPort: 3000
+      protocol: TCP
+    - name: metrics
+      port: 9090
+      targetPort: 9090
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: kubernetes-mcp
+    app.kubernetes.io/component: mcp-server
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kubernetes-mcp-internal
+  namespace: mcp-servers
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+    kube-vip.io/vipHost: k8s-mcp.home.andrewpjackson.com
+  labels:
+    app.kubernetes.io/name: kubernetes-mcp
+    app.kubernetes.io/component: mcp-server-internal
+spec:
+  type: ClusterIP
+  ports:
+    - name: mcp
+      port: 3000
+      targetPort: 3000
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: kubernetes-mcp
+    app.kubernetes.io/component: mcp-server

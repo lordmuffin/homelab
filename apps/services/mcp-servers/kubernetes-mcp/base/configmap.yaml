@@ -1,0 +1,133 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubernetes-mcp-config
+  namespace: mcp-servers
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+data:
+  # Kubernetes Configuration
+  KUBERNETES_SERVICE_HOST: "kubernetes.default.svc.cluster.local"
+  KUBERNETES_SERVICE_PORT: "443"
+  KUBERNETES_CLUSTER_DOMAIN: "cluster.local"
+  
+  # MCP Server Configuration
+  MCP_SERVER_NAME: "kubernetes-mcp"
+  MCP_SERVER_VERSION: "1.0.0"
+  MCP_SERVER_DESCRIPTION: "MCP Server for Kubernetes Cluster Management"
+  
+  # API Configuration
+  API_TIMEOUT: "30000"
+  API_RETRY_COUNT: "3"
+  API_RETRY_DELAY: "1000"
+  
+  # Rate Limiting
+  RATE_LIMIT_ENABLED: "true"
+  RATE_LIMIT_REQUESTS_PER_MINUTE: "120"
+  
+  # Default Namespaces to Monitor
+  DEFAULT_NAMESPACES: |
+    - default
+    - kube-system
+    - kube-public
+    - argocd
+    - gitea
+    - mcp-servers
+    - monitoring
+    - services
+    - networking
+    - data
+  
+  # Supported Operations
+  SUPPORTED_OPERATIONS: |
+    cluster:
+      - get_cluster_info
+      - get_cluster_version
+      - get_cluster_nodes
+      - get_cluster_resources
+    namespaces:
+      - list_namespaces
+      - get_namespace
+      - create_namespace
+      - delete_namespace
+    pods:
+      - list_pods
+      - get_pod
+      - create_pod
+      - delete_pod
+      - get_pod_logs
+      - execute_pod_command
+    deployments:
+      - list_deployments
+      - get_deployment
+      - create_deployment
+      - update_deployment
+      - delete_deployment
+      - scale_deployment
+    services:
+      - list_services
+      - get_service
+      - create_service
+      - delete_service
+    configmaps:
+      - list_configmaps
+      - get_configmap
+      - create_configmap
+      - update_configmap
+      - delete_configmap
+    secrets:
+      - list_secrets
+      - get_secret
+      - create_secret
+      - delete_secret
+    ingress:
+      - list_ingresses
+      - get_ingress
+      - create_ingress
+      - delete_ingress
+    persistentvolumes:
+      - list_persistent_volumes
+      - get_persistent_volume
+      - list_persistent_volume_claims
+      - get_persistent_volume_claim
+    jobs:
+      - list_jobs
+      - get_job
+      - create_job
+      - delete_job
+    cronjobs:
+      - list_cronjobs
+      - get_cronjob
+      - create_cronjob
+      - delete_cronjob
+    events:
+      - list_events
+      - get_event
+    metrics:
+      - get_node_metrics
+      - get_pod_metrics
+    rbac:
+      - list_roles
+      - get_role
+      - list_rolebindings
+      - get_rolebinding
+      - list_clusterroles
+      - get_clusterrole
+      - list_clusterrolebindings
+      - get_clusterrolebinding
+  
+  # Claude Code Integration
+  claude_code_config: |
+    {
+      "mcpServers": {
+        "kubernetes": {
+          "command": "stdio",
+          "args": [],
+          "env": {
+            "KUBERNETES_SERVICE_HOST": "kubernetes-mcp.mcp-servers.svc.cluster.local",
+            "KUBERNETES_SERVICE_PORT": "3000",
+            "MCP_SERVER_NAME": "kubernetes-mcp"
+          }
+        }
+      }
+    }
