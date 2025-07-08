@@ -28,12 +28,12 @@ spec:
         - name: POSTGRES_USER
           valueFrom:
             secretKeyRef:
-              name: grill-monitoring-db-credentials
+              name: grill-monitoring-db-credentials-1password
               key: username
         - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: grill-monitoring-db-credentials
+              name: grill-monitoring-db-credentials-1password
               key: password
         - name: POSTGRES_DB
           value: grillstats
