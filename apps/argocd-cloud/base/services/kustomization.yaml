@@ -21,6 +21,7 @@ resources:
 - litellm.yaml
 - obsidian.yaml
 - grill-stats.yaml
+- mcp-servers.yaml
 
 namespace: argocd
 
