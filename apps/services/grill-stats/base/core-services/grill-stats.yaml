@@ -32,10 +32,7 @@ spec:
               name: grill-stats-secrets
               key: THERMOWORKS_API_KEY
         - name: HOMEASSISTANT_URL
-          valueFrom:
-            secretKeyRef:
-              name: grill-stats-secrets
-              key: HOMEASSISTANT_URL
+          value: "https://home.andrewpjackson.com"
         - name: HOMEASSISTANT_TOKEN
           valueFrom:
             secretKeyRef:
