@@ -53,3 +53,12 @@ spec:
           value: "300"
         - name: THERMOWORKS_POLLING_INTERVAL
           value: "300"
+        - name: ADMIN_EMAIL
+          value: "admin@lab.apj.dev"
+        - name: ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: grill-stats-prod-creds-1password
+              key: ADMIN_PASSWORD
+        - name: ADMIN_NAME
+          value: "Lab Administrator"
