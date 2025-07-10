@@ -99,9 +99,9 @@ spec:
     server: https://kubernetes.default.svc
   - namespace: couchdb
     server: https://kubernetes.default.svc
-  - namespace: grill-monitoring
+  - namespace: grill-stats
     server: https://kubernetes.default.svc
-  - namespace: grill-monitoring-dev
+  - namespace: grill-stats-dev
     server: https://kubernetes.default.svc
   - namespace: mcp-servers
     server: https://kubernetes.default.svc
