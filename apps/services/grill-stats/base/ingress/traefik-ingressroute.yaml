@@ -117,10 +117,9 @@ spec:
       services:
         - name: grill-stats
           port: 5000
-      # Temporarily removed middlewares for testing
-      # middlewares:
-      #   - name: grill-stats-headers
-      #   - name: grill-stats-compress
-      #   - name: grill-stats-ratelimit
+      middlewares:
+        - name: grill-stats-headers
+        - name: grill-stats-compress
+        - name: grill-stats-ratelimit
   tls:
     secretName: lab-apj-dev-tls
