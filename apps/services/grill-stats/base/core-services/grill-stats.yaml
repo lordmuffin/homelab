@@ -102,7 +102,7 @@ spec:
   selector:
     app: grill-stats
   ports:
-  - port: 80
+  - port: 5000
     targetPort: http
     name: http
   type: ClusterIP

@@ -14,3 +14,4 @@ patches:
 - path: patches/resources-patch.yaml
 - path: patches/grill-stats-ingress-patch.yaml
 - path: patches/grill-stats-env-patch.yaml
+- path: patches/remove-replicas-patch.yaml
