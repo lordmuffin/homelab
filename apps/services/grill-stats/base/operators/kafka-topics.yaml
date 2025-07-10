@@ -2,7 +2,7 @@ apiVersion: kafka.strimzi.io/v1beta2
 kind: KafkaTopic
 metadata:
   name: temperature-data
-  namespace: grill-monitoring
+  namespace: grill-stats
   labels:
     strimzi.io/cluster: grill-stats-kafka
 spec:
@@ -16,7 +16,7 @@ apiVersion: kafka.strimzi.io/v1beta2
 kind: KafkaTopic
 metadata:
   name: device-events
-  namespace: grill-monitoring
+  namespace: grill-stats
   labels:
     strimzi.io/cluster: grill-stats-kafka
 spec:
@@ -30,7 +30,7 @@ apiVersion: kafka.strimzi.io/v1beta2
 kind: KafkaTopic
 metadata:
   name: temperature-alerts
-  namespace: grill-monitoring
+  namespace: grill-stats
   labels:
     strimzi.io/cluster: grill-stats-kafka
 spec:

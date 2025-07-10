@@ -1,8 +1,8 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: grill-monitoring-config
-  namespace: grill-monitoring
+  name: grill-stats-config
+  namespace: grill-stats
 data:
   SYNC_INTERVAL: "300"
   TEMPERATURE_THRESHOLD_HIGH: "250"

@@ -2,7 +2,7 @@ apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute
 metadata:
   name: device-service-ingress
-  namespace: grill-monitoring
+  namespace: grill-stats
 spec:
   entryPoints:
     - websecure
@@ -23,7 +23,7 @@ apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute
 metadata:
   name: temperature-service-ingress
-  namespace: grill-monitoring
+  namespace: grill-stats
 spec:
   entryPoints:
     - websecure
@@ -44,7 +44,7 @@ apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute
 metadata:
   name: homeassistant-service-ingress
-  namespace: grill-monitoring
+  namespace: grill-stats
 spec:
   entryPoints:
     - websecure
@@ -65,7 +65,7 @@ apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute
 metadata:
   name: notification-service-ingress
-  namespace: grill-monitoring
+  namespace: grill-stats
 spec:
   entryPoints:
     - websecure
@@ -86,7 +86,7 @@ apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute
 metadata:
   name: data-processing-service-ingress
-  namespace: grill-monitoring
+  namespace: grill-stats
 spec:
   entryPoints:
     - websecure
@@ -107,7 +107,7 @@ apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute
 metadata:
   name: grill-stats-main-ingress
-  namespace: grill-monitoring
+  namespace: grill-stats
 spec:
   entryPoints:
     - websecure

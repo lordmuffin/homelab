@@ -7,4 +7,4 @@ resources:
 - networkpolicy.yaml
 - configmap.yaml
 - secret.yaml
-- grill-monitoring-db-credentials-1password.yaml
+- grill-stats-db-credentials-1password.yaml

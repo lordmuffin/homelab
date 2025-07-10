@@ -3,7 +3,7 @@ apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: grill-stats-db
-  namespace: grill-monitoring
+  namespace: grill-stats
   labels:
     app: grill-stats-db
     component: database
@@ -31,7 +31,7 @@ spec:
       database: grill-stats
       owner: grill-stats
       secret:
-        name: grill-monitoring-db-credentials-1password
+        name: grill-stats-db-credentials-1password
   storage:
     storageClass: sata
     size: 20Gi
@@ -52,7 +52,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: grill-stats-db
-  namespace: grill-monitoring
+  namespace: grill-stats
   labels:
     app: grill-stats-db
     component: database
@@ -69,7 +69,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: grill-stats-db-pvc
-  namespace: grill-monitoring
+  namespace: grill-stats
 spec:
   accessModes:
     - ReadWriteOnce

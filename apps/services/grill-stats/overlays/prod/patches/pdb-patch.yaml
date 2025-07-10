@@ -2,7 +2,7 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: device-service-pdb
-  namespace: grill-monitoring
+  namespace: grill-stats
 spec:
   minAvailable: 1
   selector:
@@ -13,7 +13,7 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: temperature-service-pdb
-  namespace: grill-monitoring
+  namespace: grill-stats
 spec:
   minAvailable: 1
   selector:
@@ -24,7 +24,7 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: homeassistant-service-pdb
-  namespace: grill-monitoring
+  namespace: grill-stats
 spec:
   minAvailable: 1
   selector:
@@ -35,7 +35,7 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: postgresql-pdb
-  namespace: grill-monitoring
+  namespace: grill-stats
 spec:
   minAvailable: 1
   selector:
@@ -46,7 +46,7 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: influxdb-pdb
-  namespace: grill-monitoring
+  namespace: grill-stats
 spec:
   minAvailable: 1
   selector:

@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: influxdb
-  namespace: grill-monitoring
+  namespace: grill-stats
   labels:
     app.kubernetes.io/name: influxdb
     app.kubernetes.io/part-of: grill-stats
@@ -32,12 +32,12 @@ spec:
         - name: INFLUXDB_ADMIN_USER
           valueFrom:
             secretKeyRef:
-              name: grill-monitoring-secrets
+              name: grill-stats-secrets
               key: DB_USERNAME
         - name: INFLUXDB_ADMIN_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: grill-monitoring-secrets
+              name: grill-stats-secrets
               key: DB_PASSWORD
         - name: INFLUXDB_HTTP_AUTH_ENABLED
           value: "true"
@@ -72,7 +72,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: influxdb-service
-  namespace: grill-monitoring
+  namespace: grill-stats
   labels:
     app.kubernetes.io/name: influxdb
     app.kubernetes.io/part-of: grill-stats
@@ -89,7 +89,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: influxdb-pvc
-  namespace: grill-monitoring
+  namespace: grill-stats
 spec:
   accessModes:
     - ReadWriteOnce

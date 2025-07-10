@@ -2,7 +2,7 @@ apiVersion: traefik.containo.us/v1alpha1
 kind: Middleware
 metadata:
   name: grill-stats-headers
-  namespace: grill-monitoring
+  namespace: grill-stats
 spec:
   headers:
     frameDeny: true
@@ -19,7 +19,7 @@ apiVersion: traefik.containo.us/v1alpha1
 kind: Middleware
 metadata:
   name: grill-stats-compress
-  namespace: grill-monitoring
+  namespace: grill-stats
 spec:
   compress: {}
 ---
@@ -27,7 +27,7 @@ apiVersion: traefik.containo.us/v1alpha1
 kind: Middleware
 metadata:
   name: grill-stats-ratelimit
-  namespace: grill-monitoring
+  namespace: grill-stats
 spec:
   rateLimit:
     average: 100

@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: device-service
-  namespace: grill-monitoring
+  namespace: grill-stats
 spec:
   template:
     spec:
@@ -20,7 +20,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: temperature-service
-  namespace: grill-monitoring
+  namespace: grill-stats
 spec:
   template:
     spec:
@@ -38,7 +38,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: influxdb
-  namespace: grill-monitoring
+  namespace: grill-stats
 spec:
   template:
     spec:

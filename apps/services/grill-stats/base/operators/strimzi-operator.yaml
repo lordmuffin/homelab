@@ -2,7 +2,7 @@ apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
   name: strimzi-kafka-operator
-  namespace: grill-monitoring
+  namespace: grill-stats
 spec:
   channel: stable
   name: strimzi-kafka-operator
@@ -13,7 +13,7 @@ apiVersion: kafka.strimzi.io/v1beta2
 kind: Kafka
 metadata:
   name: grill-stats-kafka
-  namespace: grill-monitoring
+  namespace: grill-stats
 spec:
   kafka:
     version: 3.3.1

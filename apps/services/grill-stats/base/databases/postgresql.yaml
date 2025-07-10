@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: postgresql
-  namespace: grill-monitoring
+  namespace: grill-stats
   labels:
     app.kubernetes.io/name: postgresql
     app.kubernetes.io/part-of: grill-stats
@@ -30,12 +30,12 @@ spec:
         - name: POSTGRES_USER
           valueFrom:
             secretKeyRef:
-              name: grill-monitoring-secrets
+              name: grill-stats-secrets
               key: DB_USERNAME
         - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: grill-monitoring-secrets
+              name: grill-stats-secrets
               key: DB_PASSWORD
         - name: POSTGRES_DB
           value: grill_monitoring
@@ -68,7 +68,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: postgresql-service
-  namespace: grill-monitoring
+  namespace: grill-stats
   labels:
     app.kubernetes.io/name: postgresql
     app.kubernetes.io/part-of: grill-stats
@@ -85,7 +85,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: postgresql-pvc
-  namespace: grill-monitoring
+  namespace: grill-stats
 spec:
   accessModes:
     - ReadWriteOnce

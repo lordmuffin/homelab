@@ -1,7 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-namespace: grill-monitoring
+namespace: grill-stats
 
 resources:
 - ../../base
@@ -13,65 +13,4 @@ resources:
 patches:
 - path: patches/resources-patch.yaml
 - path: patches/grill-stats-ingress-patch.yaml
-- target:
-    kind: Deployment
-    name: grill-stats
-  patch: |-
-    - op: replace
-      path: /spec/template/spec/containers/0/env
-      value:
-      # ThermoWorks Configuration
-      - name: THERMOWORKS_API_KEY
-        valueFrom:
-          secretKeyRef:
-            name: grill-stats-prod-creds-1password
-            key: THERMOWORKS_API_KEY
-      
-      # Home Assistant Configuration  
-      - name: HOMEASSISTANT_URL
-        value: "http://homeassistant.home.svc.cluster.local:8123"
-      - name: HOMEASSISTANT_TOKEN
-        valueFrom:
-          secretKeyRef:
-            name: grill-stats-prod-creds-1password
-            key: HOMEASSISTANT_TOKEN
-      
-      # Database Configuration
-      - name: POSTGRES_USER
-        valueFrom:
-          secretKeyRef:
-            name: grill-stats-prod-creds-1password
-            key: DB_USERNAME
-      - name: POSTGRES_PASSWORD
-        valueFrom:
-          secretKeyRef:
-            name: grill-stats-prod-creds-1password
-            key: DB_PASSWORD
-      - name: POSTGRES_DB
-        value: grillstats
-      - name: DATABASE_URL
-        value: postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@grill-stats-db.grill-monitoring.svc.cluster.local:5432/$(POSTGRES_DB)
-      
-      # Redis Configuration
-      - name: REDIS_PASSWORD
-        valueFrom:
-          secretKeyRef:
-            name: grill-stats-prod-creds-1password
-            key: REDIS_PASSWORD
-      - name: REDIS_URL
-        value: redis://:$(REDIS_PASSWORD)@redis.grill-monitoring.svc.cluster.local:6379/0
-      
-      # Flask Configuration
-      - name: SECRET_KEY
-        valueFrom:
-          secretKeyRef:
-            name: grill-stats-prod-creds-1password
-            key: SECRET_KEY
-      - name: FLASK_ENV
-        value: production
-      
-      # Application Configuration
-      - name: SYNC_INTERVAL
-        value: "300"
-      - name: THERMOWORKS_POLLING_INTERVAL
-        value: "300"
+- path: patches/grill-stats-env-patch.yaml

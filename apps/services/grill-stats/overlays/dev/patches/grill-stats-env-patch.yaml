@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: grill-stats
-  namespace: grill-monitoring-dev
+  namespace: grill-stats-dev
 spec:
   template:
     spec:
@@ -39,7 +39,7 @@ spec:
         - name: POSTGRES_DB
           value: grillstats
         - name: DATABASE_URL
-          value: postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@grill-stats-db.grill-monitoring-dev.svc.cluster.local:5432/$(POSTGRES_DB)
+          value: postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@grill-stats-db.grill-stats-dev.svc.cluster.local:5432/$(POSTGRES_DB)
         
         # Redis Configuration
         - name: REDIS_PASSWORD
@@ -48,7 +48,7 @@ spec:
               name: grill-stats-dev-creds-1password
               key: redis-password
         - name: REDIS_URL
-          value: redis://:$(REDIS_PASSWORD)@redis.grill-monitoring-dev.svc.cluster.local:6379/0
+          value: redis://:$(REDIS_PASSWORD)@redis.grill-stats-dev.svc.cluster.local:6379/0
         
         # Flask Configuration
         - name: SECRET_KEY

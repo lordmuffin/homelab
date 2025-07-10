@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: temperature-service
-  namespace: grill-monitoring
+  namespace: grill-stats
   labels:
     app.kubernetes.io/name: temperature-service
     app.kubernetes.io/part-of: grill-stats
@@ -34,47 +34,47 @@ spec:
         - name: THERMOWORKS_API_KEY
           valueFrom:
             secretKeyRef:
-              name: grill-monitoring-secrets
+              name: grill-stats-secrets
               key: THERMOWORKS_API_KEY
         - name: INFLUXDB_HOST
           valueFrom:
             configMapKeyRef:
-              name: grill-monitoring-config
+              name: grill-stats-config
               key: INFLUXDB_HOST
         - name: DB_USERNAME
           valueFrom:
             secretKeyRef:
-              name: grill-monitoring-secrets
+              name: grill-stats-secrets
               key: DB_USERNAME
         - name: DB_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: grill-monitoring-secrets
+              name: grill-stats-secrets
               key: DB_PASSWORD
         - name: REDIS_HOST
           valueFrom:
             configMapKeyRef:
-              name: grill-monitoring-config
+              name: grill-stats-config
               key: REDIS_HOST
         - name: REDIS_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: grill-monitoring-secrets
+              name: grill-stats-secrets
               key: REDIS_PASSWORD
         - name: SYNC_INTERVAL
           valueFrom:
             configMapKeyRef:
-              name: grill-monitoring-config
+              name: grill-stats-config
               key: SYNC_INTERVAL
         - name: TEMPERATURE_THRESHOLD_HIGH
           valueFrom:
             configMapKeyRef:
-              name: grill-monitoring-config
+              name: grill-stats-config
               key: TEMPERATURE_THRESHOLD_HIGH
         - name: TEMPERATURE_THRESHOLD_LOW
           valueFrom:
             configMapKeyRef:
-              name: grill-monitoring-config
+              name: grill-stats-config
               key: TEMPERATURE_THRESHOLD_LOW
         - name: OTEL_SERVICE_NAME
           value: temperature-service
@@ -108,7 +108,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: temperature-service
-  namespace: grill-monitoring
+  namespace: grill-stats
   labels:
     app.kubernetes.io/name: temperature-service
     app.kubernetes.io/part-of: grill-stats

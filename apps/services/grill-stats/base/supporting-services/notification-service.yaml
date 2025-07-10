@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: notification-service
-  namespace: grill-monitoring
+  namespace: grill-stats
   labels:
     app.kubernetes.io/name: notification-service
     app.kubernetes.io/part-of: grill-stats
@@ -34,24 +34,24 @@ spec:
         - name: REDIS_HOST
           valueFrom:
             configMapKeyRef:
-              name: grill-monitoring-config
+              name: grill-stats-config
               key: REDIS_HOST
         - name: REDIS_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: grill-monitoring-secrets
+              name: grill-stats-secrets
               key: REDIS_PASSWORD
         - name: KAFKA_BOOTSTRAP_SERVERS
           value: "kafka:9092"
         - name: TEMPERATURE_THRESHOLD_HIGH
           valueFrom:
             configMapKeyRef:
-              name: grill-monitoring-config
+              name: grill-stats-config
               key: TEMPERATURE_THRESHOLD_HIGH
         - name: TEMPERATURE_THRESHOLD_LOW
           valueFrom:
             configMapKeyRef:
-              name: grill-monitoring-config
+              name: grill-stats-config
               key: TEMPERATURE_THRESHOLD_LOW
         - name: OTEL_SERVICE_NAME
           value: notification-service
@@ -85,7 +85,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: notification-service
-  namespace: grill-monitoring
+  namespace: grill-stats
   labels:
     app.kubernetes.io/name: notification-service
     app.kubernetes.io/part-of: grill-stats

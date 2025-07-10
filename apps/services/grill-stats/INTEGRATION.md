@@ -43,14 +43,14 @@ The application requires several secrets to function properly:
 
 ```bash
 # API keys
-kubectl create secret generic grill-monitoring-secrets \
-  --namespace grill-monitoring \
+kubectl create secret generic grill-stats-secrets \
+  --namespace grill-stats \
   --from-literal=thermoworks-api-key=your-api-key \
   --from-literal=homeassistant-token=your-token
 
 # Database credentials
-kubectl create secret generic grill-monitoring-db-credentials \
-  --namespace grill-monitoring \
+kubectl create secret generic grill-stats-db-credentials \
+  --namespace grill-stats \
   --from-literal=username=grill-admin \
   --from-literal=password=$(openssl rand -base64 20)
 ```
