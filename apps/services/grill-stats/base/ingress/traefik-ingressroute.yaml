@@ -122,4 +122,4 @@ spec:
         - name: grill-stats-compress
         - name: grill-stats-ratelimit
   tls:
-    secretName: grill-stats-tls
+    secretName: lab-apj-dev-tls

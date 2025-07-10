@@ -119,8 +119,8 @@ metadata:
 spec:
   tls:
   - hosts:
-    - grills.lab.apj.dev  # Will be patched by overlay
-    secretName: grill-stats-tls
+    - grill-stats.lab.apj.dev  # Will be patched by overlay
+    secretName: lab-apj-dev-tls
   rules:
   - host: grills.lab.apj.dev  # Will be patched by overlay
     http:
