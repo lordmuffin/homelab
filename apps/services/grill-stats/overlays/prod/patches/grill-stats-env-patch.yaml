@@ -32,7 +32,7 @@ spec:
               name: grill-stats-prod-creds-1password
               key: DB_PASSWORD
         - name: POSTGRES_DB
-          value: grillstats
+          value: grill-stats
         - name: DATABASE_URL
           value: postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@grill-stats-db-rw.grill-stats.svc.cluster.local:5432/$(POSTGRES_DB)
         - name: REDIS_PASSWORD
