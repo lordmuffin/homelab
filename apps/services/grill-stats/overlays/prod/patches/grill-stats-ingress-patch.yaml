@@ -7,7 +7,7 @@ spec:
   tls:
   - hosts:
     - grill-stats.lab.apj.dev
-    secretName: grill-stats-tls
+    secretName: lab-apj-dev-tls
   rules:
   - host: grill-stats.lab.apj.dev
     http:

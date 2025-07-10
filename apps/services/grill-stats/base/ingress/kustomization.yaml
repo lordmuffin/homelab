@@ -4,4 +4,3 @@ kind: Kustomization
 resources:
 - traefik-middleware.yaml
 - traefik-ingressroute.yaml
-- cert-issuer.yaml
