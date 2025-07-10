@@ -7,6 +7,8 @@ metadata:
   labels:
     app: grill-stats
     component: monitoring
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/part-of: grill-stats
 spec:
   replicas: 1
   selector:
@@ -17,6 +19,8 @@ spec:
       labels:
         app: grill-stats
         component: monitoring
+        app.kubernetes.io/name: grill-stats
+        app.kubernetes.io/part-of: grill-stats
     spec:
       containers:
       - name: grill-stats
@@ -98,6 +102,8 @@ metadata:
   labels:
     app: grill-stats
     component: monitoring
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/part-of: grill-stats
 spec:
   selector:
     app: grill-stats
