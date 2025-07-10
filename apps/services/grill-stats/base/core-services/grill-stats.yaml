@@ -41,28 +41,28 @@ spec:
         - name: POSTGRES_USER
           valueFrom:
             secretKeyRef:
-              name: grill-stats-secrets
+              name: grill-stats-prod-creds-1password
               key: DB_USERNAME
         - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: grill-stats-secrets
+              name: grill-stats-prod-creds-1password
               key: DB_PASSWORD
         - name: POSTGRES_DB
-          value: grillstats
+          value: grill-stats
         - name: DATABASE_URL
           value: postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@grill-stats-db-rw.grill-stats.svc.cluster.local:5432/$(POSTGRES_DB)
         - name: REDIS_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: grill-stats-secrets
+              name: grill-stats-prod-creds-1password
               key: REDIS_PASSWORD
         - name: REDIS_URL
           value: redis://:$(REDIS_PASSWORD)@redis.grill-stats.svc.cluster.local:6379/0
         - name: SECRET_KEY
           valueFrom:
             secretKeyRef:
-              name: grill-stats-secrets
+              name: grill-stats-prod-creds-1password
               key: SECRET_KEY
         - name: FLASK_ENV
           value: development
