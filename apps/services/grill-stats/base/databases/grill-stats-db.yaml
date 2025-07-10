@@ -31,7 +31,7 @@ spec:
       database: grill-stats
       owner: grill-stats
       secret:
-        name: grill-stats-db-credentials-1password
+        name: grill-stats-prod-creds-1password
   storage:
     storageClass: ssd
     size: 20Gi
