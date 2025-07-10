@@ -3,3 +3,4 @@ kind: Kustomization
 
 resources:
 - dns-policy.yaml
+- db-policy.yaml
