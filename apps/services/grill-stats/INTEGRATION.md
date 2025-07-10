@@ -43,7 +43,7 @@ The application requires several secrets to function properly:
 
 ```bash
 # API keys and application secrets
-kubectl create secret generic grill-stats-secrets \
+kubectl create secret generic grill-stats-prod-creds-1password \
   --namespace grill-stats \
   --from-literal=thermoworks-api-key=your-api-key \
   --from-literal=homeassistant-token=your-token \

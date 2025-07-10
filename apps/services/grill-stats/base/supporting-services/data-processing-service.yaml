@@ -39,12 +39,12 @@ spec:
         - name: DB_USERNAME
           valueFrom:
             secretKeyRef:
-              name: grill-stats-secrets
+              name: grill-stats-prod-creds-1password
               key: DB_USERNAME
         - name: DB_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: grill-stats-secrets
+              name: grill-stats-prod-creds-1password
               key: DB_PASSWORD
         - name: KAFKA_BOOTSTRAP_SERVERS
           value: "kafka:9092"

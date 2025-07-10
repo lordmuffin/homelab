@@ -34,12 +34,12 @@ spec:
         - name: HOMEASSISTANT_URL
           valueFrom:
             secretKeyRef:
-              name: grill-stats-secrets
+              name: grill-stats-prod-creds-1password
               key: HOMEASSISTANT_URL
         - name: HOMEASSISTANT_TOKEN
           valueFrom:
             secretKeyRef:
-              name: grill-stats-secrets
+              name: grill-stats-prod-creds-1password
               key: HOMEASSISTANT_TOKEN
         - name: REDIS_HOST
           valueFrom:
@@ -49,7 +49,7 @@ spec:
         - name: REDIS_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: grill-stats-secrets
+              name: grill-stats-prod-creds-1password
               key: REDIS_PASSWORD
         - name: OTEL_SERVICE_NAME
           value: homeassistant-service

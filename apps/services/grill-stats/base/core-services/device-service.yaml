@@ -35,7 +35,7 @@ spec:
         - name: THERMOWORKS_API_KEY
           valueFrom:
             secretKeyRef:
-              name: grill-stats-secrets
+              name: grill-stats-prod-creds-1password
               key: THERMOWORKS_API_KEY
         - name: DB_HOST
           valueFrom:
@@ -45,22 +45,22 @@ spec:
         - name: DB_USERNAME
           valueFrom:
             secretKeyRef:
-              name: grill-stats-secrets
+              name: grill-stats-prod-creds-1password
               key: DB_USERNAME
         - name: DB_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: grill-stats-secrets
+              name: grill-stats-prod-creds-1password
               key: DB_PASSWORD
         - name: HOMEASSISTANT_URL
           valueFrom:
             secretKeyRef:
-              name: grill-stats-secrets
+              name: grill-stats-prod-creds-1password
               key: HOMEASSISTANT_URL
         - name: HOMEASSISTANT_TOKEN
           valueFrom:
             secretKeyRef:
-              name: grill-stats-secrets
+              name: grill-stats-prod-creds-1password
               key: HOMEASSISTANT_TOKEN
         - name: OTEL_SERVICE_NAME
           value: device-service

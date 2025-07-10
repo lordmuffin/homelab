@@ -32,12 +32,12 @@ spec:
         - name: INFLUXDB_ADMIN_USER
           valueFrom:
             secretKeyRef:
-              name: grill-stats-secrets
+              name: grill-stats-prod-creds-1password
               key: DB_USERNAME
         - name: INFLUXDB_ADMIN_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: grill-stats-secrets
+              name: grill-stats-prod-creds-1password
               key: DB_PASSWORD
         - name: INFLUXDB_HTTP_AUTH_ENABLED
           value: "true"
