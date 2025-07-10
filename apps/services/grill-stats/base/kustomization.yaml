@@ -7,3 +7,4 @@ resources:
 - ./core-services
 - ./supporting-services
 - ./ingress
+- ./networkpolicy
