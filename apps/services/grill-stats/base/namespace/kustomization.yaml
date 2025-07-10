@@ -5,6 +5,7 @@ resources:
 - namespace.yaml
 - resourcequota.yaml
 - networkpolicy.yaml
+- networkpolicy-api-access.yaml
 - configmap.yaml
 - secret.yaml
 - grill-stats-db-credentials-1password.yaml
