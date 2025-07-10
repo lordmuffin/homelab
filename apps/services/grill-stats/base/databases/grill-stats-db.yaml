@@ -33,7 +33,7 @@ spec:
       secret:
         name: grill-stats-db-credentials-1password
   storage:
-    storageClass: sata
+    storageClass: ssd
     size: 20Gi
   monitoring:
     enablePodMonitor: true
