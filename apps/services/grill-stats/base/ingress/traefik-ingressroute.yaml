@@ -116,7 +116,7 @@ spec:
       kind: Rule
       services:
         - name: grill-stats
-          port: 80
+          port: 5000
       middlewares:
         - name: grill-stats-headers
         - name: grill-stats-compress
