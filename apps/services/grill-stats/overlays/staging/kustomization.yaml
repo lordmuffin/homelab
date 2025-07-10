@@ -12,7 +12,7 @@ patches:
 - path: patches/grill-stats-ingress-patch.yaml
 - target:
     kind: ConfigMap
-    name: grill-stats-config
+    name: grill-stats-prod-creds-1password
   patch: |-
     - op: replace
       path: /data/SYNC_INTERVAL

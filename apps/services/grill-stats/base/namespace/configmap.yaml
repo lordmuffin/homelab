@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: grill-stats-config
+  name: grill-stats-prod-creds-1password
   namespace: grill-stats
 data:
   SYNC_INTERVAL: "300"

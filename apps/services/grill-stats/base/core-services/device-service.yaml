@@ -40,7 +40,7 @@ spec:
         - name: DB_HOST
           valueFrom:
             configMapKeyRef:
-              name: grill-stats-config
+              name: grill-stats-prod-creds-1password
               key: DB_HOST
         - name: DB_USERNAME
           valueFrom:

@@ -34,7 +34,7 @@ spec:
         - name: REDIS_HOST
           valueFrom:
             configMapKeyRef:
-              name: grill-stats-config
+              name: grill-stats-prod-creds-1password
               key: REDIS_HOST
         - name: REDIS_PASSWORD
           valueFrom:
@@ -46,12 +46,12 @@ spec:
         - name: TEMPERATURE_THRESHOLD_HIGH
           valueFrom:
             configMapKeyRef:
-              name: grill-stats-config
+              name: grill-stats-prod-creds-1password
               key: TEMPERATURE_THRESHOLD_HIGH
         - name: TEMPERATURE_THRESHOLD_LOW
           valueFrom:
             configMapKeyRef:
-              name: grill-stats-config
+              name: grill-stats-prod-creds-1password
               key: TEMPERATURE_THRESHOLD_LOW
         - name: OTEL_SERVICE_NAME
           value: notification-service
