@@ -110,7 +110,7 @@ metadata:
   namespace: grill-stats
 spec:
   entryPoints:
-    - websecure
+    - web
   routes:
     - match: Host(`grill-stats.lab.apj.dev`)
       kind: Rule
@@ -121,5 +121,3 @@ spec:
         - name: grill-stats-headers
         - name: grill-stats-compress
         - name: grill-stats-ratelimit
-  tls:
-    secretName: lab-apj-dev-tls
