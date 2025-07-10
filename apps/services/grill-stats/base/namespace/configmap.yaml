@@ -15,3 +15,7 @@ data:
   REDIS_STREAM_DEVICE_EVENTS: "device-events"
   REDIS_STREAM_TEMPERATURE_ALERTS: "temperature-alerts"
   MESSAGE_BROKER_TYPE: "redis"
+  # Production admin user (will be created on startup if not exists)
+  ADMIN_EMAIL: "admin@lab.apj.dev"
+  ADMIN_PASSWORD: "GrillStats2024!"
+  ADMIN_NAME: "Lab Administrator"
