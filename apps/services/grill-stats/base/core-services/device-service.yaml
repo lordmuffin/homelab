@@ -32,6 +32,8 @@ spec:
         - containerPort: 8080
           name: http
         env:
+        - name: MOCK_MODE
+          value: true
         - name: THERMOWORKS_API_KEY
           valueFrom:
             secretKeyRef:
