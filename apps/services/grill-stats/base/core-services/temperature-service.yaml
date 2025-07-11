@@ -25,7 +25,7 @@ spec:
     spec:
       containers:
       - name: temperature-service
-        image: grill-stats/temperature-service:latest
+        image: lordmuffin/grill-stats-temperature-service:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 8080

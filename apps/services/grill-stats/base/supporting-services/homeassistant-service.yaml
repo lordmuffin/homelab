@@ -25,7 +25,7 @@ spec:
     spec:
       containers:
       - name: homeassistant-service
-        image: grill-stats/homeassistant-service:latest
+        image: lordmuffin/grill-stats-homeassistant-service:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 8080

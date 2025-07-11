@@ -25,7 +25,7 @@ spec:
     spec:
       containers:
       - name: data-processing-service
-        image: grill-stats/data-processing-service:latest
+        image: lordmuffin/grill-stats-data-processing-service:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 8080

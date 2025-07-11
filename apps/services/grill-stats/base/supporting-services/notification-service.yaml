@@ -25,7 +25,7 @@ spec:
     spec:
       containers:
       - name: notification-service
-        image: grill-stats/notification-service:latest
+        image: lordmuffin/grill-stats-notification-service:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 8080
