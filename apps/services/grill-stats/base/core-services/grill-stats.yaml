@@ -52,6 +52,16 @@ spec:
             secretKeyRef:
               name: grill-stats-prod-creds-1password
               key: DB_PASSWORD
+        - name: DB_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: grill-stats-prod-creds-1password
+              key: DB_USERNAME
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: grill-stats-prod-creds-1password
+              key: DB_PASSWORD
         - name: POSTGRES_DB
           value: grill-stats
         - name: DATABASE_URL
