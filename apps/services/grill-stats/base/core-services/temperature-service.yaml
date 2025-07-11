@@ -61,6 +61,16 @@ spec:
             secretKeyRef:
               name: grill-stats-prod-creds-1password
               key: REDIS_PASSWORD
+        - name: HOMEASSISTANT_URL
+          valueFrom:
+            secretKeyRef:
+              name: grill-stats-prod-creds-1password
+              key: HOMEASSISTANT_URL
+        - name: HOMEASSISTANT_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: grill-stats-prod-creds-1password
+              key: HOMEASSISTANT_TOKEN
         - name: SYNC_INTERVAL
           valueFrom:
             configMapKeyRef:
