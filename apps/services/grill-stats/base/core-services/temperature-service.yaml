@@ -99,11 +99,17 @@ spec:
             port: 8080
           initialDelaySeconds: 15
           periodSeconds: 20
+        volumeMounts:
+        - name: app-instance
+          mountPath: /app/instance
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
         runAsGroup: 1000
         fsGroup: 1000
+      volumes:
+      - name: app-instance
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
@@ -122,9 +128,3 @@ spec:
     targetPort: http
     name: http
   type: ClusterIP
-  volumes:
-  - name: app-instance
-    emptyDir: {}
-  volumeMounts:
-  - name: app-instance
-    mountPath: /app/instance
