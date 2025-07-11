@@ -1,0 +1,35 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grill-stats
+  namespace: grill-stats-dev
+  annotations:
+    # Development-specific annotations
+    traefik.ingress.kubernetes.io/router.tls: "false"
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  # No TLS for development - HTTP only
+  rules:
+  - host: grill-stats-dev.lab.apj.dev
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: grill-stats
+            port:
+              number: 5000
+  # Alternative localhost development access
+  - host: localhost
+    http:
+      paths:
+      - path: /grill-stats-dev
+        pathType: Prefix
+        backend:
+          service:
+            name: grill-stats
+            port:
+              number: 5000

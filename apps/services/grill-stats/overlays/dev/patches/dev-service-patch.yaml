@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: grill-stats
+  namespace: grill-stats-dev
+  labels:
+    environment: development
+  annotations:
+    description: "Development grill-stats service with debug access"
+spec:
+  ports:
+  - port: 5000
+    targetPort: 5000
+    name: http
+    protocol: TCP
+  - port: 5678
+    targetPort: 5678
+    name: debug
+    protocol: TCP
+  type: ClusterIP
+---
+# NodePort service for easy local development access
+apiVersion: v1
+kind: Service
+metadata:
+  name: grill-stats-nodeport
+  namespace: grill-stats-dev
+  labels:
+    environment: development
+    service-type: nodeport
+spec:
+  type: NodePort
+  ports:
+  - port: 5000
+    targetPort: 5000
+    nodePort: 30500
+    name: http
+  selector:
+    app.kubernetes.io/name: grill-stats
