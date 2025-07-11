@@ -33,7 +33,7 @@ spec:
           name: http
         env:
         - name: MOCK_MODE
-          value: true
+          value: false
         - name: THERMOWORKS_API_KEY
           valueFrom:
             secretKeyRef:

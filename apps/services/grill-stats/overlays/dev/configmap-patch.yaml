@@ -1,6 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: grill-stats-prod-creds-1password
-data:
-  SYNC_INTERVAL: "60"  # Faster sync for dev environment

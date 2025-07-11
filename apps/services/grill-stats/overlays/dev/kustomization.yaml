@@ -6,8 +6,25 @@ namespace: grill-stats-dev
 resources:
 - ../../base
 - ./secrets/grill-stats-dev-creds-1password.yaml
+- ./patches/dev-namespace-patch.yaml
 
 patches:
-- path: ./patches/grill-stats-env-patch.yaml
-- path: ./patches/device-service-env-patch.yaml  
-- path: ./patches/temperature-service-env-patch.yaml
+- path: patches/dev-resources-patch.yaml
+- path: patches/dev-ingress-patch.yaml
+- path: patches/dev-env-patch.yaml
+- path: patches/dev-replicas-patch.yaml
+- path: patches/dev-service-patch.yaml
+
+namePrefix: dev-
+
+commonLabels:
+  environment: development
+  app.kubernetes.io/instance: grill-stats-dev
+
+configMapGenerator:
+- name: grill-stats-dev-config
+  literals:
+  - MOCK_MODE=true
+  - FLASK_ENV=development
+  - DEBUG=true
+  - LOG_LEVEL=DEBUG
