@@ -8,6 +8,29 @@ resource "vault_auth_backend" "userpass" {
   }
 }
 
+# Kubernetes authentication backend for service accounts
+resource "vault_auth_backend" "kubernetes" {
+  type = "kubernetes"
+  path = "kubernetes"
+}
+
+# Configure the Kubernetes auth backend
+resource "vault_kubernetes_auth_backend_config" "config" {
+  backend         = vault_auth_backend.kubernetes.path
+  kubernetes_host = var.kubernetes_host
+}
+
+# Kubernetes auth role for grill-stats service
+resource "vault_kubernetes_auth_backend_role" "grill_stats" {
+  backend                          = vault_auth_backend.kubernetes.path
+  role_name                        = "grill-stats-role"
+  bound_service_account_names      = ["grill-stats-service-account"]
+  bound_service_account_namespaces = ["grill-stats"]
+  token_ttl                        = 3600
+  token_max_ttl                    = 7200
+  token_policies                   = ["grill-stats-transit-policy"]
+}
+
 # Userpass Backend
 resource "vault_identity_entity" "entity" {
   name = var.admin_username

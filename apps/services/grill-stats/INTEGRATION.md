@@ -29,7 +29,7 @@ Create a Kubernetes secret for pulling from your Gitea registry:
 
 ```bash
 kubectl create secret docker-registry gitea-registry \
-  --namespace grill-monitoring \
+  --namespace grill-stats \
   --docker-server=gitea-internal \
   --docker-username=your-gitea-username \
   --docker-password=your-gitea-password
@@ -100,7 +100,7 @@ To customize for your environment, update the `HOMEASSISTANT_URL` value in:
        path: apps/services/grill-stats
      destination:
        server: https://kubernetes.default.svc
-       namespace: grill-monitoring
+       namespace: grill-stats
      syncPolicy:
        automated:
          prune: true

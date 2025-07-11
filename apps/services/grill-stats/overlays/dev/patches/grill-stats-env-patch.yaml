@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: grill-stats
-  namespace: grill-stats-dev
+  namespace: grill-stats
 spec:
   template:
     spec:
