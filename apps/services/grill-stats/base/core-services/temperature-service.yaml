@@ -122,3 +122,9 @@ spec:
     targetPort: http
     name: http
   type: ClusterIP
+  volumes:
+  - name: app-instance
+    emptyDir: {}
+  volumeMounts:
+  - name: app-instance
+    mountPath: /app/instance
