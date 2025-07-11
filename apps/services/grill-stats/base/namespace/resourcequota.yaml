@@ -9,7 +9,7 @@ spec:
     requests.memory: 12Gi
     limits.cpu: "12"
     limits.memory: 20Gi
-    persistentvolumeclaims: "15"
-    pods: "50"
-    services: "20"
+    persistentvolumeclaims: "25"
+    pods: "75"
+    services: "25"
     services.loadbalancers: "2"
