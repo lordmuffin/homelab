@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: grill-stats
+  name: grill-stats-dev
   annotations:
     argocd-image-updater.argoproj.io/image-list: grill-stats=lordmuffin/grill-stats:latest
     argocd-image-updater.argoproj.io/write-back-method: git
