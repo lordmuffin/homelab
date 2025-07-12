@@ -2,6 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: grill-stats
+  namespace: grill-stats-dev
   labels:
     environment: development
   annotations:
@@ -23,6 +24,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: grill-stats-nodeport
+  namespace: grill-stats-dev
   labels:
     environment: development
     service-type: nodeport

@@ -2,6 +2,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: grill-stats
+  namespace: grill-stats-dev
   annotations:
     # Development-specific annotations
     traefik.ingress.kubernetes.io/router.tls: "false"

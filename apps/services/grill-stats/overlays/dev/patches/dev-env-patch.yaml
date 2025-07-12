@@ -3,6 +3,7 @@ kind: Deployment
 metadata:
   name: grill-stats
 spec:
+  replicas: 1
   template:
     spec:
       containers:
@@ -17,70 +18,22 @@ spec:
           value: "true"
         - name: LOG_LEVEL
           value: DEBUG
-        
-        # Development API credentials (placeholder values)
-        - name: THERMOWORKS_API_KEY
-          valueFrom:
-            secretKeyRef:
-              name: grill-stats-dev-creds-1password
-              key: THERMOWORKS_API_KEY
-        
-        # Development Home Assistant (local/test instance)
-        - name: HOMEASSISTANT_URL
-          value: "http://dev-homeassistant.grill-stats-dev.svc.cluster.local:8123"
-        - name: HOMEASSISTANT_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: grill-stats-dev-creds-1password
-              key: HOMEASSISTANT_TOKEN
-        
-        # Development database configuration
-        - name: POSTGRES_USER
-          valueFrom:
-            secretKeyRef:
-              name: grill-stats-dev-creds-1password
-              key: DB_USERNAME
-        - name: POSTGRES_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: grill-stats-dev-creds-1password
-              key: DB_PASSWORD
-        - name: POSTGRES_DB
-          value: grill-stats-dev
-        - name: DATABASE_URL
-          value: postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@dev-grill-stats-db-rw.grill-stats-dev.svc.cluster.local:5432/$(POSTGRES_DB)
-        
-        # Development Redis configuration
-        - name: REDIS_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: grill-stats-dev-creds-1password
-              key: REDIS_PASSWORD
-        - name: REDIS_URL
-          value: redis://:$(REDIS_PASSWORD)@dev-redis.grill-stats-dev.svc.cluster.local:6379/0
-        
-        # Development security
         - name: SECRET_KEY
           value: "dev-flask-secret-key-not-for-production"
-        
-        # Development sync intervals (faster for testing)
-        - name: SYNC_INTERVAL
-          value: "60"
-        - name: THERMOWORKS_POLLING_INTERVAL
-          value: "30"
-        
-        # Development admin user
         - name: ADMIN_EMAIL
           value: "dev@localhost"
         - name: ADMIN_PASSWORD
           value: "dev123"
         - name: ADMIN_NAME
           value: "Development Admin"
-        
-        # Development-specific settings
-        - name: ENABLE_CORS
-          value: "true"
         - name: DEVELOPMENT_MODE
           value: "true"
         - name: AUTO_RELOAD
           value: "true"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
