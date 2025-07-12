@@ -5,22 +5,20 @@ namespace: grill-stats-dev
 
 resources:
 - ../../base
-- ./secrets/grill-stats-dev-creds-1password.yaml
 - ./patches/dev-namespace-patch.yaml
-
-patchesStrategicMerge:
-- patches/dev-env-patch.yaml
-
-# namePrefix: dev-  # Removed to avoid strategic merge conflicts
 
 commonLabels:
   environment: development
   app.kubernetes.io/instance: grill-stats-dev
 
-configMapGenerator:
-- name: grill-stats-dev-config
-  literals:
-  - MOCK_MODE=true
-  - FLASK_ENV=development
-  - DEBUG=true
-  - LOG_LEVEL=DEBUG
+images:
+- name: lordmuffin/grill-stats
+  newTag: latest
+
+replicas:
+- name: grill-stats
+  count: 1
+- name: device-service  
+  count: 1
+- name: temperature-service
+  count: 1
