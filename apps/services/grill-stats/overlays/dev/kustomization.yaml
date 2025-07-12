@@ -10,8 +10,17 @@ resources:
 
 patches:
 - path: patches/dev-resources-patch.yaml
+  target:
+    kind: Deployment
+    name: grill-stats
 - path: patches/dev-ingress-patch.yaml
+  target:
+    kind: Ingress
+    name: grill-stats
 - path: patches/dev-env-patch.yaml
+  target:
+    kind: Deployment
+    name: grill-stats
 - path: patches/dev-replicas-patch.yaml
 - path: patches/dev-service-patch.yaml
 
