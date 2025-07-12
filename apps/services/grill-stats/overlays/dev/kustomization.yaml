@@ -5,7 +5,6 @@ namespace: grill-stats-dev
 
 resources:
 - ../../base
-- ./patches/dev-namespace-patch.yaml
 
 commonLabels:
   environment: development
