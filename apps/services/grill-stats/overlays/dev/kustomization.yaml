@@ -15,7 +15,7 @@ patches:
 - path: patches/dev-replicas-patch.yaml
 - path: patches/dev-service-patch.yaml
 
-namePrefix: dev-
+# namePrefix: dev-  # Removed to avoid strategic merge conflicts
 
 commonLabels:
   environment: development
