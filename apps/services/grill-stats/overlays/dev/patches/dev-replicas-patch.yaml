@@ -2,7 +2,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: grill-stats
-  namespace: grill-stats-dev
 spec:
   # Single replica for development to save resources
   replicas: 1
@@ -13,7 +12,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: device-service
-  namespace: grill-stats-dev
 spec:
   replicas: 1
 ---
@@ -21,7 +19,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: temperature-service
-  namespace: grill-stats-dev
 spec:
   replicas: 1
 ---
@@ -30,7 +27,6 @@ apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: grill-stats-hpa
-  namespace: grill-stats-dev
 spec:
   $patch: delete
 ---
@@ -39,6 +35,5 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: grill-stats-pdb
-  namespace: grill-stats-dev
 spec:
   $patch: delete
