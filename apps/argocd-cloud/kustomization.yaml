@@ -56,7 +56,6 @@ resources:
   - base/repo-rb.yaml
   - base/argocd-ingress.yaml
   - base/argocd-dashboard-1password.yaml
-  - base/argocd-initial-admin-secret.yaml
   # - base/flamingo.yaml
 
   # - https://github.com/lordmuffin/homelab/apps/networking/tailscale
