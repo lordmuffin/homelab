@@ -1,0 +1,48 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: influxdb-init
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/part-of: monitoring
+    app.kubernetes.io/component: init
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+spec:
+  backoffLimit: 5
+  template:
+    spec:
+      containers:
+      - name: influxdb-init
+        image: influxdb:1.8-alpine
+        command:
+        - /bin/sh
+        - -c
+        - |
+          # Wait for InfluxDB to be ready
+          echo "Waiting for InfluxDB to be ready..."
+          until curl -s http://influxdb-service:8086/ping > /dev/null; do
+            sleep 2
+          done
+          
+          # Create retention policies
+          echo "Creating retention policies..."
+          influx -host influxdb-service -port 8086 -username ${INFLUXDB_ADMIN_USER} -password ${INFLUXDB_ADMIN_PASSWORD} -execute "CREATE DATABASE metrics WITH DURATION 30d REPLICATION 1 NAME autogen"
+          influx -host influxdb-service -port 8086 -username ${INFLUXDB_ADMIN_USER} -password ${INFLUXDB_ADMIN_PASSWORD} -execute "CREATE RETENTION POLICY monthly ON metrics DURATION 90d REPLICATION 1"
+          influx -host influxdb-service -port 8086 -username ${INFLUXDB_ADMIN_USER} -password ${INFLUXDB_ADMIN_PASSWORD} -execute "CREATE RETENTION POLICY yearly ON metrics DURATION INF REPLICATION 1"
+          
+          echo "Initialization completed successfully"
+        env:
+        - name: INFLUXDB_ADMIN_USER
+          valueFrom:
+            secretKeyRef:
+              name: influxdb-creds-1password
+              key: DB_USERNAME
+        - name: INFLUXDB_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: influxdb-creds-1password
+              key: DB_PASSWORD
+      restartPolicy: OnFailure

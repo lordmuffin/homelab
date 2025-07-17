@@ -1,0 +1,7 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: influxdb-backup
+  namespace: monitoring
+spec:
+  schedule: "0 2 * * *"  # Daily at 2am

@@ -23,6 +23,7 @@ resources:
 - grill-stats.yaml
 - grill-stats-dev.yaml
 - mcp-servers.yaml
+- influxdb.yaml
 
 namespace: argocd
 
