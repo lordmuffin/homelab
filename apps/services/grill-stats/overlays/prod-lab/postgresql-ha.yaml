@@ -1,0 +1,348 @@
+---
+# PostgreSQL High Availability Configuration - Primary
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgresql-primary
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+    app.kubernetes.io/role: primary
+spec:
+  serviceName: postgresql-primary-service
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgresql
+      app.kubernetes.io/role: primary
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgresql
+        app.kubernetes.io/part-of: grill-stats
+        app.kubernetes.io/component: database
+        app.kubernetes.io/role: primary
+    spec:
+      securityContext:
+        fsGroup: 999
+        runAsUser: 999
+        runAsNonRoot: true
+      containers:
+      - name: postgresql
+        image: postgres:13-alpine
+        ports:
+        - containerPort: 5432
+          name: postgresql
+        env:
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secrets
+              key: postgres-user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secrets
+              key: postgres-password
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secrets
+              key: database-name
+        - name: POSTGRES_REPLICATION_MODE
+          value: master
+        - name: POSTGRES_REPLICATION_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secrets
+              key: replication-user
+        - name: POSTGRES_REPLICATION_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secrets
+              key: replication-password
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        resources:
+          requests:
+            cpu: 1000m
+            memory: 2Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+        volumeMounts:
+        - name: postgresql-data
+          mountPath: /var/lib/postgresql/data
+        - name: postgresql-config
+          mountPath: /etc/postgresql/postgresql.conf
+          subPath: postgresql.conf
+        readinessProbe:
+          exec:
+            command: ["pg_isready", "-U", "$(POSTGRES_USER)", "-d", "$(POSTGRES_DB)"]
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        livenessProbe:
+          exec:
+            command: ["pg_isready", "-U", "$(POSTGRES_USER)", "-d", "$(POSTGRES_DB)"]
+          initialDelaySeconds: 30
+          periodSeconds: 30
+      volumes:
+      - name: postgresql-config
+        configMap:
+          name: postgresql-config
+  volumeClaimTemplates:
+  - metadata:
+      name: postgresql-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 100Gi
+---
+# PostgreSQL High Availability Configuration - Replica
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgresql-replica
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+    app.kubernetes.io/role: replica
+spec:
+  serviceName: postgresql-replica-service
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgresql
+      app.kubernetes.io/role: replica
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgresql
+        app.kubernetes.io/part-of: grill-stats
+        app.kubernetes.io/component: database
+        app.kubernetes.io/role: replica
+    spec:
+      securityContext:
+        fsGroup: 999
+        runAsUser: 999
+        runAsNonRoot: true
+      containers:
+      - name: postgresql
+        image: postgres:13-alpine
+        ports:
+        - containerPort: 5432
+          name: postgresql
+        env:
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secrets
+              key: postgres-user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secrets
+              key: postgres-password
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secrets
+              key: database-name
+        - name: POSTGRES_REPLICATION_MODE
+          value: slave
+        - name: POSTGRES_REPLICATION_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secrets
+              key: replication-user
+        - name: POSTGRES_REPLICATION_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secrets
+              key: replication-password
+        - name: POSTGRES_MASTER_SERVICE
+          value: postgresql-primary-service
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+        volumeMounts:
+        - name: postgresql-data
+          mountPath: /var/lib/postgresql/data
+        readinessProbe:
+          exec:
+            command: ["pg_isready", "-U", "$(POSTGRES_USER)", "-d", "$(POSTGRES_DB)"]
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        livenessProbe:
+          exec:
+            command: ["pg_isready", "-U", "$(POSTGRES_USER)", "-d", "$(POSTGRES_DB)"]
+          initialDelaySeconds: 30
+          periodSeconds: 30
+  volumeClaimTemplates:
+  - metadata:
+      name: postgresql-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 100Gi
+---
+# PostgreSQL Primary Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgresql-primary-service
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+    app.kubernetes.io/role: primary
+spec:
+  selector:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/role: primary
+  ports:
+  - port: 5432
+    targetPort: postgresql
+    name: postgresql
+  type: ClusterIP
+---
+# PostgreSQL Replica Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgresql-replica-service
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+    app.kubernetes.io/role: replica
+spec:
+  selector:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/role: replica
+  ports:
+  - port: 5432
+    targetPort: postgresql
+    name: postgresql
+  type: ClusterIP
+---
+# PostgreSQL Read-Write Service (Primary)
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgresql-rw-service
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+    app.kubernetes.io/role: primary
+spec:
+  selector:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/role: primary
+  ports:
+  - port: 5432
+    targetPort: postgresql
+    name: postgresql
+  type: ClusterIP
+---
+# PostgreSQL Read-Only Service (Replica)
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgresql-ro-service
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+    app.kubernetes.io/role: replica
+spec:
+  selector:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/role: replica
+  ports:
+  - port: 5432
+    targetPort: postgresql
+    name: postgresql
+  type: ClusterIP
+---
+# PostgreSQL Failover Job
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: postgresql-failover-setup
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+spec:
+  template:
+    spec:
+      containers:
+      - name: failover-setup
+        image: postgres:13-alpine
+        command:
+        - /bin/sh
+        - -c
+        - |
+          # Setup failover configuration
+          echo "Setting up PostgreSQL failover configuration..."
+
+          # Create failover scripts
+          cat > /tmp/promote_replica.sh << 'EOF'
+          #!/bin/bash
+          # Promote replica to primary
+          kubectl scale statefulset postgresql-primary --replicas=0
+          sleep 10
+          kubectl exec postgresql-replica-0 -- pg_promote
+          kubectl patch service postgresql-rw-service -p '{"spec":{"selector":{"app.kubernetes.io/role":"replica"}}}'
+          EOF
+
+          cat > /tmp/check_primary_health.sh << 'EOF'
+          #!/bin/bash
+          # Check primary health
+          kubectl exec postgresql-primary-0 -- pg_isready -U postgres
+          if [ $? -ne 0 ]; then
+            echo "Primary is unhealthy, initiating failover..."
+            /tmp/promote_replica.sh
+          fi
+          EOF
+
+          chmod +x /tmp/*.sh
+
+          # Create configmap with failover scripts
+          kubectl create configmap postgresql-failover-scripts \
+            --from-file=/tmp/promote_replica.sh \
+            --from-file=/tmp/check_primary_health.sh \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          echo "Failover setup completed"
+        env:
+        - name: KUBECONFIG
+          value: /etc/kubernetes/admin.conf
+        volumeMounts:
+        - name: kubeconfig
+          mountPath: /etc/kubernetes
+          readOnly: true
+      volumes:
+      - name: kubeconfig
+        secret:
+          secretName: kubeconfig
+      restartPolicy: OnFailure

@@ -1,0 +1,417 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: vault-transit-encryption-monitor
+  namespace: grill-stats
+  labels:
+    app: vault-transit
+    component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: encryption-service
+  endpoints:
+  - port: http
+    interval: 30s
+    path: /metrics
+    honorLabels: true
+  - port: http
+    interval: 30s
+    path: /health
+    honorLabels: true
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: vault-agent-monitor
+  namespace: grill-stats
+  labels:
+    app: vault-agent
+    component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: vault-agent
+  endpoints:
+  - port: vault-agent
+    interval: 30s
+    path: /v1/sys/health
+    honorLabels: true
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: vault-transit-alerts
+  namespace: grill-stats
+  labels:
+    app: vault-transit
+    component: monitoring
+spec:
+  groups:
+  - name: vault-transit.rules
+    rules:
+    - alert: VaultTransitEncryptionFailure
+      expr: increase(vault_transit_encrypt_failures_total[5m]) > 0
+      for: 1m
+      labels:
+        severity: critical
+        service: vault-transit
+      annotations:
+        summary: "Vault Transit encryption failures detected"
+        description: "{{ $labels.instance }} has {{ $value }} encryption failures in the last 5 minutes"
+
+    - alert: VaultTransitDecryptionFailure
+      expr: increase(vault_transit_decrypt_failures_total[5m]) > 0
+      for: 1m
+      labels:
+        severity: critical
+        service: vault-transit
+      annotations:
+        summary: "Vault Transit decryption failures detected"
+        description: "{{ $labels.instance }} has {{ $value }} decryption failures in the last 5 minutes"
+
+    - alert: VaultTransitHighLatency
+      expr: histogram_quantile(0.95, rate(vault_transit_encrypt_duration_seconds_bucket[5m])) > 1
+      for: 5m
+      labels:
+        severity: warning
+        service: vault-transit
+      annotations:
+        summary: "High Vault Transit encryption latency"
+        description: "95th percentile encryption latency is {{ $value }}s"
+
+    - alert: VaultTransitKeyRotationDue
+      expr: time() - vault_transit_key_creation_time > 7776000  # 90 days
+      for: 1h
+      labels:
+        severity: warning
+        service: vault-transit
+      annotations:
+        summary: "Vault Transit key rotation overdue"
+        description: "Key {{ $labels.key_name }} was created {{ $value }} seconds ago and should be rotated"
+
+    - alert: VaultAgentDown
+      expr: up{job="vault-agent"} == 0
+      for: 5m
+      labels:
+        severity: critical
+        service: vault-agent
+      annotations:
+        summary: "Vault Agent is down"
+        description: "Vault Agent has been down for more than 5 minutes"
+
+    - alert: VaultAgentTokenExpiringSoon
+      expr: vault_agent_token_ttl_seconds < 3600  # 1 hour
+      for: 5m
+      labels:
+        severity: warning
+        service: vault-agent
+      annotations:
+        summary: "Vault Agent token expiring soon"
+        description: "Vault Agent token expires in {{ $value }} seconds"
+
+    - alert: VaultTransitRateLimitExceeded
+      expr: increase(vault_transit_rate_limit_exceeded_total[5m]) > 0
+      for: 1m
+      labels:
+        severity: warning
+        service: vault-transit
+      annotations:
+        summary: "Vault Transit rate limit exceeded"
+        description: "{{ $labels.instance }} exceeded rate limit {{ $value }} times in the last 5 minutes"
+
+    - alert: VaultTransitAuditLogFailure
+      expr: increase(vault_audit_log_failures_total[5m]) > 0
+      for: 1m
+      labels:
+        severity: critical
+        service: vault-transit
+      annotations:
+        summary: "Vault audit log failures detected"
+        description: "{{ $labels.instance }} has {{ $value }} audit log failures in the last 5 minutes"
+
+    - alert: VaultTransitKeyVersionsHigh
+      expr: vault_transit_key_versions > 10
+      for: 1h
+      labels:
+        severity: warning
+        service: vault-transit
+      annotations:
+        summary: "High number of Vault Transit key versions"
+        description: "Key {{ $labels.key_name }} has {{ $value }} versions, consider cleanup"
+
+    - alert: VaultTransitUnhealthy
+      expr: vault_transit_health_status != 1
+      for: 2m
+      labels:
+        severity: critical
+        service: vault-transit
+      annotations:
+        summary: "Vault Transit service unhealthy"
+        description: "Vault Transit service health check failed"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vault-monitoring-config
+  namespace: grill-stats
+  labels:
+    app: vault-monitoring
+    component: config
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 30s
+      evaluation_interval: 30s
+
+    rule_files:
+    - "/etc/prometheus/rules/*.yml"
+
+    scrape_configs:
+    - job_name: 'vault-transit'
+      static_configs:
+      - targets: ['encryption-service:8082']
+      scrape_interval: 30s
+      metrics_path: '/metrics'
+      scheme: 'http'
+
+    - job_name: 'vault-agent'
+      static_configs:
+      - targets: ['vault-agent:8200']
+      scrape_interval: 30s
+      metrics_path: '/v1/sys/metrics'
+      scheme: 'http'
+      params:
+        format: ['prometheus']
+
+    - job_name: 'vault-key-rotation'
+      static_configs:
+      - targets: ['key-rotation-service:8080']
+      scrape_interval: 60s
+      metrics_path: '/metrics'
+      scheme: 'http'
+
+  grafana-dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "Vault Transit Encryption",
+        "uid": "vault-transit-encryption",
+        "version": 1,
+        "schemaVersion": 30,
+        "panels": [
+          {
+            "id": 1,
+            "title": "Encryption Operations Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(vault_transit_encrypt_total[5m])",
+                "legendFormat": "Encryptions/sec"
+              },
+              {
+                "expr": "rate(vault_transit_decrypt_total[5m])",
+                "legendFormat": "Decryptions/sec"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+          },
+          {
+            "id": 2,
+            "title": "Encryption Latency",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.50, rate(vault_transit_encrypt_duration_seconds_bucket[5m]))",
+                "legendFormat": "50th percentile"
+              },
+              {
+                "expr": "histogram_quantile(0.95, rate(vault_transit_encrypt_duration_seconds_bucket[5m]))",
+                "legendFormat": "95th percentile"
+              },
+              {
+                "expr": "histogram_quantile(0.99, rate(vault_transit_encrypt_duration_seconds_bucket[5m]))",
+                "legendFormat": "99th percentile"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+          },
+          {
+            "id": 3,
+            "title": "Key Rotation Status",
+            "type": "table",
+            "targets": [
+              {
+                "expr": "vault_transit_key_creation_time",
+                "legendFormat": "Key Creation Time"
+              },
+              {
+                "expr": "vault_transit_key_versions",
+                "legendFormat": "Key Versions"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+          },
+          {
+            "id": 4,
+            "title": "Vault Agent Status",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "up{job=\"vault-agent\"}",
+                "legendFormat": "Agent Status"
+              },
+              {
+                "expr": "vault_agent_token_ttl_seconds",
+                "legendFormat": "Token TTL"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+          },
+          {
+            "id": 5,
+            "title": "Error Rates",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(vault_transit_encrypt_failures_total[5m])",
+                "legendFormat": "Encryption Failures/sec"
+              },
+              {
+                "expr": "rate(vault_transit_decrypt_failures_total[5m])",
+                "legendFormat": "Decryption Failures/sec"
+              },
+              {
+                "expr": "rate(vault_transit_rate_limit_exceeded_total[5m])",
+                "legendFormat": "Rate Limit Exceeded/sec"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16}
+          }
+        ],
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "refresh": "30s"
+      }
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vault-audit-config
+  namespace: grill-stats
+  labels:
+    app: vault-audit
+    component: config
+data:
+  fluentd.conf: |
+    <source>
+      @type tail
+      path /vault/audit/grill-stats-audit.log
+      pos_file /var/log/fluentd-vault-audit.log.pos
+      tag vault.audit
+      format json
+      time_format %Y-%m-%dT%H:%M:%S.%NZ
+      time_key time
+    </source>
+
+    <filter vault.audit>
+      @type record_transformer
+      <record>
+        service vault-transit
+        environment "#{ENV['ENVIRONMENT']}"
+        namespace grill-stats
+      </record>
+    </filter>
+
+    <match vault.audit>
+      @type elasticsearch
+      host elasticsearch.monitoring.svc.cluster.local
+      port 9200
+      index_name vault-audit
+      type_name _doc
+      logstash_format true
+      logstash_prefix vault-audit
+      logstash_dateformat %Y.%m.%d
+      include_tag_key true
+      tag_key @log_name
+      flush_interval 10s
+    </match>
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vault-audit-collector
+  namespace: grill-stats
+  labels:
+    app: vault-audit-collector
+    component: logging
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vault-audit-collector
+  template:
+    metadata:
+      labels:
+        app: vault-audit-collector
+        component: logging
+    spec:
+      serviceAccountName: vault-audit-collector
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: fluentd
+        image: fluent/fluentd:v1.16-1
+        env:
+        - name: ENVIRONMENT
+          value: "prod"
+        - name: FLUENTD_CONF
+          value: "fluentd.conf"
+        volumeMounts:
+        - name: fluentd-config
+          mountPath: /fluentd/etc
+        - name: vault-audit-logs
+          mountPath: /vault/audit
+          readOnly: true
+        - name: var-log
+          mountPath: /var/log
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+      volumes:
+      - name: fluentd-config
+        configMap:
+          name: vault-audit-config
+      - name: vault-audit-logs
+        emptyDir: {}
+      - name: var-log
+        emptyDir: {}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vault-audit-collector
+  namespace: grill-stats
+  labels:
+    app: vault-audit-collector
+    component: logging

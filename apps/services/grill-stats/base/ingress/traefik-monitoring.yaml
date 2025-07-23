@@ -1,0 +1,229 @@
+# Traefik Metrics Service Monitor
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: traefik-metrics
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: traefik
+  endpoints:
+    - port: traefik
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      honorLabels: true
+  namespaceSelector:
+    matchNames:
+      - kube-system
+      - traefik-system
+---
+# Grill Stats Ingress Service Monitor
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: grill-stats-ingress-metrics
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: grill-stats
+      app.kubernetes.io/component: web-ui
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      honorLabels: true
+---
+# Prometheus Rule for Ingress Monitoring
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: grill-stats-ingress-rules
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  groups:
+    - name: grill-stats.ingress.rules
+      rules:
+        - alert: GrillStatsHighErrorRate
+          expr: |
+            (
+              sum(rate(traefik_service_requests_total{service=~"grill-stats-.*",code=~"5.."}[5m])) /
+              sum(rate(traefik_service_requests_total{service=~"grill-stats-.*"}[5m]))
+            ) > 0.05
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High error rate on Grill Stats services"
+            description: "Error rate is {{ $value | humanizePercentage }} for grill-stats services"
+
+        - alert: GrillStatsHighLatency
+          expr: |
+            histogram_quantile(0.95, sum(rate(traefik_service_request_duration_seconds_bucket{service=~"grill-stats-.*"}[5m])) by (le)) > 2
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High latency on Grill Stats services"
+            description: "95th percentile latency is {{ $value }}s for grill-stats services"
+
+        - alert: GrillStatsServiceDown
+          expr: |
+            up{job="grill-stats-ingress-metrics"} == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Grill Stats service is down"
+            description: "Grill Stats service has been down for more than 2 minutes"
+
+        - alert: GrillStatsHighTraffic
+          expr: |
+            sum(rate(traefik_service_requests_total{service=~"grill-stats-.*"}[5m])) > 100
+          for: 5m
+          labels:
+            severity: info
+          annotations:
+            summary: "High traffic on Grill Stats services"
+            description: "Request rate is {{ $value }} req/s for grill-stats services"
+
+        - alert: GrillStatsCertificateExpiry
+          expr: |
+            (probe_ssl_earliest_cert_expiry{instance=~".*grill-stats.*"} - time()) / 86400 < 30
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: "SSL certificate expiring soon"
+            description: "SSL certificate for {{ $labels.instance }} expires in {{ $value }} days"
+---
+# Grafana Dashboard ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grill-stats-ingress-dashboard
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: grill-stats
+    grafana_dashboard: "1"
+data:
+  grill-stats-ingress-dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "Grill Stats Ingress Dashboard",
+        "tags": ["grill-stats", "ingress", "traefik"],
+        "style": "dark",
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Request Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "sum(rate(traefik_service_requests_total{service=~\"grill-stats-.*\"}[5m])) by (service)",
+                "legendFormat": "{{ service }}"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Requests/sec",
+                "min": 0
+              }
+            ],
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 0,
+              "y": 0
+            }
+          },
+          {
+            "id": 2,
+            "title": "Response Time",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, sum(rate(traefik_service_request_duration_seconds_bucket{service=~\"grill-stats-.*\"}[5m])) by (le, service))",
+                "legendFormat": "95th percentile - {{ service }}"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Seconds",
+                "min": 0
+              }
+            ],
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 12,
+              "y": 0
+            }
+          },
+          {
+            "id": 3,
+            "title": "Error Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "sum(rate(traefik_service_requests_total{service=~\"grill-stats-.*\",code=~\"5..\"}[5m])) by (service)",
+                "legendFormat": "5xx errors - {{ service }}"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Errors/sec",
+                "min": 0
+              }
+            ],
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 0,
+              "y": 8
+            }
+          },
+          {
+            "id": 4,
+            "title": "Active Connections",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "sum(traefik_service_open_connections{service=~\"grill-stats-.*\"}) by (service)",
+                "legendFormat": "{{ service }}"
+              }
+            ],
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 12,
+              "y": 8
+            }
+          }
+        ],
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "refresh": "30s"
+      }
+    }

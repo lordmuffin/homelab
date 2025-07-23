@@ -1,0 +1,156 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: grill-stats
+
+resources:
+- ../../base
+- namespace.yaml
+- hpa.yaml
+- pdb.yaml
+
+patchesStrategicMerge:
+- patches/replicas.yaml
+- patches/resources.yaml
+- patches/ingress.yaml
+- patches/environment.yaml
+- redis-prod-patch.yaml
+- postgresql-patches.yaml
+- influxdb-prod-patch.yaml
+
+patches:
+- target:
+    kind: Deployment
+    name: auth-service
+  patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 2
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/memory
+      value: "512Mi"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/memory
+      value: "1Gi"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/cpu
+      value: "250m"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/cpu
+      value: "500m"
+
+- target:
+    kind: Deployment
+    name: device-service
+  patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 2
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/memory
+      value: "512Mi"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/memory
+      value: "1Gi"
+
+- target:
+    kind: Deployment
+    name: temperature-service
+  patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 3
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/memory
+      value: "512Mi"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/memory
+      value: "1Gi"
+
+- target:
+    kind: Deployment
+    name: historical-data-service
+  patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 2
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/memory
+      value: "512Mi"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/memory
+      value: "1Gi"
+
+- target:
+    kind: Deployment
+    name: encryption-service
+  patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 2
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/memory
+      value: "512Mi"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/memory
+      value: "1Gi"
+
+- target:
+    kind: Deployment
+    name: web-ui-service
+  patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 2
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/memory
+      value: "256Mi"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/memory
+      value: "512Mi"
+
+- target:
+    kind: ConfigMap
+    name: web-ui-config
+  patch: |-
+    - op: replace
+      path: /data/API_BASE_URL
+      value: "https://grill-stats.homelab.local/api"
+    - op: replace
+      path: /data/WS_BASE_URL
+      value: "wss://grill-stats.homelab.local/ws"
+    - op: replace
+      path: /data/ENVIRONMENT
+      value: "prod-lab"
+
+images:
+- name: grill-stats/auth-service
+  newTag: v1.0.0
+- name: grill-stats/device-service
+  newTag: v1.0.0
+- name: grill-stats/temperature-service
+  newTag: v1.0.0
+- name: grill-stats/historical-data-service
+  newTag: v1.0.0
+- name: grill-stats/encryption-service
+  newTag: v1.0.0
+- name: grill-stats/web-ui
+  newTag: v1.0.0
+
+configMapGenerator:
+- name: grill-stats-config
+  behavior: merge
+  literals:
+  - SYNC_INTERVAL="300"
+  - LOG_LEVEL="INFO"
+  - CACHE_TTL="600"
+  - ENVIRONMENT="prod-lab"
+  - DEBUG="false"
+
+commonLabels:
+  environment: prod-lab
+  deployment.homelab/type: production
+
+commonAnnotations:
+  deployment.homelab/managed-by: "argocd"
+  deployment.homelab/environment: "prod-lab"

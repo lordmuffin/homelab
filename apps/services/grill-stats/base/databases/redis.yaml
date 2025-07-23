@@ -1,5 +1,5 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: redis
   namespace: grill-stats
@@ -8,6 +8,7 @@ metadata:
     app.kubernetes.io/part-of: grill-stats
     app.kubernetes.io/component: database
 spec:
+  serviceName: redis
   replicas: 1
   selector:
     matchLabels:
@@ -19,29 +20,37 @@ spec:
         app.kubernetes.io/part-of: grill-stats
         app.kubernetes.io/component: database
     spec:
+      securityContext:
+        fsGroup: 999
+        runAsUser: 999
+        runAsNonRoot: true
       containers:
       - name: redis
-        image: redis:6-alpine
-        args: ["--requirepass", "$(REDIS_PASSWORD)"]
+        image: redis:7-alpine
         ports:
         - containerPort: 6379
           name: redis
+        command:
+        - redis-server
+        - /etc/redis/redis.conf
         env:
         - name: REDIS_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: grill-stats-prod-creds-1password
+              name: grill-stats-secrets
               key: REDIS_PASSWORD
         resources:
           requests:
             cpu: 100m
-            memory: 128Mi
-          limits:
-            cpu: 200m
             memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
         volumeMounts:
         - name: redis-data
           mountPath: /data
+        - name: redis-config
+          mountPath: /etc/redis
         readinessProbe:
           exec:
             command:
@@ -61,8 +70,18 @@ spec:
           initialDelaySeconds: 15
           periodSeconds: 20
       volumes:
-      - name: redis-data
-        emptyDir: {}
+      - name: redis-config
+        configMap:
+          name: redis-config
+          defaultMode: 0755
+  volumeClaimTemplates:
+  - metadata:
+      name: redis-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 10Gi
 ---
 apiVersion: v1
 kind: Service
@@ -79,4 +98,24 @@ spec:
   ports:
   - port: 6379
     targetPort: redis
+    name: redis
+  type: ClusterIP
+  clusterIP: None  # Headless service for StatefulSet
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+spec:
+  selector:
+    app.kubernetes.io/name: redis
+  ports:
+  - port: 6379
+    targetPort: redis
+    name: redis
   type: ClusterIP

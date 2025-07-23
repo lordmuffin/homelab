@@ -32,37 +32,35 @@ spec:
         - containerPort: 8080
           name: http
         env:
-        - name: MOCK_MODE
-          value: "false"
         - name: THERMOWORKS_API_KEY
           valueFrom:
             secretKeyRef:
-              name: grill-stats-prod-creds-1password
+              name: grill-stats-secrets
               key: THERMOWORKS_API_KEY
         - name: DB_HOST
           valueFrom:
             configMapKeyRef:
-              name: grill-stats-prod-creds-1password
+              name: grill-stats-config
               key: DB_HOST
         - name: DB_USERNAME
           valueFrom:
             secretKeyRef:
-              name: grill-stats-prod-creds-1password
+              name: grill-stats-secrets
               key: DB_USERNAME
         - name: DB_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: grill-stats-prod-creds-1password
+              name: grill-stats-secrets
               key: DB_PASSWORD
         - name: HOMEASSISTANT_URL
           valueFrom:
             secretKeyRef:
-              name: grill-stats-prod-creds-1password
+              name: grill-stats-secrets
               key: HOMEASSISTANT_URL
         - name: HOMEASSISTANT_TOKEN
           valueFrom:
             secretKeyRef:
-              name: grill-stats-prod-creds-1password
+              name: grill-stats-secrets
               key: HOMEASSISTANT_TOKEN
         - name: OTEL_SERVICE_NAME
           value: device-service

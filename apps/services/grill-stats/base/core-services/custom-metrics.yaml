@@ -1,0 +1,411 @@
+# Custom Metrics Configuration for Grill Stats Business Metrics
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grill-stats-custom-metrics-config
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: metrics
+data:
+  custom-metrics.yaml: |
+    # Business metrics to export for grill-stats platform
+    metrics:
+      # Temperature and Device Metrics
+      - name: grill_stats_temperature_celsius
+        help: Current temperature reading in Celsius
+        type: gauge
+        labels: [device_id, channel_id, probe_type, location]
+
+      - name: grill_stats_device_online_status
+        help: Device online status (1 = online, 0 = offline)
+        type: gauge
+        labels: [device_id, device_type, firmware_version]
+
+      - name: grill_stats_device_battery_level
+        help: Device battery level percentage
+        type: gauge
+        labels: [device_id, device_type]
+
+      - name: grill_stats_last_temperature_reading_timestamp
+        help: Unix timestamp of last temperature reading
+        type: gauge
+        labels: [device_id, channel_id]
+
+      # User Activity Metrics
+      - name: grill_stats_user_login_total
+        help: Total number of user logins
+        type: counter
+        labels: [user_id, auth_method, client_type]
+
+      - name: grill_stats_user_session_duration_seconds
+        help: User session duration in seconds
+        type: histogram
+        buckets: [60, 300, 600, 1800, 3600, 7200, 14400]
+        labels: [user_id, session_type]
+
+      # Cooking Session Metrics
+      - name: grill_stats_cook_duration_seconds
+        help: Duration of cooking sessions in seconds
+        type: histogram
+        buckets: [300, 600, 1800, 3600, 7200, 14400, 28800]
+        labels: [user_id, device_id, cook_type]
+
+      - name: grill_stats_cook_sessions_total
+        help: Total number of cooking sessions
+        type: counter
+        labels: [user_id, device_id, cook_type]
+
+      - name: grill_stats_max_temperature_reached
+        help: Maximum temperature reached during cooking session
+        type: histogram
+        buckets: [50, 100, 150, 200, 250, 300, 350, 400]
+        labels: [device_id, channel_id, cook_type]
+
+      # Temperature Data Metrics
+      - name: grill_stats_temperature_readings_total
+        help: Total number of temperature readings
+        type: counter
+        labels: [device_id, channel_id, data_source]
+
+      - name: grill_stats_temperature_alerts_total
+        help: Total number of temperature alerts triggered
+        type: counter
+        labels: [device_id, channel_id, alert_type, severity]
+
+      # API Performance Metrics
+      - name: grill_stats_api_requests_duration_seconds
+        help: API request duration in seconds
+        type: histogram
+        buckets: [0.1, 0.25, 0.5, 1, 2.5, 5, 10]
+        labels: [method, endpoint, status, service]
+
+      - name: grill_stats_api_requests_total
+        help: Total number of API requests
+        type: counter
+        labels: [method, endpoint, status, service]
+
+      - name: grill_stats_websocket_connections_active
+        help: Number of active WebSocket connections
+        type: gauge
+        labels: [connection_type, user_type]
+
+      # Data Processing Metrics
+      - name: grill_stats_data_processing_duration_seconds
+        help: Time spent processing temperature data
+        type: histogram
+        buckets: [0.01, 0.1, 0.5, 1, 5, 10, 30]
+        labels: [processing_type, batch_size]
+
+      - name: grill_stats_data_points_processed_total
+        help: Total number of data points processed
+        type: counter
+        labels: [processing_type, source]
+
+      # Integration Metrics
+      - name: grill_stats_thermoworks_api_requests_total
+        help: Total requests to ThermoWorks API
+        type: counter
+        labels: [endpoint, status, response_code]
+
+      - name: grill_stats_thermoworks_api_duration_seconds
+        help: Duration of ThermoWorks API requests
+        type: histogram
+        buckets: [0.5, 1, 2, 5, 10, 30]
+        labels: [endpoint, status]
+
+      - name: grill_stats_homeassistant_sync_total
+        help: Total number of Home Assistant synchronizations
+        type: counter
+        labels: [entity_type, sync_status]
+
+      # Storage Metrics
+      - name: grill_stats_database_query_duration_seconds
+        help: Database query execution time
+        type: histogram
+        buckets: [0.001, 0.01, 0.1, 0.5, 1, 5]
+        labels: [database, query_type, table]
+
+      - name: grill_stats_database_connections_active
+        help: Number of active database connections
+        type: gauge
+        labels: [database, connection_pool]
+
+      - name: grill_stats_cache_hits_total
+        help: Total number of cache hits
+        type: counter
+        labels: [cache_type, key_pattern]
+
+      - name: grill_stats_cache_misses_total
+        help: Total number of cache misses
+        type: counter
+        labels: [cache_type, key_pattern]
+
+      # Error and Alert Metrics
+      - name: grill_stats_errors_total
+        help: Total number of application errors
+        type: counter
+        labels: [service, error_type, severity]
+
+      - name: grill_stats_alerts_sent_total
+        help: Total number of alerts sent
+        type: counter
+        labels: [alert_type, channel, severity]
+
+      # Business KPIs
+      - name: grill_stats_active_users_daily
+        help: Number of active users per day
+        type: gauge
+        labels: [date, user_type]
+
+      - name: grill_stats_devices_registered_total
+        help: Total number of registered devices
+        type: counter
+        labels: [device_type, registration_source]
+
+      - name: grill_stats_data_retention_days
+        help: Data retention period in days
+        type: gauge
+        labels: [data_type, storage_tier]
+
+  # Recording rules for derived metrics
+  recording-rules.yaml: |
+    groups:
+    - name: grill_stats_business_metrics
+      interval: 60s
+      rules:
+      # Active users calculation
+      - record: grill_stats:active_users_5m
+        expr: count(rate(grill_stats_user_login_total[5m]) > 0)
+
+      - record: grill_stats:active_users_1h
+        expr: count(increase(grill_stats_user_login_total[1h]) > 0)
+
+      - record: grill_stats:active_users_24h
+        expr: count(increase(grill_stats_user_login_total[24h]) > 0)
+
+      # Temperature data freshness
+      - record: grill_stats:temperature_data_freshness_ratio
+        expr: |
+          count(time() - grill_stats_last_temperature_reading_timestamp <= 60)
+          /
+          count(grill_stats_device_online_status == 1)
+
+      # API success rate
+      - record: grill_stats:api_success_rate_5m
+        expr: |
+          sum(rate(grill_stats_api_requests_total{status!~"5.."}[5m]))
+          /
+          sum(rate(grill_stats_api_requests_total[5m]))
+
+      # Average cook time
+      - record: grill_stats:average_cook_time_hours
+        expr: |
+          sum(grill_stats_cook_duration_seconds) / sum(grill_stats_cook_sessions_total) / 3600
+
+      # Device utilization
+      - record: grill_stats:device_utilization_ratio
+        expr: |
+          count(grill_stats_device_online_status == 1)
+          /
+          count(grill_stats_device_online_status)
+
+      # Temperature alert rate
+      - record: grill_stats:temperature_alert_rate_1h
+        expr: rate(grill_stats_temperature_alerts_total[1h])
+
+      # Data processing efficiency
+      - record: grill_stats:data_processing_efficiency
+        expr: |
+          sum(rate(grill_stats_data_points_processed_total[5m]))
+          /
+          sum(rate(grill_stats_api_requests_total{endpoint="/temperature"}[5m]))
+---
+# Prometheus Recording Rules for Business Metrics
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: grill-stats-recording-rules
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: metrics
+spec:
+  groups:
+  - name: grill_stats_business_metrics
+    interval: 60s
+    rules:
+    # Active users calculation
+    - record: grill_stats:active_users_5m
+      expr: count(rate(grill_stats_user_login_total[5m]) > 0)
+
+    - record: grill_stats:active_users_1h
+      expr: count(increase(grill_stats_user_login_total[1h]) > 0)
+
+    - record: grill_stats:active_users_24h
+      expr: count(increase(grill_stats_user_login_total[24h]) > 0)
+
+    # Temperature data freshness
+    - record: grill_stats:temperature_data_freshness_ratio
+      expr: |
+        count(time() - grill_stats_last_temperature_reading_timestamp <= 60)
+        /
+        count(grill_stats_device_online_status == 1)
+
+    # API success rate
+    - record: grill_stats:api_success_rate_5m
+      expr: |
+        sum(rate(grill_stats_api_requests_total{status!~"5.."}[5m]))
+        /
+        sum(rate(grill_stats_api_requests_total[5m]))
+
+    # Average cook time
+    - record: grill_stats:average_cook_time_hours
+      expr: |
+        sum(grill_stats_cook_duration_seconds) / sum(grill_stats_cook_sessions_total) / 3600
+
+    # Device utilization
+    - record: grill_stats:device_utilization_ratio
+      expr: |
+        count(grill_stats_device_online_status == 1)
+        /
+        count(grill_stats_device_online_status)
+
+    # Temperature alert rate
+    - record: grill_stats:temperature_alert_rate_1h
+      expr: rate(grill_stats_temperature_alerts_total[1h])
+
+    # Data processing efficiency
+    - record: grill_stats:data_processing_efficiency
+      expr: |
+        sum(rate(grill_stats_data_points_processed_total[5m]))
+        /
+        sum(rate(grill_stats_api_requests_total{endpoint="/temperature"}[5m]))
+
+  - name: grill_stats_slo_metrics
+    interval: 30s
+    rules:
+    # SLO calculations
+    - record: grill_stats:slo_availability_30d
+      expr: |
+        (
+          1 - (
+            sum(rate(http_requests_total{job=~"grill-stats-.*",status=~"5.."}[30d]))
+            /
+            sum(rate(http_requests_total{job=~"grill-stats-.*"}[30d]))
+          )
+        ) * 100
+
+    - record: grill_stats:slo_latency_p95_30d
+      expr: |
+        histogram_quantile(0.95,
+          sum(rate(http_request_duration_seconds_bucket{job=~"grill-stats-.*"}[30d])) by (le)
+        )
+
+    - record: grill_stats:slo_data_freshness_current
+      expr: |
+        (
+          count(time() - grill_stats_last_temperature_reading_timestamp <= 60)
+          /
+          count(grill_stats_device_online_status == 1)
+        ) * 100
+---
+# Metrics Exporter Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: grill-stats-metrics-exporter
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: metrics-exporter
+spec:
+  selector:
+    app.kubernetes.io/name: grill-stats-metrics-exporter
+  ports:
+  - port: 9090
+    targetPort: 9090
+    name: metrics
+  type: ClusterIP
+---
+# Metrics Exporter Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grill-stats-metrics-exporter
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats-metrics-exporter
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: metrics-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: grill-stats-metrics-exporter
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: grill-stats-metrics-exporter
+        app.kubernetes.io/part-of: grill-stats
+        app.kubernetes.io/component: metrics-exporter
+    spec:
+      containers:
+      - name: metrics-exporter
+        image: prom/prometheus:latest
+        args:
+        - --config.file=/etc/prometheus/prometheus.yml
+        - --storage.tsdb.path=/prometheus
+        - --web.console.libraries=/etc/prometheus/console_libraries
+        - --web.console.templates=/etc/prometheus/consoles
+        - --web.enable-lifecycle
+        - --web.listen-address=0.0.0.0:9090
+        ports:
+        - containerPort: 9090
+          name: metrics
+        volumeMounts:
+        - name: config
+          mountPath: /etc/prometheus
+        - name: storage
+          mountPath: /prometheus
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+      volumes:
+      - name: config
+        configMap:
+          name: grill-stats-custom-metrics-config
+      - name: storage
+        emptyDir: {}
+---
+# ServiceMonitor for Custom Metrics Exporter
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: grill-stats-custom-metrics
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: metrics-exporter
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: grill-stats
+      app.kubernetes.io/component: metrics-exporter
+  endpoints:
+  - port: metrics
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+  namespaceSelector:
+    matchNames:
+    - grill-stats
+    - grill-stats-dev

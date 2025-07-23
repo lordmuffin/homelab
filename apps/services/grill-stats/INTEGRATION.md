@@ -42,13 +42,11 @@ Also create this secret in the dev and staging namespaces if needed.
 The application requires several secrets to function properly:
 
 ```bash
-# API keys and application secrets
-kubectl create secret generic grill-stats-prod-creds-1password \
+# API keys
+kubectl create secret generic grill-stats-secrets \
   --namespace grill-stats \
   --from-literal=thermoworks-api-key=your-api-key \
-  --from-literal=homeassistant-token=your-token \
-  --from-literal=redis-password=your-redis-password \
-  --from-literal=secret-key=your-flask-secret-key
+  --from-literal=homeassistant-token=your-token
 
 # Database credentials
 kubectl create secret generic grill-stats-db-credentials \
@@ -59,26 +57,7 @@ kubectl create secret generic grill-stats-db-credentials \
 
 Repeat this process for each environment as needed.
 
-### 3. Configure Environment-Specific Settings
-
-The application is designed to be flexible across different environments:
-
-#### Home Assistant URL Configuration
-- **Base/Staging**: `https://home.andrewpjackson.com` (default)
-- **Development**: `http://homeassistant.home.svc.cluster.local:8123` (local cluster)
-- **Production**: `https://home.andrewpjackson.com` (external domain)
-
-To customize for your environment, update the `HOMEASSISTANT_URL` value in:
-- Base configuration: `base/core-services/grill-stats.yaml`
-- Development overlay: `overlays/dev/patches/grill-stats-env-patch.yaml`
-- Production overlay: `overlays/prod/patches/grill-stats-env-patch.yaml`
-
-#### Environment-Specific Namespaces
-- Production: `grill-stats`
-- Development: `grill-stats-dev`
-- Staging: `grill-stats-staging`
-
-### 4. Set Up ArgoCD
+### 3. Set Up ArgoCD
 
 1. Copy the existing files to your homelab repository:
    ```bash

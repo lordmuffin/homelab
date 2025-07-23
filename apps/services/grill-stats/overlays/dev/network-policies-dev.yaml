@@ -1,0 +1,282 @@
+# Development Environment Network Policy Overrides
+# This file contains relaxed network policies for development environment
+
+---
+# Development Environment Allow-All Policy (for debugging)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dev-allow-all-policy
+  namespace: grill-stats-dev
+  labels:
+    app.kubernetes.io/name: dev-allow-all
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: development
+    environment: dev
+spec:
+  podSelector:
+    matchLabels:
+      environment: dev
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow all ingress traffic in development for debugging
+  - {}
+  egress:
+  # Allow all egress traffic in development for debugging
+  - {}
+
+---
+# Development Debugging Access Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dev-debugging-access-policy
+  namespace: grill-stats-dev
+  labels:
+    app.kubernetes.io/name: dev-debugging
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: debugging
+    environment: dev
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: grill-stats
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow access from developer workstations (adjust IP ranges as needed)
+  - from:
+    - ipBlock:
+        cidr: 192.168.1.0/24  # Common home network range
+  - from:
+    - ipBlock:
+        cidr: 10.0.0.0/8  # Private network range
+  - from:
+    - ipBlock:
+        cidr: 172.16.0.0/12  # Private network range
+  # Allow access from kubectl port-forward
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+  # Allow access from development tools
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: development-tools
+  egress:
+  # Allow all egress for development flexibility
+  - {}
+
+---
+# Development Database Access Policy (less restrictive)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dev-database-access-policy
+  namespace: grill-stats-dev
+  labels:
+    app.kubernetes.io/name: dev-database
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+    environment: dev
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: database
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow database access from all grill-stats components
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: grill-stats
+  # Allow database access from development tools
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: development-tools
+  # Allow database access from database administration tools
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: database-admin
+  # Allow direct database access for debugging (from kubectl port-forward)
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+  egress:
+  # Allow all egress for database operations
+  - {}
+
+---
+# Development External Service Access Policy (permissive)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dev-external-service-access-policy
+  namespace: grill-stats-dev
+  labels:
+    app.kubernetes.io/name: dev-external-service
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: external-api
+    environment: dev
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: grill-stats
+  policyTypes:
+  - Egress
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow all external HTTP/HTTPS traffic for development
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 443
+  # Allow development API endpoints (mock services, etc.)
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 8081
+    - protocol: TCP
+      port: 8082
+    - protocol: TCP
+      port: 8083
+    - protocol: TCP
+      port: 3000
+    - protocol: TCP
+      port: 3001
+  # Allow access to development databases
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+    ports:
+    - protocol: TCP
+      port: 5432  # PostgreSQL
+    - protocol: TCP
+      port: 8086  # InfluxDB
+    - protocol: TCP
+      port: 6379  # Redis
+    - protocol: TCP
+      port: 27017  # MongoDB (if used)
+
+---
+# Development Monitoring Access Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dev-monitoring-access-policy
+  namespace: grill-stats-dev
+  labels:
+    app.kubernetes.io/name: dev-monitoring
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: monitoring
+    environment: dev
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: grill-stats
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow monitoring from all sources in development
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: monitoring
+  # Allow access from development tools
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: development-tools
+  # Allow direct access for debugging
+  - from: []
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 9090
+    - protocol: TCP
+      port: 3000
+  egress:
+  # Allow all egress for monitoring flexibility
+  - {}
+
+---
+# Development Test Access Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dev-test-access-policy
+  namespace: grill-stats-dev
+  labels:
+    app.kubernetes.io/name: dev-test
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: testing
+    environment: dev
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: testing
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow test runners to access all services
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: test-runner
+  # Allow access from CI/CD systems
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: ci-cd
+  egress:
+  # Allow test pods to access all services
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: grill-stats
+  # Allow external test dependencies
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 443
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53

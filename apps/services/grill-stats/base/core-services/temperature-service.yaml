@@ -34,57 +34,47 @@ spec:
         - name: THERMOWORKS_API_KEY
           valueFrom:
             secretKeyRef:
-              name: grill-stats-prod-creds-1password
+              name: grill-stats-secrets
               key: THERMOWORKS_API_KEY
         - name: INFLUXDB_HOST
           valueFrom:
             configMapKeyRef:
-              name: grill-stats-prod-creds-1password
+              name: grill-stats-config
               key: INFLUXDB_HOST
         - name: DB_USERNAME
           valueFrom:
             secretKeyRef:
-              name: grill-stats-prod-creds-1password
+              name: grill-stats-secrets
               key: DB_USERNAME
         - name: DB_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: grill-stats-prod-creds-1password
+              name: grill-stats-secrets
               key: DB_PASSWORD
         - name: REDIS_HOST
           valueFrom:
             configMapKeyRef:
-              name: grill-stats-prod-creds-1password
+              name: grill-stats-config
               key: REDIS_HOST
         - name: REDIS_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: grill-stats-prod-creds-1password
+              name: grill-stats-secrets
               key: REDIS_PASSWORD
-        - name: HOMEASSISTANT_URL
-          valueFrom:
-            secretKeyRef:
-              name: grill-stats-prod-creds-1password
-              key: HOMEASSISTANT_URL
-        - name: HOMEASSISTANT_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: grill-stats-prod-creds-1password
-              key: HOMEASSISTANT_TOKEN
         - name: SYNC_INTERVAL
           valueFrom:
             configMapKeyRef:
-              name: grill-stats-prod-creds-1password
+              name: grill-stats-config
               key: SYNC_INTERVAL
         - name: TEMPERATURE_THRESHOLD_HIGH
           valueFrom:
             configMapKeyRef:
-              name: grill-stats-prod-creds-1password
+              name: grill-stats-config
               key: TEMPERATURE_THRESHOLD_HIGH
         - name: TEMPERATURE_THRESHOLD_LOW
           valueFrom:
             configMapKeyRef:
-              name: grill-stats-prod-creds-1password
+              name: grill-stats-config
               key: TEMPERATURE_THRESHOLD_LOW
         - name: OTEL_SERVICE_NAME
           value: temperature-service
@@ -109,17 +99,10 @@ spec:
             port: 8080
           initialDelaySeconds: 15
           periodSeconds: 20
-        volumeMounts:
-        - name: app-instance
-          mountPath: /app/instance
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
-        runAsGroup: 1000
         fsGroup: 1000
-      volumes:
-      - name: app-instance
-        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

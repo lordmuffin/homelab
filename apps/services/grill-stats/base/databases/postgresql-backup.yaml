@@ -1,0 +1,400 @@
+---
+# PostgreSQL Backup Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgresql-backup-scripts
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: backup
+data:
+  backup.sh: |
+    #!/bin/bash
+    set -e
+
+    # PostgreSQL Backup Script
+    BACKUP_DIR="${BACKUP_DIR:-/backup}"
+    POSTGRES_DB="${POSTGRES_DB:-grill_stats}"
+    POSTGRES_USER="${POSTGRES_USER:-postgres}"
+    POSTGRES_HOST="${POSTGRES_HOST:-postgresql-service}"
+    DATE=$(date +%Y%m%d_%H%M%S)
+    BACKUP_FILE="${BACKUP_DIR}/postgresql_backup_${DATE}.sql"
+
+    echo "Starting PostgreSQL backup at $(date)"
+
+    # Create backup directory if it doesn't exist
+    mkdir -p "$BACKUP_DIR"
+
+    # Create full database backup
+    echo "Creating full database backup..."
+    pg_dump -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+      --verbose --clean --create --if-exists \
+      --format=custom --compress=9 \
+      --file="$BACKUP_FILE.dump"
+
+    # Create SQL backup for easy recovery
+    pg_dump -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+      --verbose --clean --create --if-exists \
+      --format=plain \
+      --file="$BACKUP_FILE"
+
+    # Create schema-only backup
+    pg_dump -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+      --verbose --schema-only --clean --create --if-exists \
+      --format=plain \
+      --file="${BACKUP_DIR}/postgresql_schema_${DATE}.sql"
+
+    # Create data-only backup
+    pg_dump -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+      --verbose --data-only --column-inserts \
+      --format=plain \
+      --file="${BACKUP_DIR}/postgresql_data_${DATE}.sql"
+
+    # Compress SQL backups
+    gzip "$BACKUP_FILE"
+    gzip "${BACKUP_DIR}/postgresql_schema_${DATE}.sql"
+    gzip "${BACKUP_DIR}/postgresql_data_${DATE}.sql"
+
+    # Create backup metadata
+    cat > "${BACKUP_DIR}/backup_metadata_${DATE}.json" << EOF
+    {
+      "backup_date": "$(date -Iseconds)",
+      "database": "$POSTGRES_DB",
+      "host": "$POSTGRES_HOST",
+      "backup_files": [
+        "postgresql_backup_${DATE}.sql.dump",
+        "postgresql_backup_${DATE}.sql.gz",
+        "postgresql_schema_${DATE}.sql.gz",
+        "postgresql_data_${DATE}.sql.gz"
+      ],
+      "backup_size": "$(du -sh ${BACKUP_DIR}/*${DATE}* | awk '{print $1}')",
+      "backup_type": "full"
+    }
+    EOF
+
+    echo "Backup completed successfully at $(date)"
+    echo "Backup files created:"
+    ls -la "${BACKUP_DIR}"/*${DATE}*
+
+    # Cleanup old backups (keep last 7 days)
+    find "$BACKUP_DIR" -name "postgresql_backup_*.sql.gz" -mtime +7 -delete
+    find "$BACKUP_DIR" -name "postgresql_backup_*.sql.dump" -mtime +7 -delete
+    find "$BACKUP_DIR" -name "postgresql_schema_*.sql.gz" -mtime +7 -delete
+    find "$BACKUP_DIR" -name "postgresql_data_*.sql.gz" -mtime +7 -delete
+    find "$BACKUP_DIR" -name "backup_metadata_*.json" -mtime +7 -delete
+
+    echo "Backup cleanup completed"
+
+  restore.sh: |
+    #!/bin/bash
+    set -e
+
+    # PostgreSQL Restore Script
+    BACKUP_DIR="${BACKUP_DIR:-/backup}"
+    POSTGRES_DB="${POSTGRES_DB:-grill_stats}"
+    POSTGRES_USER="${POSTGRES_USER:-postgres}"
+    POSTGRES_HOST="${POSTGRES_HOST:-postgresql-service}"
+    BACKUP_FILE="$1"
+
+    if [ -z "$BACKUP_FILE" ]; then
+      echo "Usage: $0 <backup_file>"
+      echo "Available backups:"
+      ls -la "$BACKUP_DIR"/postgresql_backup_*.sql.gz
+      exit 1
+    fi
+
+    echo "Starting PostgreSQL restore from $BACKUP_FILE at $(date)"
+
+    # Check if backup file exists
+    if [ ! -f "$BACKUP_FILE" ]; then
+      echo "Error: Backup file $BACKUP_FILE not found"
+      exit 1
+    fi
+
+    # Determine backup type and restore accordingly
+    if [[ "$BACKUP_FILE" == *.dump ]]; then
+      echo "Restoring from custom format backup..."
+      pg_restore -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+        --verbose --clean --if-exists \
+        "$BACKUP_FILE"
+    elif [[ "$BACKUP_FILE" == *.sql.gz ]]; then
+      echo "Restoring from compressed SQL backup..."
+      gunzip -c "$BACKUP_FILE" | psql -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+    elif [[ "$BACKUP_FILE" == *.sql ]]; then
+      echo "Restoring from SQL backup..."
+      psql -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB" < "$BACKUP_FILE"
+    else
+      echo "Error: Unknown backup file format"
+      exit 1
+    fi
+
+    echo "Restore completed successfully at $(date)"
+
+  point-in-time-recovery.sh: |
+    #!/bin/bash
+    set -e
+
+    # PostgreSQL Point-in-Time Recovery Script
+    BACKUP_DIR="${BACKUP_DIR:-/backup}"
+    POSTGRES_DB="${POSTGRES_DB:-grill_stats}"
+    POSTGRES_USER="${POSTGRES_USER:-postgres}"
+    POSTGRES_HOST="${POSTGRES_HOST:-postgresql-service}"
+    RECOVERY_TARGET_TIME="$1"
+
+    if [ -z "$RECOVERY_TARGET_TIME" ]; then
+      echo "Usage: $0 <recovery_target_time>"
+      echo "Example: $0 '2024-01-15 14:30:00'"
+      exit 1
+    fi
+
+    echo "Starting Point-in-Time Recovery to $RECOVERY_TARGET_TIME"
+
+    # Find the most recent base backup before the target time
+    LATEST_BACKUP=$(ls -t "$BACKUP_DIR"/postgresql_backup_*.sql.dump | head -1)
+
+    if [ -z "$LATEST_BACKUP" ]; then
+      echo "Error: No base backup found"
+      exit 1
+    fi
+
+    echo "Using base backup: $LATEST_BACKUP"
+
+    # Restore the base backup
+    echo "Restoring base backup..."
+    pg_restore -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+      --verbose --clean --if-exists \
+      "$LATEST_BACKUP"
+
+    # Create recovery configuration
+    cat > /tmp/recovery.conf << EOF
+    restore_command = 'cp /var/lib/postgresql/archive/%f %p'
+    recovery_target_time = '$RECOVERY_TARGET_TIME'
+    recovery_target_inclusive = true
+    EOF
+
+    # Apply recovery configuration
+    echo "Applying recovery configuration..."
+    kubectl cp /tmp/recovery.conf postgresql-0:/var/lib/postgresql/data/recovery.conf
+
+    # Restart PostgreSQL to apply recovery
+    echo "Restarting PostgreSQL to apply recovery..."
+    kubectl rollout restart statefulset/postgresql
+
+    echo "Point-in-Time Recovery initiated. Check PostgreSQL logs for completion."
+
+  verify-backup.sh: |
+    #!/bin/bash
+    set -e
+
+    # PostgreSQL Backup Verification Script
+    BACKUP_DIR="${BACKUP_DIR:-/backup}"
+    POSTGRES_DB="${POSTGRES_DB:-grill_stats}"
+    POSTGRES_USER="${POSTGRES_USER:-postgres}"
+    POSTGRES_HOST="${POSTGRES_HOST:-postgresql-service}"
+    BACKUP_FILE="$1"
+
+    if [ -z "$BACKUP_FILE" ]; then
+      echo "Usage: $0 <backup_file>"
+      exit 1
+    fi
+
+    echo "Verifying backup: $BACKUP_FILE"
+
+    # Check if backup file exists and is readable
+    if [ ! -f "$BACKUP_FILE" ]; then
+      echo "Error: Backup file $BACKUP_FILE not found"
+      exit 1
+    fi
+
+    # Check backup file integrity
+    if [[ "$BACKUP_FILE" == *.dump ]]; then
+      echo "Verifying custom format backup..."
+      pg_restore --list "$BACKUP_FILE" > /dev/null
+      echo "Custom format backup verification: PASSED"
+    elif [[ "$BACKUP_FILE" == *.sql.gz ]]; then
+      echo "Verifying compressed SQL backup..."
+      gunzip -t "$BACKUP_FILE"
+      echo "Compressed SQL backup verification: PASSED"
+    elif [[ "$BACKUP_FILE" == *.sql ]]; then
+      echo "Verifying SQL backup..."
+      # Check if SQL file is valid
+      head -100 "$BACKUP_FILE" | grep -q "PostgreSQL database dump"
+      echo "SQL backup verification: PASSED"
+    fi
+
+    echo "Backup verification completed successfully"
+---
+# PostgreSQL Backup CronJob
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgresql-backup
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: backup
+spec:
+  schedule: "0 2 * * *"  # Run daily at 2 AM
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: postgres-backup
+            image: postgres:13-alpine
+            command:
+            - /bin/sh
+            - -c
+            - |
+              # Install required packages
+              apk add --no-cache curl
+
+              # Run backup script
+              /scripts/backup.sh
+
+              # Send notification on completion
+              if [ $? -eq 0 ]; then
+                echo "Backup completed successfully"
+                curl -X POST "${WEBHOOK_URL}" \
+                  -H "Content-Type: application/json" \
+                  -d '{"text":"PostgreSQL backup completed successfully"}'
+              else
+                echo "Backup failed"
+                curl -X POST "${WEBHOOK_URL}" \
+                  -H "Content-Type: application/json" \
+                  -d '{"text":"PostgreSQL backup failed"}'
+              fi
+            env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgresql-secrets
+                  key: backup-user
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgresql-secrets
+                  key: backup-password
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: postgresql-secrets
+                  key: database-name
+            - name: POSTGRES_HOST
+              value: postgresql-service
+            - name: BACKUP_DIR
+              value: /backup
+            - name: WEBHOOK_URL
+              valueFrom:
+                secretKeyRef:
+                  name: postgresql-secrets
+                  key: backup-webhook-url
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgresql-secrets
+                  key: backup-password
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backup
+            - name: backup-scripts
+              mountPath: /scripts
+            resources:
+              requests:
+                cpu: 100m
+                memory: 256Mi
+              limits:
+                cpu: 500m
+                memory: 512Mi
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: postgresql-backup-pvc
+          - name: backup-scripts
+            configMap:
+              name: postgresql-backup-scripts
+              defaultMode: 0755
+          restartPolicy: OnFailure
+---
+# PostgreSQL Backup Storage
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgresql-backup-pvc
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: backup
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: standard
+---
+# PostgreSQL Backup Verification CronJob
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgresql-backup-verify
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: backup
+spec:
+  schedule: "0 3 * * *"  # Run daily at 3 AM (after backup)
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: postgres-backup-verify
+            image: postgres:13-alpine
+            command:
+            - /bin/sh
+            - -c
+            - |
+              # Find the most recent backup
+              LATEST_BACKUP=$(ls -t /backup/postgresql_backup_*.sql.dump | head -1)
+
+              if [ -z "$LATEST_BACKUP" ]; then
+                echo "No backup found to verify"
+                exit 1
+              fi
+
+              # Run verification script
+              /scripts/verify-backup.sh "$LATEST_BACKUP"
+            env:
+            - name: BACKUP_DIR
+              value: /backup
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backup
+            - name: backup-scripts
+              mountPath: /scripts
+            resources:
+              requests:
+                cpu: 50m
+                memory: 128Mi
+              limits:
+                cpu: 200m
+                memory: 256Mi
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: postgresql-backup-pvc
+          - name: backup-scripts
+            configMap:
+              name: postgresql-backup-scripts
+              defaultMode: 0755
+          restartPolicy: OnFailure

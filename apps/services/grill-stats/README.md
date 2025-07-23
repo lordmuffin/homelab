@@ -76,11 +76,11 @@ kustomize/
    # Development
    cp kustomize/overlays/dev/secrets/dev.env.example kustomize/overlays/dev/secrets/dev.env
    # Edit dev.env with your development secrets
-   
+
    # Staging
    cp kustomize/overlays/staging/secrets/staging.env.example kustomize/overlays/staging/secrets/staging.env
    # Edit staging.env with your staging secrets
-   
+
    # Production
    cp kustomize/overlays/prod/secrets/prod.env.example kustomize/overlays/prod/secrets/prod.env
    # Edit prod.env with your production secrets

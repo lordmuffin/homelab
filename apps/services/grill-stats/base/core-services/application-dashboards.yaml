@@ -1,0 +1,690 @@
+# Application-Specific Dashboards for Grill Stats Microservices
+
+# Authentication Service Dashboard
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-auth-service
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: auth-service
+    grafana_dashboard: "1"
+data:
+  auth-service-dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "Authentication Service Dashboard",
+        "uid": "grill-stats-auth-service",
+        "tags": ["grill-stats", "auth", "microservice"],
+        "style": "dark",
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Authentication Requests",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+            "targets": [
+              {
+                "expr": "sum(rate(http_requests_total{job=\"grill-stats-auth-service\"}[5m])) by (method, endpoint)",
+                "legendFormat": "{{ method }} {{ endpoint }}",
+                "refId": "A"
+              }
+            ]
+          },
+          {
+            "id": 2,
+            "title": "Authentication Success Rate",
+            "type": "stat",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+            "targets": [
+              {
+                "expr": "(1 - (sum(rate(auth_failures_total[5m])) / sum(rate(auth_attempts_total[5m])))) * 100",
+                "legendFormat": "Success Rate",
+                "refId": "A"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "percent",
+                "thresholds": {
+                  "steps": [
+                    {"color": "red", "value": 0},
+                    {"color": "yellow", "value": 95},
+                    {"color": "green", "value": 99}
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "id": 3,
+            "title": "Login Methods Distribution",
+            "type": "piechart",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+            "targets": [
+              {
+                "expr": "sum(increase(grill_stats_user_login_total[24h])) by (auth_method)",
+                "legendFormat": "{{ auth_method }}",
+                "refId": "A"
+              }
+            ]
+          },
+          {
+            "id": 4,
+            "title": "Active Sessions",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+            "targets": [
+              {
+                "expr": "sum(grill_stats_active_sessions)",
+                "legendFormat": "Active Sessions",
+                "refId": "A"
+              }
+            ]
+          },
+          {
+            "id": 5,
+            "title": "Authentication Errors",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16},
+            "targets": [
+              {
+                "expr": "sum(rate(auth_failures_total[5m])) by (error_type)",
+                "legendFormat": "{{ error_type }}",
+                "refId": "A"
+              }
+            ]
+          }
+        ],
+        "time": {"from": "now-24h", "to": "now"},
+        "refresh": "30s",
+        "schemaVersion": 27,
+        "version": 1
+      }
+    }
+---
+# Device Service Dashboard
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-device-service
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: device-service
+    grafana_dashboard: "1"
+data:
+  device-service-dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "Device Service Dashboard",
+        "uid": "grill-stats-device-service",
+        "tags": ["grill-stats", "device", "microservice"],
+        "style": "dark",
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Device Management Requests",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+            "targets": [
+              {
+                "expr": "sum(rate(http_requests_total{job=\"grill-stats-device-service\"}[5m])) by (method, endpoint)",
+                "legendFormat": "{{ method }} {{ endpoint }}",
+                "refId": "A"
+              }
+            ]
+          },
+          {
+            "id": 2,
+            "title": "Connected Devices",
+            "type": "stat",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+            "targets": [
+              {
+                "expr": "count(grill_stats_device_online_status == 1)",
+                "legendFormat": "Online Devices",
+                "refId": "A"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "short",
+                "color": {"mode": "palette-classic"}
+              }
+            }
+          },
+          {
+            "id": 3,
+            "title": "Device Types Distribution",
+            "type": "piechart",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+            "targets": [
+              {
+                "expr": "count(grill_stats_device_online_status) by (device_type)",
+                "legendFormat": "{{ device_type }}",
+                "refId": "A"
+              }
+            ]
+          },
+          {
+            "id": 4,
+            "title": "Device Registration Rate",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+            "targets": [
+              {
+                "expr": "sum(rate(grill_stats_devices_registered_total[5m]))",
+                "legendFormat": "Registrations/sec",
+                "refId": "A"
+              }
+            ]
+          },
+          {
+            "id": 5,
+            "title": "ThermoWorks API Calls",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+            "targets": [
+              {
+                "expr": "sum(rate(grill_stats_thermoworks_api_requests_total[5m])) by (endpoint)",
+                "legendFormat": "{{ endpoint }}",
+                "refId": "A"
+              }
+            ]
+          },
+          {
+            "id": 6,
+            "title": "API Response Times",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, sum(rate(grill_stats_thermoworks_api_duration_seconds_bucket[5m])) by (le))",
+                "legendFormat": "P95 Response Time",
+                "refId": "A"
+              }
+            ]
+          }
+        ],
+        "time": {"from": "now-24h", "to": "now"},
+        "refresh": "30s",
+        "schemaVersion": 27,
+        "version": 1
+      }
+    }
+---
+# Temperature Service Dashboard
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-temperature-service
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: temperature-service
+    grafana_dashboard: "1"
+data:
+  temperature-service-dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "Temperature Service Dashboard",
+        "uid": "grill-stats-temperature-service",
+        "tags": ["grill-stats", "temperature", "microservice"],
+        "style": "dark",
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Temperature Data Ingestion Rate",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+            "targets": [
+              {
+                "expr": "sum(rate(grill_stats_temperature_readings_total[5m]))",
+                "legendFormat": "Readings/sec",
+                "refId": "A"
+              }
+            ]
+          },
+          {
+            "id": 2,
+            "title": "Current Temperature Readings",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+            "targets": [
+              {
+                "expr": "grill_stats_temperature_celsius",
+                "legendFormat": "{{ device_id }}-{{ channel_id }}",
+                "refId": "A"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "celsius",
+                "min": 0,
+                "max": 300
+              }
+            }
+          },
+          {
+            "id": 3,
+            "title": "Temperature Alerts",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+            "targets": [
+              {
+                "expr": "sum(rate(grill_stats_temperature_alerts_total[5m])) by (alert_type)",
+                "legendFormat": "{{ alert_type }}",
+                "refId": "A"
+              }
+            ]
+          },
+          {
+            "id": 4,
+            "title": "Data Processing Time",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, sum(rate(grill_stats_data_processing_duration_seconds_bucket[5m])) by (le))",
+                "legendFormat": "P95 Processing Time",
+                "refId": "A"
+              }
+            ]
+          },
+          {
+            "id": 5,
+            "title": "Temperature Service Health",
+            "type": "stat",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+            "targets": [
+              {
+                "expr": "up{job=\"grill-stats-temperature-service\"}",
+                "legendFormat": "Service Status",
+                "refId": "A"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "mappings": [
+                  {
+                    "options": {
+                      "0": {"text": "DOWN", "color": "red"},
+                      "1": {"text": "UP", "color": "green"}
+                    },
+                    "type": "value"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": 6,
+            "title": "Cache Hit Rate",
+            "type": "stat",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+            "targets": [
+              {
+                "expr": "sum(rate(grill_stats_cache_hits_total[5m])) / (sum(rate(grill_stats_cache_hits_total[5m])) + sum(rate(grill_stats_cache_misses_total[5m]))) * 100",
+                "legendFormat": "Cache Hit Rate",
+                "refId": "A"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "percent",
+                "thresholds": {
+                  "steps": [
+                    {"color": "red", "value": 0},
+                    {"color": "yellow", "value": 70},
+                    {"color": "green", "value": 90}
+                  ]
+                }
+              }
+            }
+          }
+        ],
+        "time": {"from": "now-6h", "to": "now"},
+        "refresh": "15s",
+        "schemaVersion": 27,
+        "version": 1
+      }
+    }
+---
+# Historical Data Service Dashboard
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-historical-service
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: historical-service
+    grafana_dashboard: "1"
+data:
+  historical-service-dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "Historical Data Service Dashboard",
+        "uid": "grill-stats-historical-service",
+        "tags": ["grill-stats", "historical", "microservice"],
+        "style": "dark",
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Historical Data Queries",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+            "targets": [
+              {
+                "expr": "sum(rate(http_requests_total{job=\"grill-stats-historical-service\"}[5m])) by (endpoint)",
+                "legendFormat": "{{ endpoint }}",
+                "refId": "A"
+              }
+            ]
+          },
+          {
+            "id": 2,
+            "title": "Query Performance",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, sum(rate(grill_stats_database_query_duration_seconds_bucket{database=\"timescaledb\"}[5m])) by (le))",
+                "legendFormat": "P95 Query Time",
+                "refId": "A"
+              }
+            ]
+          },
+          {
+            "id": 3,
+            "title": "Data Retention",
+            "type": "table",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+            "targets": [
+              {
+                "expr": "grill_stats_data_retention_days",
+                "legendFormat": "{{ data_type }}",
+                "refId": "A",
+                "format": "table"
+              }
+            ]
+          },
+          {
+            "id": 4,
+            "title": "Storage Usage",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+            "targets": [
+              {
+                "expr": "pg_database_size_bytes{datname=\"grill_stats_historical\"}",
+                "legendFormat": "Database Size",
+                "refId": "A"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "bytes"
+              }
+            }
+          },
+          {
+            "id": 5,
+            "title": "Data Aggregation Jobs",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16},
+            "targets": [
+              {
+                "expr": "sum(rate(grill_stats_data_aggregation_jobs_total[5m])) by (job_type)",
+                "legendFormat": "{{ job_type }}",
+                "refId": "A"
+              }
+            ]
+          }
+        ],
+        "time": {"from": "now-24h", "to": "now"},
+        "refresh": "1m",
+        "schemaVersion": 27,
+        "version": 1
+      }
+    }
+---
+# Encryption Service Dashboard
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-encryption-service
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: encryption-service
+    grafana_dashboard: "1"
+data:
+  encryption-service-dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "Encryption Service Dashboard",
+        "uid": "grill-stats-encryption-service",
+        "tags": ["grill-stats", "encryption", "microservice"],
+        "style": "dark",
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Encryption Operations",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+            "targets": [
+              {
+                "expr": "sum(rate(grill_stats_encryption_operations_total[5m])) by (operation_type)",
+                "legendFormat": "{{ operation_type }}",
+                "refId": "A"
+              }
+            ]
+          },
+          {
+            "id": 2,
+            "title": "Encryption Performance",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, sum(rate(grill_stats_encryption_duration_seconds_bucket[5m])) by (le))",
+                "legendFormat": "P95 Encryption Time",
+                "refId": "A"
+              }
+            ]
+          },
+          {
+            "id": 3,
+            "title": "Key Rotation Status",
+            "type": "stat",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+            "targets": [
+              {
+                "expr": "time() - grill_stats_last_key_rotation_timestamp",
+                "legendFormat": "Time Since Last Rotation",
+                "refId": "A"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "s",
+                "thresholds": {
+                  "steps": [
+                    {"color": "green", "value": 0},
+                    {"color": "yellow", "value": 2592000},
+                    {"color": "red", "value": 7776000}
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "id": 4,
+            "title": "Vault Health",
+            "type": "stat",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+            "targets": [
+              {
+                "expr": "vault_up",
+                "legendFormat": "Vault Status",
+                "refId": "A"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "mappings": [
+                  {
+                    "options": {
+                      "0": {"text": "DOWN", "color": "red"},
+                      "1": {"text": "UP", "color": "green"}
+                    },
+                    "type": "value"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": 5,
+            "title": "Encryption Errors",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16},
+            "targets": [
+              {
+                "expr": "sum(rate(grill_stats_encryption_errors_total[5m])) by (error_type)",
+                "legendFormat": "{{ error_type }}",
+                "refId": "A"
+              }
+            ]
+          }
+        ],
+        "time": {"from": "now-24h", "to": "now"},
+        "refresh": "1m",
+        "schemaVersion": 27,
+        "version": 1
+      }
+    }
+---
+# Web UI Dashboard
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-web-ui
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: web-ui
+    grafana_dashboard: "1"
+data:
+  web-ui-dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "Web UI Dashboard",
+        "uid": "grill-stats-web-ui",
+        "tags": ["grill-stats", "web-ui", "microservice"],
+        "style": "dark",
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Web UI Requests",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+            "targets": [
+              {
+                "expr": "sum(rate(nginx_http_requests_total[5m])) by (method, status)",
+                "legendFormat": "{{ method }} {{ status }}",
+                "refId": "A"
+              }
+            ]
+          },
+          {
+            "id": 2,
+            "title": "Active WebSocket Connections",
+            "type": "stat",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+            "targets": [
+              {
+                "expr": "sum(grill_stats_websocket_connections_active)",
+                "legendFormat": "Active Connections",
+                "refId": "A"
+              }
+            ]
+          },
+          {
+            "id": 3,
+            "title": "Page Load Times",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, sum(rate(nginx_http_request_duration_seconds_bucket[5m])) by (le))",
+                "legendFormat": "P95 Load Time",
+                "refId": "A"
+              }
+            ]
+          },
+          {
+            "id": 4,
+            "title": "Static Asset Cache Hit Rate",
+            "type": "stat",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+            "targets": [
+              {
+                "expr": "sum(rate(nginx_cache_hits_total[5m])) / (sum(rate(nginx_cache_hits_total[5m])) + sum(rate(nginx_cache_misses_total[5m]))) * 100",
+                "legendFormat": "Cache Hit Rate",
+                "refId": "A"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "percent",
+                "thresholds": {
+                  "steps": [
+                    {"color": "red", "value": 0},
+                    {"color": "yellow", "value": 80},
+                    {"color": "green", "value": 95}
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "id": 5,
+            "title": "Error Rate by Status Code",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16},
+            "targets": [
+              {
+                "expr": "sum(rate(nginx_http_requests_total{status=~\"4..|5..\"}[5m])) by (status)",
+                "legendFormat": "{{ status }}",
+                "refId": "A"
+              }
+            ]
+          }
+        ],
+        "time": {"from": "now-24h", "to": "now"},
+        "refresh": "30s",
+        "schemaVersion": 27,
+        "version": 1
+      }
+    }

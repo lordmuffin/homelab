@@ -1,6 +1,41 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
+metadata:
+  name: grill-stats-ingress
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/part-of: grill-stats
+
 resources:
-- traefik-middleware.yaml
-- traefik-ingressroute.yaml
+  # Core Ingress Configuration
+  - traefik-ingressroute.yaml
+  - traefik-middleware.yaml
+
+  # SSL/TLS Certificate Management
+  - cert-issuer.yaml
+
+  # Administrative and Monitoring
+  - traefik-admin.yaml
+  - traefik-monitoring.yaml
+
+  # TCP Services (Database Access)
+  - traefik-tcp.yaml
+
+commonLabels:
+  app.kubernetes.io/name: grill-stats
+  app.kubernetes.io/component: ingress
+  app.kubernetes.io/part-of: grill-stats
+
+patchesStrategicMerge:
+  # Environment-specific patches will be applied in overlays
+
+patchesJson6902: []
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+configurations:
+  - name: grill-stats-ingress-config
+    behavior: merge

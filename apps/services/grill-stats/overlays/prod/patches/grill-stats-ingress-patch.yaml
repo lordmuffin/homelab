@@ -6,10 +6,10 @@ metadata:
 spec:
   tls:
   - hosts:
-    - grill-stats.lab.apj.dev
-    secretName: lab-apj-dev-tls
+    - grills.lab.apj.dev
+    secretName: grill-stats-tls
   rules:
-  - host: grill-stats.lab.apj.dev
+  - host: grills.lab.apj.dev
     http:
       paths:
       - path: /
@@ -18,4 +18,4 @@ spec:
           service:
             name: grill-stats
             port:
-              number: 5000
+              number: 80

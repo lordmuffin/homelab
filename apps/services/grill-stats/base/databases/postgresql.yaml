@@ -7,6 +7,8 @@ metadata:
     app.kubernetes.io/name: postgresql
     app.kubernetes.io/part-of: grill-stats
     app.kubernetes.io/component: database
+    app.kubernetes.io/version: "13"
+    app.kubernetes.io/managed-by: kustomize
 spec:
   serviceName: postgresql-service
   replicas: 1
@@ -19,7 +21,32 @@ spec:
         app.kubernetes.io/name: postgresql
         app.kubernetes.io/part-of: grill-stats
         app.kubernetes.io/component: database
+        app.kubernetes.io/version: "13"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9187"
+        prometheus.io/path: "/metrics"
     spec:
+      securityContext:
+        fsGroup: 999
+        runAsUser: 999
+        runAsNonRoot: true
+      initContainers:
+      - name: init-db
+        image: postgres:13-alpine
+        command:
+          - /bin/sh
+          - -c
+          - |
+            # Initialize database directory permissions
+            mkdir -p /var/lib/postgresql/data/pgdata
+            chown -R 999:999 /var/lib/postgresql/data
+            chmod 700 /var/lib/postgresql/data/pgdata
+        securityContext:
+          runAsUser: 0
+        volumeMounts:
+        - name: postgresql-data
+          mountPath: /var/lib/postgresql/data
       containers:
       - name: postgresql
         image: postgres:13-alpine
@@ -30,36 +57,112 @@ spec:
         - name: POSTGRES_USER
           valueFrom:
             secretKeyRef:
-              name: grill-stats-prod-creds-1password
-              key: DB_USERNAME
+              name: postgresql-secrets
+              key: postgres-user
         - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: grill-stats-prod-creds-1password
-              key: DB_PASSWORD
+              name: postgresql-secrets
+              key: postgres-password
         - name: POSTGRES_DB
-          value: grill_monitoring
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secrets
+              key: database-name
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        - name: POSTGRES_INITDB_ARGS
+          value: "--auth-host=scram-sha-256 --auth-local=scram-sha-256"
         resources:
           requests:
-            cpu: 100m
-            memory: 256Mi
-          limits:
-            cpu: 500m
+            cpu: 200m
             memory: 512Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
         volumeMounts:
         - name: postgresql-data
           mountPath: /var/lib/postgresql/data
+        - name: postgresql-config
+          mountPath: /etc/postgresql/postgresql.conf
+          subPath: postgresql.conf
+        - name: postgresql-hba
+          mountPath: /etc/postgresql/pg_hba.conf
+          subPath: pg_hba.conf
+        - name: init-scripts
+          mountPath: /docker-entrypoint-initdb.d
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+              - ALL
         readinessProbe:
           exec:
-            command: ["pg_isready", "-U", "$(POSTGRES_USER)"]
-          initialDelaySeconds: 5
+            command: ["pg_isready", "-U", "$(POSTGRES_USER)", "-d", "$(POSTGRES_DB)"]
+          initialDelaySeconds: 10
           periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
         livenessProbe:
           exec:
-            command: ["pg_isready", "-U", "$(POSTGRES_USER)"]
+            command: ["pg_isready", "-U", "$(POSTGRES_USER)", "-d", "$(POSTGRES_DB)"]
           initialDelaySeconds: 30
-          periodSeconds: 15
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+        startupProbe:
+          exec:
+            command: ["pg_isready", "-U", "$(POSTGRES_USER)", "-d", "$(POSTGRES_DB)"]
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+      # PostgreSQL Prometheus Exporter
+      - name: postgres-exporter
+        image: prometheuscommunity/postgres-exporter:v0.15.0
+        ports:
+        - containerPort: 9187
+          name: metrics
+        env:
+        - name: DATA_SOURCE_NAME
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secrets
+              key: database-url
+        - name: PG_EXPORTER_EXTEND_QUERY_PATH
+          value: "/etc/postgres-exporter/queries.yaml"
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+        volumeMounts:
+        - name: postgres-exporter-config
+          mountPath: /etc/postgres-exporter
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 65534
+          capabilities:
+            drop:
+              - ALL
       volumes:
+      - name: postgresql-config
+        configMap:
+          name: postgresql-config
+      - name: postgresql-hba
+        configMap:
+          name: postgresql-hba-config
+      - name: init-scripts
+        configMap:
+          name: postgresql-init-scripts
+      - name: postgres-exporter-config
+        configMap:
+          name: postgres-exporter-config
       - name: postgresql-data
         persistentVolumeClaim:
           claimName: postgresql-pvc
@@ -86,10 +189,14 @@ kind: PersistentVolumeClaim
 metadata:
   name: postgresql-pvc
   namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
 spec:
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 10Gi
-  storageClassName: ssd
+      storage: 20Gi
+  storageClassName: standard

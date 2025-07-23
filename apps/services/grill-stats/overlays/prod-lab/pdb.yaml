@@ -1,0 +1,77 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: auth-service-pdb
+  namespace: grill-stats
+  labels:
+    environment: prod-lab
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: auth-service
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: device-service-pdb
+  namespace: grill-stats
+  labels:
+    environment: prod-lab
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: device-service
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: temperature-service-pdb
+  namespace: grill-stats
+  labels:
+    environment: prod-lab
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: temperature-service
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: historical-data-service-pdb
+  namespace: grill-stats
+  labels:
+    environment: prod-lab
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: historical-data-service
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: encryption-service-pdb
+  namespace: grill-stats
+  labels:
+    environment: prod-lab
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: encryption-service
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: web-ui-service-pdb
+  namespace: grill-stats
+  labels:
+    environment: prod-lab
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: web-ui

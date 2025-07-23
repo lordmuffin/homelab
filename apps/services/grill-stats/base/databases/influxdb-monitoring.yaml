@@ -1,0 +1,325 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: influxdb-network-policy
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: influxdb
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow access from services in the same namespace
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: grill-stats
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: grill-stats
+    ports:
+    - protocol: TCP
+      port: 8086
+    - protocol: TCP
+      port: 8088
+  # Allow access from monitoring namespace
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 8086
+  # Allow access from Traefik ingress
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: traefik
+    ports:
+    - protocol: TCP
+      port: 8086
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow NTP for time synchronization
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 123
+  # Allow access to external services for health checks
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 443
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: influxdb-metrics
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+    prometheus.io/scrape: "true"
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: influxdb
+      prometheus.io/scrape: "true"
+  endpoints:
+  - port: metrics
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+    scheme: http
+    honorLabels: true
+    metricRelabelings:
+    - sourceLabels: [__name__]
+      regex: "influxdb_.*"
+      targetLabel: __name__
+      replacement: "${1}"
+    - sourceLabels: [instance]
+      targetLabel: instance
+      regex: "([^:]+):(\\d+)"
+      replacement: "${1}"
+    - sourceLabels: [job]
+      targetLabel: job
+      replacement: "influxdb"
+    relabelings:
+    - sourceLabels: [__meta_kubernetes_pod_name]
+      targetLabel: pod
+    - sourceLabels: [__meta_kubernetes_pod_node_name]
+      targetLabel: node
+    - sourceLabels: [__meta_kubernetes_namespace]
+      targetLabel: namespace
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: influxdb-alerts
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+  - name: influxdb.rules
+    rules:
+    - alert: InfluxDBDown
+      expr: up{job="influxdb"} == 0
+      for: 5m
+      labels:
+        severity: critical
+        service: influxdb
+        component: database
+      annotations:
+        summary: "InfluxDB is down"
+        description: "InfluxDB has been down for more than 5 minutes"
+        runbook_url: "https://docs.influxdata.com/influxdb/v2.7/troubleshoot/"
+
+    - alert: InfluxDBHighMemoryUsage
+      expr: influxdb_go_memstats_heap_inuse_bytes / influxdb_go_memstats_heap_sys_bytes > 0.85
+      for: 10m
+      labels:
+        severity: warning
+        service: influxdb
+        component: database
+      annotations:
+        summary: "InfluxDB high memory usage"
+        description: "InfluxDB memory usage is above 85% for more than 10 minutes"
+        runbook_url: "https://docs.influxdata.com/influxdb/v2.7/troubleshoot/"
+
+    - alert: InfluxDBHighDiskUsage
+      expr: (influxdb_boltdb_writes_total - influxdb_boltdb_reads_total) / influxdb_boltdb_writes_total > 0.9
+      for: 15m
+      labels:
+        severity: warning
+        service: influxdb
+        component: database
+      annotations:
+        summary: "InfluxDB high disk usage"
+        description: "InfluxDB disk usage is above 90% for more than 15 minutes"
+        runbook_url: "https://docs.influxdata.com/influxdb/v2.7/troubleshoot/"
+
+    - alert: InfluxDBHighQueryLatency
+      expr: influxdb_query_request_duration_seconds{quantile="0.99"} > 30
+      for: 5m
+      labels:
+        severity: warning
+        service: influxdb
+        component: database
+      annotations:
+        summary: "InfluxDB high query latency"
+        description: "InfluxDB 99th percentile query latency is above 30 seconds"
+        runbook_url: "https://docs.influxdata.com/influxdb/v2.7/troubleshoot/"
+
+    - alert: InfluxDBHighWriteLatency
+      expr: influxdb_write_request_duration_seconds{quantile="0.99"} > 10
+      for: 5m
+      labels:
+        severity: warning
+        service: influxdb
+        component: database
+      annotations:
+        summary: "InfluxDB high write latency"
+        description: "InfluxDB 99th percentile write latency is above 10 seconds"
+        runbook_url: "https://docs.influxdata.com/influxdb/v2.7/troubleshoot/"
+
+    - alert: InfluxDBTasksFailing
+      expr: influxdb_task_executor_total_runs_active == 0
+      for: 30m
+      labels:
+        severity: warning
+        service: influxdb
+        component: database
+      annotations:
+        summary: "InfluxDB tasks not running"
+        description: "InfluxDB has no active task runs for more than 30 minutes"
+        runbook_url: "https://docs.influxdata.com/influxdb/v2.7/troubleshoot/"
+
+    - alert: InfluxDBBucketHighCardinality
+      expr: influxdb_bucket_series_total > 1000000
+      for: 1h
+      labels:
+        severity: warning
+        service: influxdb
+        component: database
+      annotations:
+        summary: "InfluxDB bucket has high cardinality"
+        description: "InfluxDB bucket has more than 1 million series"
+        runbook_url: "https://docs.influxdata.com/influxdb/v2.7/troubleshoot/"
+
+    - alert: InfluxDBNoDataIngestion
+      expr: increase(influxdb_write_request_bytes_total[5m]) == 0
+      for: 10m
+      labels:
+        severity: warning
+        service: influxdb
+        component: database
+      annotations:
+        summary: "InfluxDB no data ingestion"
+        description: "InfluxDB has not ingested any data for more than 10 minutes"
+        runbook_url: "https://docs.influxdata.com/influxdb/v2.7/troubleshoot/"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: influxdb-grafana-dashboard
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+    grafana_dashboard: "true"
+data:
+  influxdb-dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "InfluxDB Monitoring Dashboard",
+        "tags": ["influxdb", "database", "grill-stats"],
+        "style": "dark",
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "InfluxDB Status",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "up{job=\"influxdb\"}",
+                "legendFormat": "{{instance}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+          },
+          {
+            "id": 2,
+            "title": "Memory Usage",
+            "type": "timeseries",
+            "targets": [
+              {
+                "expr": "influxdb_go_memstats_heap_inuse_bytes",
+                "legendFormat": "Heap In Use"
+              },
+              {
+                "expr": "influxdb_go_memstats_heap_sys_bytes",
+                "legendFormat": "Heap System"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+          },
+          {
+            "id": 3,
+            "title": "Write Throughput",
+            "type": "timeseries",
+            "targets": [
+              {
+                "expr": "rate(influxdb_write_request_bytes_total[5m])",
+                "legendFormat": "Write Bytes/sec"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+          },
+          {
+            "id": 4,
+            "title": "Query Latency",
+            "type": "timeseries",
+            "targets": [
+              {
+                "expr": "influxdb_query_request_duration_seconds",
+                "legendFormat": "{{quantile}} percentile"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+          },
+          {
+            "id": 5,
+            "title": "Active Tasks",
+            "type": "timeseries",
+            "targets": [
+              {
+                "expr": "influxdb_task_executor_total_runs_active",
+                "legendFormat": "Active Tasks"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+          },
+          {
+            "id": 6,
+            "title": "Bucket Series Count",
+            "type": "timeseries",
+            "targets": [
+              {
+                "expr": "influxdb_bucket_series_total",
+                "legendFormat": "{{bucket}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}
+          }
+        ],
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "refresh": "30s"
+      }
+    }

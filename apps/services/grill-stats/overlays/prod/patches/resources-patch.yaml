@@ -2,7 +2,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: device-service
-  namespace: grill-stats
 spec:
   template:
     spec:
@@ -20,7 +19,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: temperature-service
-  namespace: grill-stats
 spec:
   template:
     spec:
@@ -37,8 +35,24 @@ spec:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
+  name: postgresql
+spec:
+  template:
+    spec:
+      containers:
+      - name: postgresql
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 1
+            memory: 1Gi
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
   name: influxdb
-  namespace: grill-stats
 spec:
   template:
     spec:

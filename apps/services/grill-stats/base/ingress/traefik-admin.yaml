@@ -1,0 +1,231 @@
+# Admin Dashboard IngressRoute (Restricted Access)
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: grill-stats-admin-dashboard
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: admin
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`admin.grill-stats.homelab.local`) && PathPrefix(`/dashboard`)
+      kind: Rule
+      services:
+        - name: traefik
+          port: 8080
+          namespace: kube-system
+      middlewares:
+        - name: grill-stats-admin-auth
+        - name: grill-stats-ip-whitelist
+        - name: grill-stats-admin-security
+  tls:
+    secretName: grill-stats-admin-tls
+---
+# Metrics Endpoint IngressRoute
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: grill-stats-metrics
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: admin
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`admin.grill-stats.homelab.local`) && PathPrefix(`/metrics`)
+      kind: Rule
+      services:
+        - name: traefik
+          port: 8080
+          namespace: kube-system
+      middlewares:
+        - name: grill-stats-admin-auth
+        - name: grill-stats-ip-whitelist
+        - name: grill-stats-metrics-security
+  tls:
+    secretName: grill-stats-admin-tls
+---
+# API Debug Endpoint IngressRoute
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: grill-stats-api-debug
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: admin
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`admin.grill-stats.homelab.local`) && PathPrefix(`/api/debug`)
+      kind: Rule
+      services:
+        - name: traefik
+          port: 8080
+          namespace: kube-system
+      middlewares:
+        - name: grill-stats-admin-auth
+        - name: grill-stats-ip-whitelist
+        - name: grill-stats-debug-security
+  tls:
+    secretName: grill-stats-admin-tls
+---
+# Admin Authentication Middleware
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: grill-stats-admin-auth
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: admin
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  basicAuth:
+    secret: grill-stats-admin-auth
+    removeHeader: true
+---
+# Admin Security Headers
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: grill-stats-admin-security
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: admin
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  headers:
+    frameDeny: true
+    sslRedirect: true
+    browserXssFilter: true
+    contentTypeNosniff: true
+    forceSTSHeader: true
+    stsIncludeSubdomains: true
+    stsPreload: true
+    stsSeconds: 31536000
+    customRequestHeaders:
+      X-Forwarded-Proto: "https"
+      X-Admin-Access: "true"
+    customResponseHeaders:
+      X-Frame-Options: "DENY"
+      Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https:;"
+      Referrer-Policy: "strict-origin-when-cross-origin"
+      X-Content-Type-Options: "nosniff"
+      X-XSS-Protection: "1; mode=block"
+      Cache-Control: "no-cache, no-store, must-revalidate"
+      Pragma: "no-cache"
+---
+# Metrics Security Headers
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: grill-stats-metrics-security
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: admin
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  headers:
+    customRequestHeaders:
+      X-Forwarded-Proto: "https"
+      X-Metrics-Access: "true"
+    customResponseHeaders:
+      Content-Type: "text/plain; version=0.0.4; charset=utf-8"
+      Cache-Control: "no-cache, no-store, must-revalidate"
+      Pragma: "no-cache"
+      X-Content-Type-Options: "nosniff"
+---
+# Debug Security Headers
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: grill-stats-debug-security
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: admin
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  headers:
+    customRequestHeaders:
+      X-Forwarded-Proto: "https"
+      X-Debug-Access: "true"
+    customResponseHeaders:
+      Content-Type: "application/json"
+      Cache-Control: "no-cache, no-store, must-revalidate"
+      Pragma: "no-cache"
+      X-Content-Type-Options: "nosniff"
+---
+# Admin TLS Certificate
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: grill-stats-admin-tls
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: admin
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  secretName: grill-stats-admin-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+    - admin.grill-stats.homelab.local
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days
+  subject:
+    organizations:
+      - homelab-admin
+  privateKey:
+    algorithm: RSA
+    encoding: PKCS1
+    size: 2048
+  usages:
+    - digital signature
+    - key encipherment
+    - server auth
+---
+# Admin Auth Secret (Base64 encoded user:password)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: grill-stats-admin-auth
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: admin
+    app.kubernetes.io/part-of: grill-stats
+type: Opaque
+data:
+  # admin:admin123 (change this in production!)
+  users: YWRtaW46JGFwcjEkSDY1dnlxVU8kSnFHT1pnUGR3aGdUMGNmLjl4NDczMAo=
+---
+# Admin Rate Limiting
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: grill-stats-admin-rate-limit
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: admin
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  rateLimit:
+    average: 10
+    period: 1m
+    burst: 5

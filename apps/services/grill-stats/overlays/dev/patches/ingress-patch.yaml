@@ -1,0 +1,47 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: device-service-ingress
+spec:
+  routes:
+    - match: Host(`dev.grill-stats.example.com`) && PathPrefix(`/api/devices`)
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: temperature-service-ingress
+spec:
+  routes:
+    - match: Host(`dev.grill-stats.example.com`) && PathPrefix(`/api/temperature`)
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: homeassistant-service-ingress
+spec:
+  routes:
+    - match: Host(`dev.grill-stats.example.com`) && PathPrefix(`/api/homeassistant`)
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: notification-service-ingress
+spec:
+  routes:
+    - match: Host(`dev.grill-stats.example.com`) && PathPrefix(`/api/notifications`)
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: data-processing-service-ingress
+spec:
+  routes:
+    - match: Host(`dev.grill-stats.example.com`) && PathPrefix(`/api/data`)
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: grill-stats-tls
+spec:
+  dnsNames:
+    - dev.grill-stats.example.com

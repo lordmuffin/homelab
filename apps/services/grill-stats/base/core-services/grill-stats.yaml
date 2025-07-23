@@ -7,8 +7,6 @@ metadata:
   labels:
     app: grill-stats
     component: monitoring
-    app.kubernetes.io/name: grill-stats
-    app.kubernetes.io/part-of: grill-stats
 spec:
   replicas: 1
   selector:
@@ -19,13 +17,12 @@ spec:
       labels:
         app: grill-stats
         component: monitoring
-        app.kubernetes.io/name: grill-stats
-        app.kubernetes.io/part-of: grill-stats
     spec:
+      imagePullSecrets:
+      - name: gitea-registry
       containers:
       - name: grill-stats
-        image: lordmuffin/grill-stats:latest
-        imagePullPolicy: Always
+        image: gitea-internal/lordmuffin/grill-stats:latest
         ports:
         - containerPort: 5000
           name: http
@@ -33,57 +30,38 @@ spec:
         - name: THERMOWORKS_API_KEY
           valueFrom:
             secretKeyRef:
-              name: grill-stats-prod-creds-1password
-              key: THERMOWORKS_API_KEY
+              name: grill-stats-secrets
+              key: thermoworks-api-key
         - name: HOMEASSISTANT_URL
-          value: "https://home.andrewpjackson.com"
+          valueFrom:
+            configMapKeyRef:
+              name: grill-stats-config
+              key: homeassistant-url
         - name: HOMEASSISTANT_TOKEN
           valueFrom:
             secretKeyRef:
-              name: grill-stats-prod-creds-1password
-              key: HOMEASSISTANT_TOKEN
+              name: grill-stats-secrets
+              key: homeassistant-token
         - name: POSTGRES_USER
           valueFrom:
             secretKeyRef:
-              name: grill-stats-prod-creds-1password
-              key: DB_USERNAME
+              name: grill-stats-db-credentials
+              key: username
         - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: grill-stats-prod-creds-1password
-              key: DB_PASSWORD
-        - name: DB_USERNAME
-          valueFrom:
-            secretKeyRef:
-              name: grill-stats-prod-creds-1password
-              key: DB_USERNAME
-        - name: DB_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: grill-stats-prod-creds-1password
-              key: DB_PASSWORD
+              name: grill-stats-db-credentials
+              key: password
         - name: POSTGRES_DB
-          value: grill-stats
+          value: grillstats
         - name: DATABASE_URL
-          value: postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@grill-stats-db-rw.grill-stats.svc.cluster.local:5432/$(POSTGRES_DB)
-        - name: REDIS_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: grill-stats-prod-creds-1password
-              key: REDIS_PASSWORD
-        - name: REDIS_URL
-          value: redis://:$(REDIS_PASSWORD)@redis.grill-stats.svc.cluster.local:6379/0
-        - name: SECRET_KEY
-          valueFrom:
-            secretKeyRef:
-              name: grill-stats-prod-creds-1password
-              key: SECRET_KEY
-        - name: FLASK_ENV
-          value: development
+          value: postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@grill-stats-db.$(NAMESPACE).svc.cluster.local:5432/$(POSTGRES_DB)
         - name: SYNC_INTERVAL
-          value: "300"
-        - name: THERMOWORKS_POLLING_INTERVAL
-          value: "300"
+          valueFrom:
+            configMapKeyRef:
+              name: grill-stats-config
+              key: SYNC_INTERVAL
+              optional: true
         resources:
           limits:
             memory: "512Mi"
@@ -112,13 +90,11 @@ metadata:
   labels:
     app: grill-stats
     component: monitoring
-    app.kubernetes.io/name: grill-stats
-    app.kubernetes.io/part-of: grill-stats
 spec:
   selector:
     app: grill-stats
   ports:
-  - port: 5000
+  - port: 80
     targetPort: http
     name: http
   type: ClusterIP
@@ -130,13 +106,14 @@ metadata:
   namespace: grill-stats
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod
+    kubernetes.io/ingress.class: nginx
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
     traefik.ingress.kubernetes.io/router.tls: "true"
 spec:
   tls:
   - hosts:
-    - grill-stats.lab.apj.dev  # Will be patched by overlay
-    secretName: lab-apj-dev-tls
+    - grills.lab.apj.dev  # Will be patched by overlay
+    secretName: grill-stats-tls
   rules:
   - host: grills.lab.apj.dev  # Will be patched by overlay
     http:
@@ -147,4 +124,4 @@ spec:
           service:
             name: grill-stats
             port:
-              number: 5000
+              number: 80

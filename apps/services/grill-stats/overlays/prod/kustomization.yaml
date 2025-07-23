@@ -3,15 +3,28 @@ kind: Kustomization
 
 namespace: grill-stats
 
-resources:
+bases:
 - ../../base
-- ./secrets/grill-stats-prod-creds-1password.yaml
-- patches/grill-stats-hpa.yaml
-- patches/hpa-patch.yaml
-- patches/pdb-patch.yaml
 
 patches:
+- path: patches/hpa-patch.yaml
+- path: patches/pdb-patch.yaml
 - path: patches/resources-patch.yaml
 - path: patches/grill-stats-ingress-patch.yaml
-- path: patches/grill-stats-env-patch.yaml
-- path: patches/remove-replicas-patch.yaml
+
+resources:
+- patches/grill-stats-hpa.yaml
+- vault-prod-config.yaml
+- network-policies-prod.yaml
+
+configMapGenerator:
+- name: grill-stats-config
+  behavior: merge
+  literals:
+  - SYNC_INTERVAL="300"  # 5 minutes for production
+
+secretGenerator:
+- name: grill-stats-secrets
+  behavior: merge
+  envs:
+  - secrets/prod.env  # Will contain production environment secrets

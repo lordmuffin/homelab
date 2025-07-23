@@ -1,0 +1,238 @@
+# TCP IngressRoute for Database Admin Access (PostgreSQL)
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRouteTCP
+metadata:
+  name: grill-stats-postgresql-admin
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  entryPoints:
+    - postgresql
+  routes:
+    - match: HostSNI(`db.grill-stats.homelab.local`)
+      services:
+        - name: postgresql-service
+          port: 5432
+  tls:
+    secretName: grill-stats-db-tls
+    passthrough: false
+---
+# TCP IngressRoute for InfluxDB Admin Access
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRouteTCP
+metadata:
+  name: grill-stats-influxdb-admin
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  entryPoints:
+    - influxdb
+  routes:
+    - match: HostSNI(`influx.grill-stats.homelab.local`)
+      services:
+        - name: influxdb-service
+          port: 8086
+  tls:
+    secretName: grill-stats-influx-tls
+    passthrough: false
+---
+# TCP IngressRoute for Redis Admin Access
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRouteTCP
+metadata:
+  name: grill-stats-redis-admin
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  entryPoints:
+    - redis
+  routes:
+    - match: HostSNI(`redis.grill-stats.homelab.local`)
+      services:
+        - name: redis-service
+          port: 6379
+  tls:
+    secretName: grill-stats-redis-tls
+    passthrough: false
+---
+# Database Admin TLS Certificates
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: grill-stats-db-tls
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  secretName: grill-stats-db-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+    - db.grill-stats.homelab.local
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days
+  subject:
+    organizations:
+      - homelab-db
+  privateKey:
+    algorithm: RSA
+    encoding: PKCS1
+    size: 2048
+  usages:
+    - digital signature
+    - key encipherment
+    - server auth
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: grill-stats-influx-tls
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  secretName: grill-stats-influx-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+    - influx.grill-stats.homelab.local
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days
+  subject:
+    organizations:
+      - homelab-influx
+  privateKey:
+    algorithm: RSA
+    encoding: PKCS1
+    size: 2048
+  usages:
+    - digital signature
+    - key encipherment
+    - server auth
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: grill-stats-redis-tls
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  secretName: grill-stats-redis-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+    - redis.grill-stats.homelab.local
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days
+  subject:
+    organizations:
+      - homelab-redis
+  privateKey:
+    algorithm: RSA
+    encoding: PKCS1
+    size: 2048
+  usages:
+    - digital signature
+    - key encipherment
+    - server auth
+---
+# TCP Port Configuration for Traefik
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: traefik-tcp-config
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/part-of: grill-stats
+data:
+  traefik.yaml: |
+    entryPoints:
+      web:
+        address: ":80"
+      websecure:
+        address: ":443"
+      postgresql:
+        address: ":5432"
+      influxdb:
+        address: ":8086"
+      redis:
+        address: ":6379"
+
+    certificatesResolvers:
+      letsencrypt:
+        acme:
+          email: admin@homelab.local
+          storage: /data/acme.json
+          httpChallenge:
+            entryPoint: web
+          dnsChallenge:
+            provider: cloudflare
+            resolvers:
+              - "1.1.1.1:53"
+              - "1.0.0.1:53"
+
+    api:
+      dashboard: true
+      debug: true
+      insecure: false
+
+    metrics:
+      prometheus:
+        addEntryPointsLabels: true
+        addServicesLabels: true
+        addRoutersLabels: true
+        buckets:
+          - "0.1"
+          - "0.3"
+          - "1.2"
+          - "5.0"
+
+    accessLog:
+      format: json
+      fields:
+        defaultMode: keep
+        names:
+          ClientUsername: drop
+        headers:
+          defaultMode: keep
+          names:
+            User-Agent: redact
+            Authorization: drop
+            Content-Type: keep
+
+    log:
+      level: INFO
+      format: json
+
+    providers:
+      kubernetesCRD:
+        namespaces:
+          - "grill-stats"
+          - "grill-stats-dev"
+          - "grill-stats-staging"
+      kubernetesIngress:
+        namespaces:
+          - "grill-stats"
+          - "grill-stats-dev"
+          - "grill-stats-staging"

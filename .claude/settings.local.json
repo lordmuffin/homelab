@@ -29,7 +29,11 @@
       "Bash(kubectl delete:*)",
       "Bash(argocd app sync:*)",
       "Bash(docker pull:*)",
-      "Bash(podman inspect:*)"
+      "Bash(podman inspect:*)",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__get-library-docs",
+      "Bash(ssh-add:*)",
+      "Bash(ssh:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

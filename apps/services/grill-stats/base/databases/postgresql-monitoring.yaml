@@ -1,0 +1,446 @@
+---
+# PostgreSQL Monitoring Service for Prometheus
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgresql-metrics
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: monitoring
+spec:
+  selector:
+    app.kubernetes.io/name: postgresql
+  ports:
+  - port: 9187
+    targetPort: 9187
+    name: metrics
+  type: ClusterIP
+---
+# ServiceMonitor for Prometheus Operator
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: postgresql-metrics
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgresql
+      app.kubernetes.io/component: monitoring
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+    scrapeTimeout: 10s
+---
+# PostgreSQL Alerting Rules
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: postgresql-alerts
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: monitoring
+spec:
+  groups:
+  - name: postgresql.rules
+    rules:
+    # PostgreSQL Instance Down
+    - alert: PostgreSQLDown
+      expr: pg_up == 0
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "PostgreSQL instance is down"
+        description: "PostgreSQL instance {{ $labels.instance }} is down for more than 1 minute"
+
+    # High Connection Usage
+    - alert: PostgreSQLHighConnections
+      expr: sum(pg_stat_activity_count) by (instance) / sum(pg_settings_max_connections) by (instance) > 0.8
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "PostgreSQL connection usage is high"
+        description: "PostgreSQL instance {{ $labels.instance }} has {{ $value | humanizePercentage }} connections used"
+
+    # Replication Lag
+    - alert: PostgreSQLReplicationLag
+      expr: pg_replication_lag > 60
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "PostgreSQL replication lag is high"
+        description: "PostgreSQL replication lag on {{ $labels.instance }} is {{ $value }} seconds"
+
+    # Database Size Growth
+    - alert: PostgreSQLDatabaseSizeGrowth
+      expr: increase(pg_database_size_bytes[1h]) > 1e9
+      for: 0m
+      labels:
+        severity: warning
+      annotations:
+        summary: "PostgreSQL database size is growing rapidly"
+        description: "PostgreSQL database {{ $labels.datname }} on {{ $labels.instance }} grew by {{ $value | humanizeBytes }} in the last hour"
+
+    # Dead Tuples
+    - alert: PostgreSQLDeadTuples
+      expr: (pg_stat_user_tables_n_dead_tup / (pg_stat_user_tables_n_live_tup + pg_stat_user_tables_n_dead_tup)) > 0.1
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "PostgreSQL has too many dead tuples"
+        description: "PostgreSQL table {{ $labels.relname }} on {{ $labels.instance }} has {{ $value | humanizePercentage }} dead tuples"
+
+    # Unused Indexes
+    - alert: PostgreSQLUnusedIndexes
+      expr: pg_stat_user_indexes_idx_scan == 0
+      for: 1d
+      labels:
+        severity: info
+      annotations:
+        summary: "PostgreSQL has unused indexes"
+        description: "PostgreSQL index {{ $labels.indexrelname }} on table {{ $labels.relname }} ({{ $labels.instance }}) hasn't been used for a day"
+
+    # Slow Queries
+    - alert: PostgreSQLSlowQueries
+      expr: rate(pg_stat_activity_max_tx_duration[5m]) > 300
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "PostgreSQL has slow queries"
+        description: "PostgreSQL instance {{ $labels.instance }} has queries running for more than 5 minutes"
+
+    # Checkpoint Time
+    - alert: PostgreSQLCheckpointTime
+      expr: pg_stat_bgwriter_checkpoint_write_time / pg_stat_bgwriter_checkpoints_timed > 10000
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "PostgreSQL checkpoint time is high"
+        description: "PostgreSQL instance {{ $labels.instance }} average checkpoint write time is {{ $value }} milliseconds"
+
+    # WAL Files
+    - alert: PostgreSQLWALFiles
+      expr: pg_stat_archiver_archived_count - pg_stat_archiver_failed_count < 0
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "PostgreSQL WAL archiving is failing"
+        description: "PostgreSQL instance {{ $labels.instance }} has {{ $value }} failed WAL archives"
+
+    # Backup Status
+    - alert: PostgreSQLBackupFailed
+      expr: time() - pg_last_backup_timestamp > 86400
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "PostgreSQL backup is overdue"
+        description: "PostgreSQL instance {{ $labels.instance }} hasn't had a successful backup in over 24 hours"
+---
+# PostgreSQL Grafana Dashboard ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgresql-grafana-dashboard
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: monitoring
+    grafana_dashboard: "1"
+data:
+  postgresql-dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "PostgreSQL Database - Grill Stats",
+        "tags": ["postgresql", "database", "grill-stats"],
+        "style": "dark",
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Database Connections",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "sum(pg_stat_activity_count) by (instance)",
+                "legendFormat": "Active Connections"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "palette-classic"
+                },
+                "custom": {
+                  "displayMode": "list",
+                  "orientation": "horizontal"
+                },
+                "mappings": [],
+                "thresholds": {
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 80
+                    }
+                  ]
+                }
+              }
+            },
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 0,
+              "y": 0
+            }
+          },
+          {
+            "id": 2,
+            "title": "Database Size",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "pg_database_size_bytes{datname=\"grill_stats\"}",
+                "legendFormat": "Database Size"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "palette-classic"
+                },
+                "custom": {
+                  "displayMode": "list",
+                  "orientation": "horizontal"
+                },
+                "mappings": [],
+                "unit": "bytes"
+              }
+            },
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 12,
+              "y": 0
+            }
+          },
+          {
+            "id": 3,
+            "title": "Query Performance",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(pg_stat_database_xact_commit[5m])",
+                "legendFormat": "Commits/sec"
+              },
+              {
+                "expr": "rate(pg_stat_database_xact_rollback[5m])",
+                "legendFormat": "Rollbacks/sec"
+              }
+            ],
+            "gridPos": {
+              "h": 8,
+              "w": 24,
+              "x": 0,
+              "y": 8
+            }
+          },
+          {
+            "id": 4,
+            "title": "Table Statistics",
+            "type": "table",
+            "targets": [
+              {
+                "expr": "pg_stat_user_tables_n_live_tup",
+                "legendFormat": "Live Tuples",
+                "format": "table"
+              },
+              {
+                "expr": "pg_stat_user_tables_n_dead_tup",
+                "legendFormat": "Dead Tuples",
+                "format": "table"
+              }
+            ],
+            "gridPos": {
+              "h": 8,
+              "w": 24,
+              "x": 0,
+              "y": 16
+            }
+          }
+        ],
+        "time": {
+          "from": "now-6h",
+          "to": "now"
+        },
+        "refresh": "5s",
+        "schemaVersion": 27,
+        "version": 1
+      }
+    }
+---
+# PostgreSQL Health Check Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgresql-health
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: health
+spec:
+  selector:
+    app.kubernetes.io/name: postgresql
+  ports:
+  - port: 8080
+    targetPort: 8080
+    name: health
+  type: ClusterIP
+---
+# PostgreSQL Health Check Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgresql-health-check
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: postgresql-health-check
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: health
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgresql-health-check
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgresql-health-check
+        app.kubernetes.io/part-of: grill-stats
+        app.kubernetes.io/component: health
+    spec:
+      containers:
+      - name: health-check
+        image: postgres:13-alpine
+        command:
+        - /bin/sh
+        - -c
+        - |
+          # Install required packages
+          apk add --no-cache curl
+
+          # Create health check script
+          cat > /usr/local/bin/health-check.sh << 'EOF'
+          #!/bin/sh
+
+          # PostgreSQL Health Check Script
+          POSTGRES_HOST="${POSTGRES_HOST:-postgresql-service}"
+          POSTGRES_USER="${POSTGRES_USER:-postgres}"
+          POSTGRES_DB="${POSTGRES_DB:-grill_stats}"
+
+          # Check database connectivity
+          pg_isready -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+          CONNECTIVITY=$?
+
+          # Check replication status (if applicable)
+          REPLICATION_STATUS=0
+          if [ "$POSTGRES_REPLICATION_MODE" = "master" ]; then
+            REPLICATION_STATUS=$(psql -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -t -c "SELECT COUNT(*) FROM pg_stat_replication;" 2>/dev/null || echo "0")
+          fi
+
+          # Check backup status
+          BACKUP_STATUS=0
+          if [ -f /backup/backup_metadata_*.json ]; then
+            LAST_BACKUP=$(ls -t /backup/backup_metadata_*.json | head -1)
+            BACKUP_AGE=$(( $(date +%s) - $(stat -c %Y "$LAST_BACKUP") ))
+            if [ $BACKUP_AGE -lt 86400 ]; then
+              BACKUP_STATUS=1
+            fi
+          fi
+
+          # Return health status
+          if [ $CONNECTIVITY -eq 0 ]; then
+            echo "PostgreSQL is healthy"
+            echo "Connectivity: OK"
+            echo "Replication: $REPLICATION_STATUS replicas"
+            echo "Backup: $([ $BACKUP_STATUS -eq 1 ] && echo "OK" || echo "WARN")"
+            exit 0
+          else
+            echo "PostgreSQL is unhealthy"
+            exit 1
+          fi
+          EOF
+
+          chmod +x /usr/local/bin/health-check.sh
+
+          # Start HTTP server for health checks
+          while true; do
+            echo -e "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n$(/usr/local/bin/health-check.sh 2>&1)" | nc -l -p 8080
+          done
+        env:
+        - name: POSTGRES_HOST
+          value: postgresql-service
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secrets
+              key: monitoring-user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secrets
+              key: monitoring-password
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secrets
+              key: database-name
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secrets
+              key: monitoring-password
+        ports:
+        - containerPort: 8080
+          name: health
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 60

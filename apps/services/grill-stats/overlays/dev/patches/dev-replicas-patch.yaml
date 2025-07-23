@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: grill-stats
-  namespace: grill-stats-dev
+  namespace: grill-stats
 spec:
   # Single replica for development to save resources
   replicas: 1
@@ -13,7 +13,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: device-service
-  namespace: grill-stats-dev
+  namespace: grill-stats
 spec:
   replicas: 1
 ---
@@ -21,6 +21,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: temperature-service
-  namespace: grill-stats-dev
+  namespace: grill-stats
 spec:
   replicas: 1

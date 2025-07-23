@@ -1,0 +1,267 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: historical-data-service
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: historical-data
+    app.kubernetes.io/part-of: grill-stats
+    app: historical-data-service
+    component: backend
+    tier: data
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: grill-stats
+      app.kubernetes.io/component: historical-data
+      app: historical-data-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: grill-stats
+        app.kubernetes.io/component: historical-data
+        app.kubernetes.io/part-of: grill-stats
+        app: historical-data-service
+        component: backend
+        tier: data
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8083"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: grill-stats-historical-data
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: historical-data-service
+        image: grill-stats/historical-data-service:latest
+        ports:
+        - containerPort: 8083
+          name: http
+          protocol: TCP
+        env:
+        - name: TIMESCALE_HOST
+          valueFrom:
+            secretKeyRef:
+              name: timescale-credentials-secret
+              key: hostname
+        - name: TIMESCALE_PORT
+          valueFrom:
+            secretKeyRef:
+              name: timescale-credentials-secret
+              key: port
+        - name: TIMESCALE_DB
+          valueFrom:
+            secretKeyRef:
+              name: timescale-credentials-secret
+              key: database
+        - name: TIMESCALE_USER
+          valueFrom:
+            secretKeyRef:
+              name: timescale-credentials-secret
+              key: username
+        - name: TIMESCALE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: timescale-credentials-secret
+              key: password
+        - name: REDIS_HOST
+          value: "redis.grill-stats.svc.cluster.local"
+        - name: REDIS_PORT
+          value: "6379"
+        - name: INFLUXDB_HOST
+          valueFrom:
+            secretKeyRef:
+              name: influxdb-credentials-secret
+              key: hostname
+        - name: INFLUXDB_PORT
+          valueFrom:
+            secretKeyRef:
+              name: influxdb-credentials-secret
+              key: port
+        - name: INFLUXDB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: influxdb-credentials-secret
+              key: token
+        - name: INFLUXDB_ORG
+          valueFrom:
+            secretKeyRef:
+              name: influxdb-credentials-secret
+              key: org
+        - name: INFLUXDB_BUCKET
+          valueFrom:
+            secretKeyRef:
+              name: influxdb-credentials-secret
+              key: bucket
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: historical-data-service-config
+              key: LOG_LEVEL
+        - name: CACHE_TTL
+          valueFrom:
+            configMapKeyRef:
+              name: historical-data-service-config
+              key: CACHE_TTL
+        - name: MAX_QUERY_RANGE_DAYS
+          valueFrom:
+            configMapKeyRef:
+              name: historical-data-service-config
+              key: MAX_QUERY_RANGE_DAYS
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8083
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8083
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: app-tmp
+          mountPath: /app/tmp
+        - name: cache
+          mountPath: /app/cache
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: app-tmp
+        emptyDir: {}
+      - name: cache
+        emptyDir:
+          sizeLimit: 1Gi
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: historical-data-service
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: historical-data
+    app.kubernetes.io/part-of: grill-stats
+    app: historical-data-service
+    component: backend
+    tier: data
+spec:
+  selector:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: historical-data
+    app: historical-data-service
+  ports:
+  - port: 8083
+    targetPort: 8083
+    name: http
+    protocol: TCP
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: historical-data-service-network-policy
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: historical-data
+    app: historical-data-service
+spec:
+  podSelector:
+    matchLabels:
+      app: historical-data-service
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: web-ui
+    - podSelector:
+        matchLabels:
+          app: grill-stats
+    - podSelector:
+        matchLabels:
+          app: auth-service
+    ports:
+    - protocol: TCP
+      port: 8083
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: timescaledb
+    ports:
+    - protocol: TCP
+      port: 5432
+  - to:
+    - podSelector:
+        matchLabels:
+          app: redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  - to:
+    - podSelector:
+        matchLabels:
+          app: influxdb
+    ports:
+    - protocol: TCP
+      port: 8086
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: historical-data-service-config
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: historical-data
+    app: historical-data-service
+data:
+  LOG_LEVEL: "INFO"
+  CACHE_TTL: "300"
+  MAX_QUERY_RANGE_DAYS: "30"
+  AGGREGATION_WINDOW: "5m"
+  RETENTION_POLICY: "30d"
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: grill-stats-historical-data
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: historical-data
+    app: historical-data-service
+automountServiceAccountToken: false
