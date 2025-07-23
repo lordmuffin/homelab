@@ -22,7 +22,7 @@ spec:
         fsGroup: 1000
       initContainers:
       - name: restore-db-backup
-        image: postgres:latest
+        image: alpine:latest
         # This init container combines PostgreSQL and b2 CLI for backup restoration
         env:
         - name: B2_APPLICATION_KEY_ID
@@ -56,6 +56,13 @@ spec:
         command: ["/bin/sh", "-c"]
         args:
         - |
+          echo "Installing required dependencies..."
+          apk add --no-cache postgresql-client curl unzip
+          
+          echo "Installing B2 CLI..."
+          curl -L https://github.com/Backblaze/B2_Command_Line_Tool/releases/latest/download/b2-linux -o /usr/local/bin/b2v4
+          chmod +x /usr/local/bin/b2v4
+          
           echo "Checking for backups in B2 bucket..."
           # List backups, sort by date (newest first) and get the latest one
           LATEST_BACKUP=$(b2v4 ls --recursive $B2_BUCKET_NAME tandoor/ | grep -E 'pg_backup_[0-9]{8}_[0-9]{6}.sql.gz' | sort -r | head -n 1 | awk '{print $6}')
