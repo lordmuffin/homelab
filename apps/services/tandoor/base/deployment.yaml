@@ -171,6 +171,26 @@ spec:
             exit 1
           fi
           
+          # Clear existing database to avoid conflicts
+          echo "Clearing existing database for clean restoration..."
+          PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_HOST -U $POSTGRES_USER -d $POSTGRES_DB -c "
+            DO \$\$ DECLARE
+              r RECORD;
+            BEGIN
+              -- Drop all tables in the public schema
+              FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') LOOP
+                EXECUTE 'DROP TABLE IF EXISTS public.' || quote_ident(r.tablename) || ' CASCADE';
+              END LOOP;
+              
+              -- Drop all sequences in the public schema
+              FOR r IN (SELECT sequencename FROM pg_sequences WHERE schemaname = 'public') LOOP
+                EXECUTE 'DROP SEQUENCE IF EXISTS public.' || quote_ident(r.sequencename) || ' CASCADE';
+              END LOOP;
+            END \$\$;
+          "
+          
+          echo "Database cleared successfully. Starting restoration..."
+          
           # Restore the backup
           echo "Restoring database from backup: $LATEST_BACKUP"
           if gunzip -c /tmp/backup/latest.sql.gz | PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_HOST -U $POSTGRES_USER -d $POSTGRES_DB -q; then
@@ -179,6 +199,11 @@ spec:
             # Verify restoration by checking table count
             RESTORED_TABLES=$(PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_HOST -U $POSTGRES_USER -d $POSTGRES_DB -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null | tr -d ' ')
             echo "Restored database contains $RESTORED_TABLES tables."
+            
+            # Check for restored user data
+            USER_RECIPES_RESTORED=$(PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_HOST -U $POSTGRES_USER -d $POSTGRES_DB -t -c "SELECT COUNT(*) FROM cookbook_recipe WHERE id > 0;" 2>/dev/null | tr -d ' ' || echo "0")
+            USER_SPACES_RESTORED=$(PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_HOST -U $POSTGRES_USER -d $POSTGRES_DB -t -c "SELECT COUNT(*) FROM cookbook_space WHERE id > 0;" 2>/dev/null | tr -d ' ' || echo "0")
+            echo "Restored $USER_RECIPES_RESTORED recipes and $USER_SPACES_RESTORED spaces from backup."
           else
             echo "ERROR: Database restoration failed."
             exit 1
