@@ -59,9 +59,22 @@ spec:
           echo "Installing required dependencies..."
           apk add --no-cache postgresql-client curl unzip
           
+          echo "Validating environment variables..."
+          echo "B2_APPLICATION_KEY_ID length: ${#B2_APPLICATION_KEY_ID}"
+          echo "B2_APPLICATION_KEY length: ${#B2_APPLICATION_KEY}"
+          echo "B2_BUCKET_NAME: $B2_BUCKET_NAME"
+          
+          if [ -z "$B2_APPLICATION_KEY_ID" ] || [ -z "$B2_APPLICATION_KEY" ]; then
+            echo "ERROR: B2 credentials not available. Skipping backup restoration."
+            exit 0
+          fi
+          
           echo "Installing B2 CLI..."
           curl -L https://github.com/Backblaze/B2_Command_Line_Tool/releases/latest/download/b2-linux -o /usr/local/bin/b2v4
           chmod +x /usr/local/bin/b2v4
+          
+          echo "Authenticating with B2..."
+          /usr/local/bin/b2v4 authorize-account $B2_APPLICATION_KEY_ID $B2_APPLICATION_KEY
           
           echo "Checking for backups in B2 bucket..."
           # List backups, sort by date (newest first) and get the latest one
