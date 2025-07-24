@@ -1,0 +1,103 @@
+{
+  "timestamp": "/home/lordmuffin/Claude/Git/homelab/apps/services/tandoor/migration",
+  "statistics": {
+    "pages_scanned": 18,
+    "recipes_found": 18,
+    "recipes_normalized": 18,
+    "recipes_uploaded": 18,
+    "recipes_failed": 0,
+    "recipes_skipped": 0
+  },
+  "successful_uploads": [
+    {
+      "recipe": "Plan ahead, crust needs to refrigerate for 30 minutes.",
+      "id": 2,
+      "url": "https://tandoor.lab.apj.dev/recipe/view/2"
+    },
+    {
+      "recipe": "Stir Fry",
+      "id": 3,
+      "url": "https://tandoor.lab.apj.dev/recipe/view/3"
+    },
+    {
+      "recipe": "Watergate Cake",
+      "id": 4,
+      "url": "https://tandoor.lab.apj.dev/recipe/view/4"
+    },
+    {
+      "recipe": "Enchiladas",
+      "id": 5,
+      "url": "https://tandoor.lab.apj.dev/recipe/view/5"
+    },
+    {
+      "recipe": "Alfredo Sauce",
+      "id": 6,
+      "url": "https://tandoor.lab.apj.dev/recipe/view/6"
+    },
+    {
+      "recipe": "Beef Teriyaki",
+      "id": 7,
+      "url": "https://tandoor.lab.apj.dev/recipe/view/7"
+    },
+    {
+      "recipe": "Taco Seasoning",
+      "id": 8,
+      "url": "https://tandoor.lab.apj.dev/recipe/view/8"
+    },
+    {
+      "recipe": "Beef Strogonoff",
+      "id": 9,
+      "url": "https://tandoor.lab.apj.dev/recipe/view/9"
+    },
+    {
+      "recipe": "Spaghetti Sauce",
+      "id": 10,
+      "url": "https://tandoor.lab.apj.dev/recipe/view/10"
+    },
+    {
+      "recipe": "Grammie Sugar Cookies",
+      "id": 11,
+      "url": "https://tandoor.lab.apj.dev/recipe/view/11"
+    },
+    {
+      "recipe": "One Dish Chicken & Rice Bake",
+      "id": 12,
+      "url": "https://tandoor.lab.apj.dev/recipe/view/12"
+    },
+    {
+      "recipe": "Easy Fried Rice",
+      "id": 13,
+      "url": "https://tandoor.lab.apj.dev/recipe/view/13"
+    },
+    {
+      "recipe": "Impossibly Easy Cheeseburger Pie",
+      "id": 14,
+      "url": "https://tandoor.lab.apj.dev/recipe/view/14"
+    },
+    {
+      "recipe": "1 pkg ground turkey (1.25lb, use The Turkey Store brand)",
+      "id": 15,
+      "url": "https://tandoor.lab.apj.dev/recipe/view/15"
+    },
+    {
+      "recipe": "Pudding Tort",
+      "id": 16,
+      "url": "https://tandoor.lab.apj.dev/recipe/view/16"
+    },
+    {
+      "recipe": "Sirloin Tip Roast",
+      "id": 17,
+      "url": "https://tandoor.lab.apj.dev/recipe/view/17"
+    },
+    {
+      "recipe": "chili",
+      "id": 18,
+      "url": "https://tandoor.lab.apj.dev/recipe/view/18"
+    },
+    {
+      "recipe": "Teriyaki Chicken Wings",
+      "id": 19,
+      "url": "https://tandoor.lab.apj.dev/recipe/view/19"
+    }
+  ]
+}

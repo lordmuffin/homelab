@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  onenote-migrator:
+    build: .
+    container_name: onenote-tandoor-migrator
+    environment:
+      # Microsoft Graph API
+      - MICROSOFT_CLIENT_ID=${MICROSOFT_CLIENT_ID}
+      - MICROSOFT_CLIENT_SECRET=${MICROSOFT_CLIENT_SECRET}
+      - MICROSOFT_TENANT_ID=${MICROSOFT_TENANT_ID}
+      
+      # Tandoor API
+      - TANDOOR_URL=${TANDOOR_URL}
+      - TANDOOR_API_TOKEN=${TANDOOR_API_TOKEN}
+      
+      # Migration settings
+      - ONENOTE_NOTEBOOK_NAME=${ONENOTE_NOTEBOOK_NAME:-Recipes}
+      - BATCH_SIZE=${BATCH_SIZE:-10}
+      - DELAY_BETWEEN_REQUESTS=${DELAY_BETWEEN_REQUESTS:-1.0}
+      - SKIP_DUPLICATES=${SKIP_DUPLICATES:-true}
+      - DRY_RUN=${DRY_RUN:-false}
+      
+      # Logging
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_CONSOLE=${LOG_CONSOLE:-true}
+    
+    volumes:
+      # Mount logs and reports to host
+      - ./logs:/app/logs
+      - ./reports:/app/reports
+      
+      # Mount custom config if needed
+      - ./config.yaml:/app/config.yaml:ro
+      
+      # Mount .env file
+      - ./.env:/app/.env:ro
+    
+    # Override default command for interactive usage
+    # command: ["--dry-run", "--verbose"]
+    
+    # For one-time migration, remove restart policy
+    restart: "no"
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.1'
+
+  # Optional: Run as a scheduled job using ofelia
+  # Uncomment this service to run migrations on a schedule
+  # scheduler:
+  #   image: mcuadros/ofelia:latest
+  #   container_name: migration-scheduler
+  #   depends_on:
+  #     - onenote-migrator
+  #   command: daemon --docker
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock:ro
+  #     - ./scheduler.ini:/etc/ofelia/config.ini:ro
+  #   labels:
+  #     ofelia.enabled: "true"
+
+volumes:
+  migration_logs:
+  migration_reports:

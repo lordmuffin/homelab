@@ -1,0 +1,78 @@
+{
+  "timestamp": "/home/lordmuffin/Claude/Git/homelab/apps/services/tandoor/migration",
+  "failed_uploads": [
+    {
+      "recipe": "Plan ahead, crust needs to refrigerate for 30 minutes.",
+      "error": "Recipe creation failed: 400 Client Error: Bad Request for url: https://tandoor.lab.apj.dev/api/recipe/"
+    },
+    {
+      "recipe": "Stir Fry",
+      "error": "Recipe creation failed: 400 Client Error: Bad Request for url: https://tandoor.lab.apj.dev/api/recipe/"
+    },
+    {
+      "recipe": "Watergate Cake",
+      "error": "Recipe creation failed: 400 Client Error: Bad Request for url: https://tandoor.lab.apj.dev/api/recipe/"
+    },
+    {
+      "recipe": "Enchiladas",
+      "error": "Recipe creation failed: 400 Client Error: Bad Request for url: https://tandoor.lab.apj.dev/api/recipe/"
+    },
+    {
+      "recipe": "Alfredo Sauce",
+      "error": "Recipe creation failed: 400 Client Error: Bad Request for url: https://tandoor.lab.apj.dev/api/recipe/"
+    },
+    {
+      "recipe": "Beef Teriyaki",
+      "error": "Recipe creation failed: 400 Client Error: Bad Request for url: https://tandoor.lab.apj.dev/api/recipe/"
+    },
+    {
+      "recipe": "Taco Seasoning",
+      "error": "Recipe creation failed: 400 Client Error: Bad Request for url: https://tandoor.lab.apj.dev/api/recipe/"
+    },
+    {
+      "recipe": "Beef Strogonoff",
+      "error": "Recipe creation failed: 400 Client Error: Bad Request for url: https://tandoor.lab.apj.dev/api/recipe/"
+    },
+    {
+      "recipe": "Spaghetti Sauce",
+      "error": "Recipe creation failed: 400 Client Error: Bad Request for url: https://tandoor.lab.apj.dev/api/recipe/"
+    },
+    {
+      "recipe": "Grammie Sugar Cookies",
+      "error": "Recipe creation failed: 400 Client Error: Bad Request for url: https://tandoor.lab.apj.dev/api/recipe/"
+    },
+    {
+      "recipe": "One Dish Chicken & Rice Bake",
+      "error": "Recipe creation failed: 400 Client Error: Bad Request for url: https://tandoor.lab.apj.dev/api/recipe/"
+    },
+    {
+      "recipe": "Easy Fried Rice",
+      "error": "Recipe creation failed: 400 Client Error: Bad Request for url: https://tandoor.lab.apj.dev/api/recipe/"
+    },
+    {
+      "recipe": "Impossibly Easy Cheeseburger Pie",
+      "error": "Recipe creation failed: 400 Client Error: Bad Request for url: https://tandoor.lab.apj.dev/api/recipe/"
+    },
+    {
+      "recipe": "1 pkg ground turkey (1.25lb, use The Turkey Store brand)",
+      "error": "Recipe creation failed: 400 Client Error: Bad Request for url: https://tandoor.lab.apj.dev/api/recipe/"
+    },
+    {
+      "recipe": "Pudding Tort",
+      "error": "Recipe creation failed: 400 Client Error: Bad Request for url: https://tandoor.lab.apj.dev/api/recipe/"
+    },
+    {
+      "recipe": "Sirloin Tip Roast",
+      "error": "Recipe creation failed: 400 Client Error: Bad Request for url: https://tandoor.lab.apj.dev/api/recipe/"
+    },
+    {
+      "recipe": "chili",
+      "error": "Recipe creation failed: 400 Client Error: Bad Request for url: https://tandoor.lab.apj.dev/api/recipe/"
+    },
+    {
+      "recipe": "Teriyaki Chicken Wings",
+      "error": "Recipe creation failed: 400 Client Error: Bad Request for url: https://tandoor.lab.apj.dev/api/recipe/"
+    }
+  ],
+  "skipped_uploads": []
+}

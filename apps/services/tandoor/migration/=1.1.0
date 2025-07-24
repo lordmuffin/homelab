@@ -1,0 +1,10 @@
+Collecting python-docx
+  Downloading python_docx-1.2.0-py3-none-any.whl.metadata (2.0 kB)
+Collecting lxml>=3.1.0 (from python-docx)
+  Using cached lxml-6.0.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (6.6 kB)
+Requirement already satisfied: typing_extensions>=4.9.0 in ./venv/lib/python3.12/site-packages (from python-docx) (4.14.1)
+Downloading python_docx-1.2.0-py3-none-any.whl (252 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 253.0/253.0 kB 10.4 MB/s eta 0:00:00
+Using cached lxml-6.0.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (5.3 MB)
+Installing collected packages: lxml, python-docx
+Successfully installed lxml-6.0.0 python-docx-1.2.0
