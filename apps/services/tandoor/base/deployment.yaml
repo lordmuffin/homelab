@@ -113,14 +113,15 @@ spec:
           # Create temp directory for backup
           mkdir -p /tmp/backup
           
-          # Download the backup using B2 URI syntax
+          # Download the backup using correct B2 CLI syntax
           echo "Downloading backup: $BACKUP_FILENAME"
           BACKUP_B2_URI="b2://$B2_BUCKET_NAME/tandoor/$BACKUP_FILENAME"
           echo "Download URI: $BACKUP_B2_URI"
           
-          if ! /usr/local/bin/b2 download "$BACKUP_B2_URI" /tmp/backup/latest.sql.gz 2>/dev/null; then
-            echo "Failed to download backup file. Trying alternative download method..."
-            # Fallback to modern file download syntax
+          # Use the correct modern B2 CLI file download syntax
+          if ! /usr/local/bin/b2 file download "$BACKUP_B2_URI" /tmp/backup/latest.sql.gz; then
+            echo "Failed to download backup file. Trying bucket/key syntax..."
+            # Fallback to bucket name + key syntax
             if ! /usr/local/bin/b2 file download "$B2_BUCKET_NAME" "tandoor/$BACKUP_FILENAME" /tmp/backup/latest.sql.gz; then
               echo "Both download methods failed. Skipping restoration."
               exit 0
