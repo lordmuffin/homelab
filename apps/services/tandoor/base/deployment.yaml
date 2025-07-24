@@ -77,8 +77,8 @@ spec:
           /usr/local/bin/b2v4 authorize-account $B2_APPLICATION_KEY_ID $B2_APPLICATION_KEY
           
           echo "Checking for backups in B2 bucket..."
-          # List backups using correct B2 CLI syntax (bucket name with b2:// prefix)
-          LATEST_BACKUP=$(/usr/local/bin/b2v4 file list $B2_BUCKET_NAME tandoor/ --recursive | grep -E 'pg_backup_[0-9]{8}_[0-9]{6}.sql.gz' | sort -r | head -n 1 | awk '{print $1}')
+          # List backups using correct B2 CLI syntax
+          LATEST_BACKUP=$(/usr/local/bin/b2v4 ls $B2_BUCKET_NAME tandoor/ --recursive | grep -E 'pg_backup_[0-9]{8}_[0-9]{6}.sql.gz' | sort -r | head -n 1 | awk '{print $6}')
           
           if [ -z "$LATEST_BACKUP" ]; then
             echo "No backup found in B2 bucket. Skipping restoration."
@@ -92,7 +92,7 @@ spec:
           
           # Download the backup
           echo "Downloading backup from B2..."
-          /usr/local/bin/b2v4 file download "b2://$B2_BUCKET_NAME/$LATEST_BACKUP" /tmp/backup/latest.sql.gz
+          /usr/local/bin/b2v4 download-file-by-name $B2_BUCKET_NAME "$LATEST_BACKUP" /tmp/backup/latest.sql.gz
           
           # Check if database already has data
           echo "Checking if database is empty..."
