@@ -77,25 +77,31 @@ spec:
           /usr/local/bin/b2 authorize-account $B2_APPLICATION_KEY_ID $B2_APPLICATION_KEY
           
           echo "Checking for backups in B2 bucket..."
-          # List all files in the bucket to debug structure
-          echo "DEBUG: Listing bucket contents..."
-          echo "Using bucket: $B2_BUCKET_NAME"
-          echo "Trying basic bucket list..."
-          /usr/local/bin/b2 ls 2>&1 || echo "Basic ls failed"
-          echo "Trying bucket-specific list..."
-          /usr/local/bin/b2 ls "$B2_BUCKET_NAME" 2>&1 || echo "Bucket ls failed"
-          echo "Trying with b2:// URI..."
-          /usr/local/bin/b2 ls "b2://$B2_BUCKET_NAME" 2>&1 || echo "URI ls failed"
+          # List backups using correct B2 URI syntax
+          echo "Searching for tandoor backups in B2..."
+          BACKUP_LIST=$(/usr/local/bin/b2 ls "b2://$B2_BUCKET_NAME/tandoor/" --recursive 2>/dev/null || echo "")
           
-          # Skip backup restoration for now since B2 CLI syntax issues
-          echo "NOTICE: Skipping backup restoration due to B2 CLI command issues."
-          echo "This is expected for a fresh deployment or when backup system needs fixing."
-          echo "Application will start with empty database."
-          exit 0
+          if [ -z "$BACKUP_LIST" ]; then
+            echo "No files found in tandoor/ folder. Checking if folder exists..."
+            FOLDER_CHECK=$(/usr/local/bin/b2 ls "b2://$B2_BUCKET_NAME" 2>/dev/null | grep "tandoor/" || echo "")
+            if [ -z "$FOLDER_CHECK" ]; then
+              echo "No tandoor/ folder found in bucket. No backups available."
+            else
+              echo "tandoor/ folder exists but contains no backup files."
+            fi
+            echo "Skipping restoration - starting with empty database."
+            exit 0
+          fi
+          
+          # Find the latest backup file
+          echo "Found backup files, searching for latest..."
+          LATEST_BACKUP=$(echo "$BACKUP_LIST" | grep -E 'pg_backup_[0-9]{8}_[0-9]{6}\.sql\.gz' | sort -r | head -n 1 | awk '{print $NF}')
           
           if [ -z "$LATEST_BACKUP" ]; then
-            echo "No backup found in B2 bucket. Skipping restoration."
-            echo "This might be normal for a fresh deployment, or the backup system may need fixing."
+            echo "No valid backup files found matching pattern pg_backup_YYYYMMDD_HHMMSS.sql.gz"
+            echo "Available files in tandoor/ folder:"
+            echo "$BACKUP_LIST"
+            echo "Skipping restoration - starting with empty database."
             exit 0
           fi
           
@@ -104,22 +110,21 @@ spec:
           # Create temp directory for backup
           mkdir -p /tmp/backup
           
-          # Download the backup - handle both full path and filename only
-          echo "Downloading backup from B2..."
-          DOWNLOAD_PATH=""
-          if [[ "$LATEST_BACKUP" == tandoor/* ]]; then
-            # Full path including folder
-            DOWNLOAD_PATH="$LATEST_BACKUP"
-          else
-            # Just filename, assume it's in tandoor/ folder
-            DOWNLOAD_PATH="tandoor/$LATEST_BACKUP"
+          # Download the backup using B2 URI syntax
+          echo "Downloading backup: $LATEST_BACKUP"
+          BACKUP_B2_URI="b2://$B2_BUCKET_NAME/tandoor/$LATEST_BACKUP"
+          echo "Download URI: $BACKUP_B2_URI"
+          
+          if ! /usr/local/bin/b2 download "$BACKUP_B2_URI" /tmp/backup/latest.sql.gz 2>/dev/null; then
+            echo "Failed to download backup file. Trying alternative download method..."
+            # Fallback to old download-file-by-name syntax
+            if ! /usr/local/bin/b2 download-file-by-name "$B2_BUCKET_NAME" "tandoor/$LATEST_BACKUP" /tmp/backup/latest.sql.gz; then
+              echo "Both download methods failed. Skipping restoration."
+              exit 0
+            fi
           fi
           
-          echo "Downloading from path: $DOWNLOAD_PATH"
-          if ! /usr/local/bin/b2 download-file-by-name $B2_BUCKET_NAME "$DOWNLOAD_PATH" /tmp/backup/latest.sql.gz; then
-            echo "Failed to download backup file. Skipping restoration."
-            exit 0
-          fi
+          echo "Backup downloaded successfully."
           
           # Check database connectivity and if it has data
           echo "Testing database connectivity..."
@@ -136,11 +141,31 @@ spec:
             exit 0
           fi
           
-          # Restore the backup
-          echo "Restoring database from backup..."
-          gunzip -c /tmp/backup/latest.sql.gz | PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_HOST -U $POSTGRES_USER -d $POSTGRES_DB
+          # Validate backup file
+          echo "Validating backup file..."
+          if [ ! -f /tmp/backup/latest.sql.gz ]; then
+            echo "ERROR: Backup file not found after download."
+            exit 1
+          fi
           
-          echo "Database restoration completed successfully."
+          # Check if file is valid gzip
+          if ! gunzip -t /tmp/backup/latest.sql.gz 2>/dev/null; then
+            echo "ERROR: Downloaded backup file is corrupted or not a valid gzip file."
+            exit 1
+          fi
+          
+          # Restore the backup
+          echo "Restoring database from backup: $LATEST_BACKUP"
+          if gunzip -c /tmp/backup/latest.sql.gz | PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_HOST -U $POSTGRES_USER -d $POSTGRES_DB -q; then
+            echo "Database restoration completed successfully."
+            
+            # Verify restoration by checking table count
+            RESTORED_TABLES=$(PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_HOST -U $POSTGRES_USER -d $POSTGRES_DB -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null | tr -d ' ')
+            echo "Restored database contains $RESTORED_TABLES tables."
+          else
+            echo "ERROR: Database restoration failed."
+            exit 1
+          fi
       containers:
       - name: recipes
         image: vabene1111/recipes
