@@ -115,10 +115,11 @@ spec:
           
           # Download the backup using B2 CLI
           echo "Downloading backup: $BACKUP_FILENAME"
-          echo "Using B2 CLI: b2 file download $B2_BUCKET_NAME tandoor/$BACKUP_FILENAME /tmp/backup/latest.sql.gz"
+          BACKUP_URI="b2://$B2_BUCKET_NAME/tandoor/$BACKUP_FILENAME"
+          echo "Using B2 CLI: b2 file download $BACKUP_URI /tmp/backup/latest.sql.gz"
           
-          # Use B2 CLI file download with bucket name and file path
-          if ! /usr/local/bin/b2 file download "$B2_BUCKET_NAME" "tandoor/$BACKUP_FILENAME" /tmp/backup/latest.sql.gz; then
+          # Use B2 CLI file download with B2 URI format
+          if ! /usr/local/bin/b2 file download "$BACKUP_URI" /tmp/backup/latest.sql.gz; then
             echo "Failed to download backup file. Skipping restoration."
             exit 0
           fi
