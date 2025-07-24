@@ -115,17 +115,12 @@ spec:
           
           # Download the backup using correct B2 CLI syntax
           echo "Downloading backup: $BACKUP_FILENAME"
-          BACKUP_B2_URI="b2://$B2_BUCKET_NAME/tandoor/$BACKUP_FILENAME"
-          echo "Download URI: $BACKUP_B2_URI"
+          echo "Downloading from bucket: $B2_BUCKET_NAME, key: tandoor/$BACKUP_FILENAME"
           
-          # Use the correct modern B2 CLI file download syntax
-          if ! /usr/local/bin/b2 file download "$BACKUP_B2_URI" /tmp/backup/latest.sql.gz; then
-            echo "Failed to download backup file. Trying bucket/key syntax..."
-            # Fallback to bucket name + key syntax
-            if ! /usr/local/bin/b2 file download "$B2_BUCKET_NAME" "tandoor/$BACKUP_FILENAME" /tmp/backup/latest.sql.gz; then
-              echo "Both download methods failed. Skipping restoration."
-              exit 0
-            fi
+          # Use correct B2 CLI syntax: bucketName fileKey localFileName
+          if ! /usr/local/bin/b2 file download "$B2_BUCKET_NAME" "tandoor/$BACKUP_FILENAME" /tmp/backup/latest.sql.gz; then
+            echo "Failed to download backup file. Skipping restoration."
+            exit 0
           fi
           
           echo "Backup downloaded successfully."
@@ -137,13 +132,22 @@ spec:
             exit 1
           fi
           
-          echo "Checking if database is empty..."
-          TABLES=$(PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_HOST -U $POSTGRES_USER -d $POSTGRES_DB -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null | tr -d ' ')
+          echo "Checking if database contains user data..."
+          # Check for actual user content in key Tandoor tables instead of just schema
+          # These tables would only have meaningful data if users have actually used the app
+          USER_RECIPES=$(PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_HOST -U $POSTGRES_USER -d $POSTGRES_DB -t -c "SELECT COUNT(*) FROM cookbook_recipe WHERE id > 0;" 2>/dev/null | tr -d ' ' || echo "0")
+          USER_KEYWORDS=$(PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_HOST -U $POSTGRES_USER -d $POSTGRES_DB -t -c "SELECT COUNT(*) FROM cookbook_keyword WHERE id > 0;" 2>/dev/null | tr -d ' ' || echo "0")
+          USER_FOODS=$(PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_HOST -U $POSTGRES_USER -d $POSTGRES_DB -t -c "SELECT COUNT(*) FROM cookbook_food WHERE id > 0;" 2>/dev/null | tr -d ' ' || echo "0")
           
-          if [ "$TABLES" -gt "0" ]; then
-            echo "Database already contains tables. Skipping restoration to prevent data loss."
+          echo "Found $USER_RECIPES recipes, $USER_KEYWORDS keywords, $USER_FOODS foods in database"
+          
+          # If there are user recipes or substantial keyword/food data, assume it's real user data
+          if [ "$USER_RECIPES" -gt "0" ] || [ "$USER_KEYWORDS" -gt "10" ] || [ "$USER_FOODS" -gt "10" ]; then
+            echo "Database contains user data (recipes: $USER_RECIPES). Skipping restoration to prevent data loss."
             exit 0
           fi
+          
+          echo "Database appears to contain only default/seed data. Proceeding with backup restoration..."
           
           # Validate backup file
           echo "Validating backup file..."
