@@ -113,11 +113,11 @@ spec:
           # Create temp directory for backup
           mkdir -p /tmp/backup
           
-          # Download the backup using correct B2 CLI syntax
+          # Download the backup using B2 CLI
           echo "Downloading backup: $BACKUP_FILENAME"
-          echo "Downloading from bucket: $B2_BUCKET_NAME, key: tandoor/$BACKUP_FILENAME"
+          echo "Using B2 CLI: b2 file download $B2_BUCKET_NAME tandoor/$BACKUP_FILENAME /tmp/backup/latest.sql.gz"
           
-          # Use correct B2 CLI syntax: bucketName fileKey localFileName
+          # Use B2 CLI file download with bucket name and file path
           if ! /usr/local/bin/b2 file download "$B2_BUCKET_NAME" "tandoor/$BACKUP_FILENAME" /tmp/backup/latest.sql.gz; then
             echo "Failed to download backup file. Skipping restoration."
             exit 0
