@@ -115,13 +115,21 @@ spec:
           
           # Download the backup using B2 CLI
           echo "Downloading backup: $BACKUP_FILENAME"
-          BACKUP_URI="b2://$B2_BUCKET_NAME/tandoor/$BACKUP_FILENAME"
-          echo "Using B2 CLI: b2 file download $BACKUP_URI /tmp/backup/latest.sql.gz"
+          echo "B2 CLI version:"
+          /usr/local/bin/b2 version
           
-          # Use B2 CLI file download with B2 URI format
-          if ! /usr/local/bin/b2 file download "$BACKUP_URI" /tmp/backup/latest.sql.gz; then
-            echo "Failed to download backup file. Skipping restoration."
-            exit 0
+          # Try older B2 CLI download syntax first (legacy compatibility)
+          echo "Attempting legacy B2 download syntax..."
+          if /usr/local/bin/b2 download_file_by_name "$B2_BUCKET_NAME" "tandoor/$BACKUP_FILENAME" /tmp/backup/latest.sql.gz 2>/dev/null; then
+            echo "Downloaded successfully using legacy syntax"
+          else
+            echo "Legacy syntax failed, trying modern file download..."
+            # Try modern B2 URI format
+            BACKUP_URI="b2://$B2_BUCKET_NAME/tandoor/$BACKUP_FILENAME"
+            if ! /usr/local/bin/b2 file download "$BACKUP_URI" /tmp/backup/latest.sql.gz 2>/dev/null; then
+              echo "Both download methods failed. Skipping restoration."
+              exit 0
+            fi
           fi
           
           echo "Backup downloaded successfully."

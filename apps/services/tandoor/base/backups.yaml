@@ -18,13 +18,37 @@ spec:
                     secretKeyRef:
                       name: tandoor-db-postgres-creds-1password
                       key: password
+                - name: POSTGRES_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: tandoor-db-postgres-creds-1password
+                      key: username
+                - name: POSTGRES_HOST
+                  value: tandoor-database-rw.tandoor.svc.cluster.local
+                - name: POSTGRES_DB
+                  value: tandoor
               command: ["/bin/sh", "-c"]
               args:
                 - |
                   BACKUP_FILE="pg_backup_$(date +%Y%m%d_%H%M%S).sql.gz"
                   echo "Creating backup $BACKUP_FILE..."
-                  pg_dumpall -h postgres.default.svc.cluster.local -U tandoor | gzip > /mnt/backup/$BACKUP_FILE
-                  echo "Backup completed."
+                  echo "Connecting to: $POSTGRES_HOST as $POSTGRES_USER for database $POSTGRES_DB"
+                  
+                  # Test connection first
+                  if ! pg_isready -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB"; then
+                    echo "ERROR: Cannot connect to database at $POSTGRES_HOST"
+                    exit 1
+                  fi
+                  
+                  # Create backup of specific Tandoor database (not pg_dumpall)
+                  if pg_dump -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB" --verbose --no-owner --no-privileges | gzip > /mnt/backup/$BACKUP_FILE; then
+                    echo "Backup completed successfully: $BACKUP_FILE"
+                    ls -lh /mnt/backup/$BACKUP_FILE
+                  else
+                    echo "ERROR: Backup failed"
+                    exit 1
+                  fi
+                  
                   # signal the next container that the dump is completed
                   touch /mnt/backup/.done                  
               volumeMounts:
