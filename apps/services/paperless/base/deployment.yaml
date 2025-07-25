@@ -16,6 +16,137 @@ spec:
         app: paperless
     spec:
       initContainers:
+      - name: restore-db-backup
+        image: alpine:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: B2_APPLICATION_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: backblaze-cloud-homelab-creds-1password
+              key: application_key_id
+        - name: B2_APPLICATION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: backblaze-cloud-homelab-creds-1password
+              key: application_key
+        - name: B2_BUCKET_NAME
+          value: cloud-homelab-backups
+        - name: POSTGRES_HOST
+          value: paperless-database-rw.paperless.svc.cluster.local
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: POSTGRES_DB
+          value: paperless
+        - name: POSTGRES_USER
+          value: paperless
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: paperless-db-postgres-creds-1password
+              key: password
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          echo "Installing PostgreSQL client and B2 CLI..."
+          apk add --no-cache postgresql-client python3 py3-pip
+          pip3 install --break-system-packages b2
+
+          echo "Authenticating with B2..."
+          b2 authorize-account $B2_APPLICATION_KEY_ID $B2_APPLICATION_KEY
+
+          echo "Searching for Paperless database backups..."
+          LATEST_BACKUP=$(b2 ls --json $B2_BUCKET_NAME paperless/ | python3 -c "
+          import sys, json
+          files = [json.loads(line) for line in sys.stdin if line.strip()]
+          db_backups = [f for f in files if f['fileName'].endswith('.sql.gz')]
+          if db_backups:
+              latest = max(db_backups, key=lambda x: x['uploadTimestamp'])
+              print(latest['fileName'])
+          ")
+
+          if [ -z "$LATEST_BACKUP" ]; then
+              echo "No backup found to restore. Starting with empty database."
+              exit 0
+          fi
+
+          echo "Found backup: $LATEST_BACKUP"
+
+          # Wait for database to be ready
+          until PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d $POSTGRES_DB -c '\q' 2>/dev/null; do
+              echo "Waiting for database connection..."
+              sleep 5
+          done
+
+          echo "Database is ready. Checking if restoration is needed..."
+
+          # Check if Paperless schema exists
+          SCHEMA_EXISTS=$(PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d $POSTGRES_DB -tAc "
+              SELECT COUNT(*) FROM information_schema.tables 
+              WHERE table_schema = 'public' 
+              AND table_name IN ('documents_document', 'documents_tag');
+          ")
+
+          if [ "$SCHEMA_EXISTS" = "0" ]; then
+              echo "Paperless schema not found. Database needs initialization."
+              # Schema will be created by Paperless on first run
+              echo "Downloading and restoring backup..."
+          else
+              echo "Paperless schema exists. Checking for existing user data..."
+              
+              # Check for existing documents
+              DOCUMENTS_COUNT=$(PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d $POSTGRES_DB -tAc "
+                  SELECT COUNT(*) FROM documents_document WHERE id > 0;
+              " 2>/dev/null || echo "0")
+              
+              # Check for tags (more than default system tags)
+              TAGS_COUNT=$(PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d $POSTGRES_DB -tAc "
+                  SELECT COUNT(*) FROM documents_tag WHERE id > 0;
+              " 2>/dev/null || echo "0")
+              
+              echo "Found $DOCUMENTS_COUNT documents and $TAGS_COUNT tags"
+              
+              # Only restore if no documents exist and fewer than 10 tags
+              if [ "$DOCUMENTS_COUNT" = "0" ] && [ "$TAGS_COUNT" -lt "10" ]; then
+                  echo "No user data found. Proceeding with restoration..."
+              else
+                  echo "User data exists. Skipping restoration to prevent data loss."
+                  exit 0
+              fi
+          fi
+
+          # Download the backup
+          echo "Downloading backup from B2..."
+          b2 download-file-by-name $B2_BUCKET_NAME "$LATEST_BACKUP" /tmp/backup.sql.gz
+
+          # Clear existing database
+          echo "Clearing existing database..."
+          PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d $POSTGRES_DB -c "
+              DROP SCHEMA public CASCADE;
+              CREATE SCHEMA public;
+              GRANT ALL ON SCHEMA public TO $POSTGRES_USER;
+              GRANT ALL ON SCHEMA public TO public;
+          "
+
+          # Restore the backup
+          echo "Restoring database backup..."
+          gunzip -c /tmp/backup.sql.gz | PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d $POSTGRES_DB
+
+          echo "Database restoration completed successfully!"
+
+          # Validate restoration
+          TABLE_COUNT=$(PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d $POSTGRES_DB -tAc "
+              SELECT COUNT(*) FROM information_schema.tables 
+              WHERE table_schema = 'public' 
+              AND table_type = 'BASE TABLE';
+          ")
+
+          echo "Restored $TABLE_COUNT tables to the database"
+
+          # Clean up
+          rm -f /tmp/backup.sql.gz
       - name: wait-for-db
         image: busybox:1.37
         command: ['sh', '-c', 'until nc -z paperless-database-rw.paperless.svc.cluster.local 5432; do echo "Waiting for Postgres..."; sleep 5; done']

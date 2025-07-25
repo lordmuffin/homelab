@@ -1,0 +1,201 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: paperless-postgres-backup
+  namespace: paperless
+spec:
+  schedule: "30 2 * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: postgres-backup
+            image: postgres:latest
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "250m"
+              limits:
+                memory: "512Mi"
+                cpu: "500m"
+            env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: paperless-db-postgres-creds-1password
+                  key: password
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: paperless-db-postgres-creds-1password
+                  key: username
+            - name: POSTGRES_HOST
+              value: paperless-database-rw.paperless.svc.cluster.local
+            - name: POSTGRES_DB
+              value: paperless
+            command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              echo "Starting backup process..."
+              
+              # Test database connection with exponential backoff
+              echo "Testing database connection..."
+              MAX_RETRIES=5
+              RETRY_COUNT=0
+              BASE_DELAY=10
+              
+              while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+                RETRY_COUNT=$((RETRY_COUNT + 1))
+                echo "Attempt $RETRY_COUNT/$MAX_RETRIES: Testing database connection..."
+                
+                if pg_isready -h $POSTGRES_HOST -U $POSTGRES_USER -d $POSTGRES_DB -t 10 -q; then
+                  echo "Database connection successful!"
+                  break
+                fi
+                
+                if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                  # Calculate exponential backoff delay: 10, 20, 40, 80, 160 seconds
+                  DELAY=$((BASE_DELAY * (2 ** (RETRY_COUNT - 1))))
+                  echo "Database connection failed. Retrying in $DELAY seconds..."
+                  sleep $DELAY
+                else
+                  echo "Database connection failed after $MAX_RETRIES attempts."
+                  exit 1
+                fi
+              done
+              
+              # Create backup
+              BACKUP_FILE="/mnt/backup/pg_backup_$(date +%Y%m%d_%H%M%S).sql.gz"
+              echo "Creating backup: $BACKUP_FILE"
+              pg_dump -h $POSTGRES_HOST -U $POSTGRES_USER -d $POSTGRES_DB \
+                --verbose --no-owner --no-privileges | gzip > "$BACKUP_FILE"
+              
+              # Verify backup integrity
+              echo "Verifying backup integrity..."
+              if gzip -t "$BACKUP_FILE"; then
+                echo "✅ Backup integrity verification passed"
+                echo "Database backup size: $(du -h "$BACKUP_FILE" | cut -f1)"
+                # Signal completion only after successful verification
+                touch /mnt/backup/.db_done
+                echo "Database backup completed successfully"
+              else
+                echo "❌ Backup integrity verification failed"
+                exit 1
+              fi
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /mnt/backup
+          - name: b2-uploader
+            image: backblazeit/b2:latest
+            resources:
+              requests:
+                memory: "64Mi"
+                cpu: "50m"
+              limits:
+                memory: "128Mi"
+                cpu: "100m"
+            env:
+            - name: B2_APPLICATION_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: backblaze-cloud-homelab-creds-1password
+                  key: keyID
+            - name: B2_APPLICATION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: backblaze-cloud-homelab-creds-1password
+                  key: applicationKey
+            - name: B2_BUCKET_NAME
+              value: cloud-homelab-backups
+            - name: RETENTION_DAYS
+              value: "30"
+            command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              echo "Waiting for backup to complete..."
+              
+              # Wait for backup completion
+              while [ ! -f /mnt/backup/.db_done ]; do
+                echo "Waiting for database backup to complete..."
+                sleep 5
+              done
+              
+              echo "Database backup completed, starting upload to B2..."
+              
+              # Install jq for JSON processing
+              apk add --no-cache jq
+              
+              # Authenticate with B2
+              b2v4 authorize-account "$B2_APPLICATION_KEY_ID" "$B2_APPLICATION_KEY"
+              
+              # Upload database backup files only
+              for file in /mnt/backup/*.sql.gz; do
+                if [ -f "$file" ]; then
+                  echo "Uploading $file to B2..."
+                  b2v4 file upload "$B2_BUCKET_NAME" "$file" "paperless/$(basename $file)"
+                fi
+              done
+              
+              echo "Database backup uploaded successfully to B2"
+              
+              # Cleanup old backups using jq for robust JSON parsing
+              echo "Starting backup retention cleanup..."
+              CUTOFF_DATE=$(date -d "$RETENTION_DAYS days ago" +%s)
+              
+              # List all paperless backup files in the bucket
+              echo "Listing existing backups for retention cleanup..."
+              if ! b2v4 ls "$B2_BUCKET_NAME" paperless/ --recursive --json > /tmp/backup_list.json; then
+                echo "Warning: Failed to list B2 files, skipping cleanup"
+                exit 0
+              fi
+              
+              # Process backup files for cleanup using jq
+              if [ -s /tmp/backup_list.json ]; then
+                echo "Processing backup files for retention policy..."
+                
+                deleted_count=0
+                kept_count=0
+                
+                # Use jq to extract file information and process each backup
+                jq -r '.[] | select(.fileName | test("^paperless/.*\\.sql\\.gz$")) | "\(.fileName) \(.fileId) \(.uploadTimestamp)"' /tmp/backup_list.json | \
+                while read -r file_name file_id upload_timestamp; do
+                  # Convert milliseconds to seconds
+                  file_timestamp=$((upload_timestamp / 1000))
+                  
+                  # Check if file is older than retention period
+                  if [ "$file_timestamp" -lt "$CUTOFF_DATE" ]; then
+                    file_age_days=$(( (CUTOFF_DATE - file_timestamp) / 86400 ))
+                    echo "Deleting old backup: $file_name (age: ${file_age_days} days)"
+                    
+                    if b2v4 delete-file-version "$file_name" "$file_id"; then
+                      deleted_count=$((deleted_count + 1))
+                    else
+                      echo "Error deleting $file_name"
+                    fi
+                  else
+                    kept_count=$((kept_count + 1))
+                  fi
+                done
+                
+                echo "Retention cleanup completed: $deleted_count files deleted, $kept_count files kept"
+              else
+                echo "No existing backups found in bucket"
+              fi
+              
+              # Cleanup temporary files
+              rm -f /tmp/backup_list.json
+              
+              echo "Backup upload and retention cleanup completed successfully"
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /mnt/backup
+          volumes:
+          - name: backup-storage
+            emptyDir: {}
+          restartPolicy: OnFailure

@@ -1,0 +1,254 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: n8n-backup
+  namespace: services
+spec:
+  schedule: "45 2 * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: postgres-backup
+              image: postgres:latest
+              resources:
+                requests:
+                  cpu: 250m
+                  memory: 256Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+              env:
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: n8n-db-postgres-creds-1password
+                      key: password
+                - name: POSTGRES_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: n8n-db-postgres-creds-1password
+                      key: username
+                - name: POSTGRES_HOST
+                  value: "n8n-database-rw.services.svc.cluster.local"
+                - name: POSTGRES_DB
+                  value: "n8n"
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  set -euo pipefail
+                  
+                  echo "Testing database connection with retry logic..."
+                  
+                  # Retry configuration
+                  MAX_RETRIES=5
+                  RETRY_COUNT=0
+                  BASE_DELAY=10
+                  
+                  # Function to test database connection with exponential backoff
+                  test_db_connection() {
+                    while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+                      RETRY_COUNT=$((RETRY_COUNT + 1))
+                      
+                      echo "Attempt $RETRY_COUNT/$MAX_RETRIES: Testing database connection..."
+                      
+                      if pg_isready -h $POSTGRES_HOST -p 5432 -U $POSTGRES_USER -d $POSTGRES_DB; then
+                        echo "Database connection successful!"
+                        return 0
+                      fi
+                      
+                      if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                        # Calculate exponential backoff delay: 10, 20, 40, 80, 160 seconds
+                        DELAY=$((BASE_DELAY * (2 ** (RETRY_COUNT - 1))))
+                        echo "Database connection failed. Retrying in $DELAY seconds..."
+                        sleep $DELAY
+                      else
+                        echo "Database connection failed after $MAX_RETRIES attempts."
+                        return 1
+                      fi
+                    done
+                  }
+                  
+                  # Execute the database connection test
+                  test_db_connection
+                  
+                  echo "Creating database backup..."
+                  BACKUP_FILE="/mnt/backup/pg_backup_$(date +%Y%m%d_%H%M%S).sql.gz"
+                  pg_dump -h $POSTGRES_HOST -U $POSTGRES_USER -d $POSTGRES_DB \
+                    --verbose --no-owner --no-privileges | gzip > "$BACKUP_FILE"
+                  
+                  echo "Database backup completed: $BACKUP_FILE"
+                  ls -lh "$BACKUP_FILE"
+                  
+                  # Verify backup integrity
+                  echo "Verifying backup integrity..."
+                  if gzip -t "$BACKUP_FILE"; then
+                    echo "✅ Backup integrity verification passed"
+                    # Signal completion only after successful verification
+                    touch /mnt/backup/.db_done
+                  else
+                    echo "❌ Backup integrity verification failed"
+                    exit 1
+                  fi
+              volumeMounts:
+                - name: backup-storage
+                  mountPath: /mnt/backup
+
+            - name: file-backup
+              image: alpine:latest
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: 200m
+                  memory: 256Mi
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -euo pipefail
+                  
+                  echo "Installing required packages..."
+                  apk add --no-cache tar gzip
+                  
+                  echo "Creating file backup..."
+                  BACKUP_FILE="/mnt/backup/n8n_files_$(date +%Y%m%d_%H%M%S).tar.gz"
+                  tar -czf "$BACKUP_FILE" -C /mnt/n8n-data .
+                  
+                  echo "File backup completed: $BACKUP_FILE"
+                  ls -lh "$BACKUP_FILE"
+                  
+                  # Verify backup integrity
+                  echo "Verifying backup integrity..."
+                  if tar -tf "$BACKUP_FILE" > /dev/null 2>&1; then
+                    echo "✅ Backup integrity verification passed"
+                    # Signal completion only after successful verification
+                    touch /mnt/backup/.files_done
+                  else
+                    echo "❌ Backup integrity verification failed"
+                    exit 1
+                  fi
+              volumeMounts:
+                - name: backup-storage
+                  mountPath: /mnt/backup
+                - name: n8n-data
+                  mountPath: /mnt/n8n-data
+                  readOnly: true
+
+            - name: b2-uploader
+              image: backblazeit/b2:latest
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+                limits:
+                  cpu: 100m
+                  memory: 128Mi
+              env:
+                - name: B2_APPLICATION_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: backblaze-cloud-homelab-creds-1password
+                      key: keyID
+                - name: B2_APPLICATION_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: backblaze-cloud-homelab-creds-1password
+                      key: applicationKey
+                - name: B2_BUCKET_NAME
+                  value: "cloud-homelab-backups"
+                - name: RETENTION_DAYS
+                  value: "30"
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  set -euo pipefail
+                  
+                  echo "Waiting for backups to complete..."
+                  while [ ! -f /mnt/backup/.db_done ] || [ ! -f /mnt/backup/.files_done ]; do
+                    echo "Waiting for backup completion..."
+                    sleep 5
+                  done
+                  
+                  echo "Both backups completed, starting upload to B2..."
+                  
+                  # Install jq for JSON processing
+                  apk add --no-cache jq
+                  
+                  # Authenticate with B2
+                  b2v4 authorize-account "$B2_APPLICATION_KEY_ID" "$B2_APPLICATION_KEY"
+                  
+                  # Upload all backup files
+                  for file in /mnt/backup/*.sql.gz /mnt/backup/*.tar.gz; do
+                    if [ -f "$file" ]; then
+                      echo "Uploading $file to B2..."
+                      b2v4 file upload $B2_BUCKET_NAME "$file" "n8n/$(basename $file)"
+                    fi
+                  done
+                  
+                  echo "All backups uploaded successfully to B2"
+                  
+                  # Cleanup old backups (keep only last 30 days)
+                  echo "Starting backup retention cleanup..."
+                  CUTOFF_DATE=$(date -d "$RETENTION_DAYS days ago" +%s)
+                  
+                  # List all n8n backup files in the bucket
+                  echo "Listing existing backups for retention cleanup..."
+                  if ! b2v4 ls "$B2_BUCKET_NAME" n8n/ --recursive --json > /tmp/backup_list.json; then
+                    echo "Warning: Failed to list B2 files, skipping cleanup"
+                    exit 0
+                  fi
+                  
+                  # Process backup files for cleanup using jq
+                  if [ -s /tmp/backup_list.json ]; then
+                    echo "Processing backup files for retention policy..."
+                    
+                    deleted_count=0
+                    kept_count=0
+                    
+                    # Use jq to extract file information and process each backup
+                    jq -r '.[] | select(.fileName | test("^n8n/.*\\.(sql\\.gz|tar\\.gz)$")) | "\(.fileName) \(.fileId) \(.uploadTimestamp)"' /tmp/backup_list.json | \
+                    while read -r file_name file_id upload_timestamp; do
+                      # Convert milliseconds to seconds
+                      file_timestamp=$((upload_timestamp / 1000))
+                      
+                      # Check if file is older than retention period
+                      if [ "$file_timestamp" -lt "$CUTOFF_DATE" ]; then
+                        file_age_days=$(( (CUTOFF_DATE - file_timestamp) / 86400 ))
+                        echo "Deleting old backup: $file_name (age: ${file_age_days} days)"
+                        
+                        if b2v4 delete-file-version "$file_name" "$file_id"; then
+                          deleted_count=$((deleted_count + 1))
+                        else
+                          echo "Error deleting $file_name"
+                        fi
+                      else
+                        kept_count=$((kept_count + 1))
+                      fi
+                    done
+                    
+                    echo "Retention cleanup completed: $deleted_count files deleted, $kept_count files kept"
+                  else
+                    echo "No existing backups found in bucket"
+                  fi
+                  
+                  # Cleanup temporary files
+                  rm -f /tmp/backup_list.json
+                  
+                  echo "Backup upload and retention cleanup completed successfully"
+              volumeMounts:
+                - name: backup-storage
+                  mountPath: /mnt/backup
+
+          volumes:
+            - name: backup-storage
+              emptyDir: {}
+            - name: n8n-data
+              persistentVolumeClaim:
+                claimName: n8n-storage

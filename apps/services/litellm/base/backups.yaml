@@ -1,0 +1,335 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: litellm-backup
+  namespace: services
+spec:
+  schedule: "0 3 * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: postgres-backup
+            image: postgres:latest
+            env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: litellm-db-postgres-creds-1password
+                  key: password
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: litellm-db-postgres-creds-1password
+                  key: username
+            - name: POSTGRES_HOST
+              value: "litellm-database-rw.services.svc.cluster.local"
+            - name: POSTGRES_DB
+              value: "litellm"
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /mnt/backup
+            command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              
+              echo "=== PostgreSQL Backup Container Starting ==="
+              
+              # Validate required environment variables
+              echo "Validating environment variables..."
+              REQUIRED_VARS="PGPASSWORD POSTGRES_USER POSTGRES_HOST POSTGRES_DB"
+              MISSING_VARS=""
+              
+              for var in $REQUIRED_VARS; do
+                eval "value=\$$var"
+                if [ -z "$value" ]; then
+                  MISSING_VARS="$MISSING_VARS $var"
+                fi
+              done
+              
+              if [ -n "$MISSING_VARS" ]; then
+                echo "ERROR: Missing required environment variables:$MISSING_VARS"
+                echo "Please check the secret references and configuration"
+                exit 1
+              fi
+              
+              echo "All required environment variables are set"
+              echo "Database: $POSTGRES_DB on $POSTGRES_HOST"
+              echo "User: $POSTGRES_USER"
+              
+              BACKUP_FILE="/mnt/backup/pg_backup_$(date +%Y%m%d_%H%M%S).sql.gz"
+              
+              echo "Starting PostgreSQL backup for LiteLLM database..."
+              
+              # Retry logic with exponential backoff
+              max_attempts=5
+              attempt=1
+              while [ $attempt -le $max_attempts ]; do
+                echo "Connection attempt $attempt/$max_attempts..."
+                if pg_isready -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB"; then
+                  echo "Database connection successful!"
+                  break
+                elif [ $attempt -eq $max_attempts ]; then
+                  echo "Failed to connect to database after $max_attempts attempts"
+                  exit 1
+                else
+                  sleep_time=$((2 ** attempt))
+                  echo "Connection failed, waiting ${sleep_time}s before retry..."
+                  sleep $sleep_time
+                  attempt=$((attempt + 1))
+                fi
+              done
+              
+              echo "Creating database dump..."
+              pg_dump -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+                --verbose --no-owner --no-privileges | gzip > "$BACKUP_FILE"
+              
+              echo "Verifying backup integrity..."
+              if gzip -t "$BACKUP_FILE"; then
+                echo "Backup integrity verified successfully"
+                echo "Database backup completed: $BACKUP_FILE"
+                echo "Database backup size: $(du -h "$BACKUP_FILE" | cut -f1)"
+              else
+                echo "Backup integrity check failed!"
+                exit 1
+              fi
+              
+              # Signal completion to b2-uploader
+              touch /mnt/backup/.db_done
+              echo "Database backup completed successfully"
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "250m"
+              limits:
+                memory: "512Mi"
+                cpu: "500m"
+          - name: file-backup
+            image: alpine:latest
+            resources:
+              requests:
+                memory: "128Mi"
+                cpu: "100m"
+              limits:
+                memory: "256Mi"
+                cpu: "200m"
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /mnt/backup
+            - name: litellm-data
+              mountPath: /mnt/litellm-data
+              readOnly: true
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -euo pipefail
+              
+              echo "Installing required packages..."
+              apk add --no-cache tar gzip
+              
+              echo "Creating file backup..."
+              BACKUP_FILE="/mnt/backup/litellm_files_$(date +%Y%m%d_%H%M%S).tar.gz"
+              
+              if [ -d "/mnt/litellm-data" ] && [ "$(ls -A /mnt/litellm-data 2>/dev/null)" ]; then
+                tar -czf "$BACKUP_FILE" -C /mnt/litellm-data .
+                echo "File archive created: $BACKUP_FILE"
+                echo "File backup size: $(du -h "$BACKUP_FILE" | cut -f1)"
+              else
+                echo "LiteLLM data directory is empty, creating empty archive..."
+                tar -czf "$BACKUP_FILE" -T /dev/null
+              fi
+              
+              # Verify backup integrity
+              echo "Verifying backup integrity..."
+              if tar -tf "$BACKUP_FILE" > /dev/null 2>&1; then
+                echo "✅ Backup integrity verification passed"
+                # Signal completion only after successful verification
+                touch /mnt/backup/.files_done
+                echo "File backup completed successfully"
+              else
+                echo "❌ Backup integrity verification failed"
+                exit 1
+              fi
+          - name: b2-uploader
+            image: backblazeit/b2:latest
+            env:
+            - name: B2_APPLICATION_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: backblaze-cloud-homelab-creds-1password
+                  key: keyID
+            - name: B2_APPLICATION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: backblaze-cloud-homelab-creds-1password
+                  key: applicationKey
+            - name: B2_BUCKET_NAME
+              value: "cloud-homelab-backups"
+            - name: RETENTION_DAYS
+              value: "30"
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /mnt/backup
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              
+              echo "=== B2 Uploader Container Starting ==="
+              
+              # Validate required environment variables
+              echo "Validating environment variables..."
+              REQUIRED_VARS="B2_APPLICATION_KEY_ID B2_APPLICATION_KEY B2_BUCKET_NAME RETENTION_DAYS"
+              MISSING_VARS=""
+              
+              for var in $REQUIRED_VARS; do
+                eval "value=\$$var"
+                if [ -z "$value" ]; then
+                  MISSING_VARS="$MISSING_VARS $var"
+                fi
+              done
+              
+              if [ -n "$MISSING_VARS" ]; then
+                echo "ERROR: Missing required environment variables:$MISSING_VARS"
+                echo "Please check the secret references and configuration"
+                exit 1
+              fi
+              
+              # Validate retention days is a positive number
+              if ! echo "$RETENTION_DAYS" | grep -q '^[0-9]\+$' || [ "$RETENTION_DAYS" -lt 1 ]; then
+                echo "ERROR: RETENTION_DAYS must be a positive integer, got: $RETENTION_DAYS"
+                exit 1
+              fi
+              
+              echo "All required environment variables are set"
+              echo "B2 Bucket: $B2_BUCKET_NAME"
+              echo "Retention: $RETENTION_DAYS days"
+              
+              echo "Waiting for backup containers to complete..."
+              while [ ! -f /mnt/backup/.db_done ] || [ ! -f /mnt/backup/.files_done ]; do
+                echo "Waiting for backups to complete..."
+                sleep 10
+              done
+              
+              echo "Both backups completed, starting B2 upload..."
+              
+              # Install jq for JSON processing
+              apk add --no-cache jq
+              
+              # Authenticate with B2
+              b2v4 authorize-account "$B2_APPLICATION_KEY_ID" "$B2_APPLICATION_KEY"
+              
+              # Validate and upload database backup
+              DB_BACKUP=$(ls -1t /mnt/backup/pg_backup_*.sql.gz 2>/dev/null | head -n 1)
+              if [ -n "$DB_BACKUP" ] && [ -f "$DB_BACKUP" ]; then
+                DB_SIZE=$(stat -c%s "$DB_BACKUP" 2>/dev/null || echo "0")
+                DB_FILENAME=$(basename "$DB_BACKUP")
+                
+                if [ "$DB_SIZE" -gt 0 ]; then
+                  echo "Uploading database backup: $DB_FILENAME (size: $(du -h "$DB_BACKUP" | cut -f1))"
+                  if b2v4 file upload "$B2_BUCKET_NAME" "$DB_BACKUP" "litellm/$DB_FILENAME"; then
+                    echo "Database backup uploaded successfully"
+                  else
+                    echo "ERROR: Failed to upload database backup"
+                    exit 1
+                  fi
+                else
+                  echo "ERROR: Database backup file is empty (0 bytes): $DB_FILENAME"
+                  exit 1
+                fi
+              else
+                echo "ERROR: No valid database backup found in /mnt/backup/"
+                exit 1
+              fi
+              
+              # Validate and upload file backup
+              FILE_BACKUP=$(ls -1t /mnt/backup/litellm_files_*.tar.gz 2>/dev/null | head -n 1)
+              if [ -n "$FILE_BACKUP" ] && [ -f "$FILE_BACKUP" ]; then
+                FILE_SIZE=$(stat -c%s "$FILE_BACKUP" 2>/dev/null || echo "0")
+                FILE_FILENAME=$(basename "$FILE_BACKUP")
+                
+                if [ "$FILE_SIZE" -gt 0 ]; then
+                  echo "Uploading file backup: $FILE_FILENAME (size: $(du -h "$FILE_BACKUP" | cut -f1))"
+                  if b2v4 file upload "$B2_BUCKET_NAME" "$FILE_BACKUP" "litellm/$FILE_FILENAME"; then
+                    echo "File backup uploaded successfully"
+                  else
+                    echo "ERROR: Failed to upload file backup"
+                    exit 1
+                  fi
+                else
+                  echo "ERROR: File backup is empty (0 bytes): $FILE_FILENAME"
+                  exit 1
+                fi
+              else
+                echo "ERROR: No valid file backup found in /mnt/backup/"
+                exit 1
+              fi
+              
+              # Cleanup old backups using jq for robust JSON parsing
+              echo "Starting backup retention cleanup..."
+              CUTOFF_DATE=$(date -d "$RETENTION_DAYS days ago" +%s)
+              
+              # List all litellm backup files in the bucket
+              echo "Listing existing backups for retention cleanup..."
+              if ! b2v4 ls "$B2_BUCKET_NAME" litellm/ --recursive --json > /tmp/backup_list.json; then
+                echo "Warning: Failed to list B2 files, skipping cleanup"
+                exit 0
+              fi
+              
+              # Process backup files for cleanup using jq
+              if [ -s /tmp/backup_list.json ]; then
+                echo "Processing backup files for retention policy..."
+                
+                deleted_count=0
+                kept_count=0
+                
+                # Use jq to extract file information and process each backup
+                jq -r '.[] | select(.fileName | test("^litellm/.*\\.(sql\\.gz|tar\\.gz)$")) | "\(.fileName) \(.fileId) \(.uploadTimestamp)"' /tmp/backup_list.json | \
+                while read -r file_name file_id upload_timestamp; do
+                  # Convert milliseconds to seconds
+                  file_timestamp=$((upload_timestamp / 1000))
+                  
+                  # Check if file is older than retention period
+                  if [ "$file_timestamp" -lt "$CUTOFF_DATE" ]; then
+                    file_age_days=$(( (CUTOFF_DATE - file_timestamp) / 86400 ))
+                    echo "Deleting old backup: $file_name (age: ${file_age_days} days)"
+                    
+                    if b2v4 delete-file-version "$file_name" "$file_id"; then
+                      deleted_count=$((deleted_count + 1))
+                    else
+                      echo "Error deleting $file_name"
+                    fi
+                  else
+                    kept_count=$((kept_count + 1))
+                  fi
+                done
+                
+                echo "Retention cleanup completed: $deleted_count files deleted, $kept_count files kept"
+              else
+                echo "No existing backups found in bucket"
+              fi
+              
+              # Cleanup temporary files
+              rm -f /tmp/backup_list.json
+              
+              echo "Backup and upload process completed successfully!"
+            resources:
+              requests:
+                memory: "64Mi"
+                cpu: "50m"
+              limits:
+                memory: "128Mi"
+                cpu: "100m"
+          volumes:
+          - name: backup-storage
+            emptyDir: {}
+          - name: litellm-data
+            persistentVolumeClaim:
+              claimName: litellm-data-pvc
