@@ -53,7 +53,7 @@ spec:
             secretKeyRef:
               name: tandoor-db-postgres-creds-1password
               key: password
-        command: ["/bin/sh", "-c"]
+        command: ["/bin/bash", "-c"]
         args:
         - |
           echo "Installing required dependencies..."

@@ -27,7 +27,7 @@ spec:
                   value: tandoor-database-rw.tandoor.svc.cluster.local
                 - name: POSTGRES_DB
                   value: tandoor
-              command: ["/bin/sh", "-c"]
+              command: ["/bin/bash", "-c"]
               args:
                 - |
                   # Strict error handling
@@ -143,7 +143,7 @@ spec:
                       key: applicationKey
                 - name: B2_BUCKET_NAME
                   value: "cloud-homelab-backups"
-              command: ["/bin/sh", "-c"]
+              command: ["/bin/bash", "-c"]
               args:
                 - |
                   # Strict error handling

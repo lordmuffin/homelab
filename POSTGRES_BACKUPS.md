@@ -369,6 +369,11 @@ curl -L https://github.com/Backblaze/B2_Command_Line_Tool/releases/latest/downlo
 chmod +x /usr/local/bin/b2
 ```
 
+**Shell Requirements:**
+```yaml
+command: ["/bin/bash", "-c"]  # Required for bash-specific features like 'set -euo pipefail'
+```
+
 **Environment Variables:**
 - `B2_APPLICATION_KEY_ID` - From 1Password secret (`keyID`)
 - `B2_APPLICATION_KEY` - From 1Password secret (`applicationKey`)  
@@ -544,7 +549,7 @@ initContainers:
         secretKeyRef:
           name: [service]-db-postgres-creds-1password
           key: password
-  command: ["/bin/sh", "-c"]
+  command: ["/bin/bash", "-c"]
   args:
     - |
       # Standard restoration script (see full implementation examples)

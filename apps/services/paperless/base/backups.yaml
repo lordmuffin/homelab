@@ -35,7 +35,7 @@ spec:
                   value: paperless-database-rw.paperless.svc.cluster.local
                 - name: POSTGRES_DB
                   value: paperless
-              command: ["/bin/sh", "-c"]
+              command: ["/bin/bash", "-c"]
               args:
                 - |
                   # Strict error handling
@@ -160,7 +160,7 @@ spec:
                   value: "cloud-homelab-backups"
                 - name: RETENTION_DAYS
                   value: "30"
-              command: ["/bin/sh", "-c"]
+              command: ["/bin/bash", "-c"]
               args:
                 - |
                   # Strict error handling
