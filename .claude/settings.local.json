@@ -57,7 +57,9 @@
       "Bash(NAMESPACE=\"paperless\")",
       "Bash(SERVICE=\"paperless\")",
       "Bash(DB_POD=\"paperless-database-1\")",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "WebFetch(domain:actualbudget.org)",
+      "WebFetch(domain:github.com)"
     ]
   },
   "enableAllProjectMcpServers": true,
