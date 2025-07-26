@@ -1,0 +1,471 @@
+# Azure DevOps Pipeline: Terraform Apply
+# Applies Terraform changes to infrastructure
+
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - terraform/**
+      - .azure-pipelines/**
+
+pr: none
+
+parameters:
+  - name: environment
+    displayName: 'Environment to deploy'
+    type: string
+    default: 'dev-lab'
+    values:
+      - dev-lab
+      - prod-lab
+  
+  - name: module
+    displayName: 'Module to deploy'
+    type: string
+    default: 'main'
+    values:
+      - main
+      - vault
+      - unifi
+      - vultr
+      - b2
+  
+  - name: confirmApply
+    displayName: 'Type "apply" to confirm deployment'
+    type: string
+    default: ''
+  
+  - name: deploymentMode
+    displayName: 'Deployment Mode'
+    type: string
+    default: 'automatic'
+    values:
+      - automatic
+      - manual
+
+variables:
+  - name: TF_VERSION
+    value: '1.5.7'
+  - name: ARM_USE_AZUREAD
+    value: true
+  - name: ARM_USE_CLI
+    value: false
+  - name: ARM_STORAGE_USE_AZUREAD
+    value: true
+  - name: TF_IN_AUTOMATION
+    value: true
+  - name: TF_INPUT
+    value: false
+  - name: SYSTEM_ACCESSTOKEN
+    value: $(System.AccessToken)
+
+resources:
+  repositories:
+    - repository: self
+      type: git
+      ref: $(Build.SourceBranch)
+
+stages:
+  - stage: PreApplyChecks
+    displayName: 'Pre-Apply Security Checks'
+    jobs:
+      - job: SecurityValidation
+        displayName: 'Security Validation'
+        pool:
+          vmImage: 'ubuntu-latest'
+        
+        steps:
+          - checkout: self
+            fetchDepth: 0
+          
+          - task: PowerShell@2
+            displayName: 'Validate Manual Confirmation'
+            inputs:
+              targetType: 'inline'
+              script: |
+                if ("${{ parameters.deploymentMode }}" -eq "manual") {
+                  if ("${{ parameters.confirmApply }}" -ne "apply") {
+                    Write-Host "❌ Manual confirmation failed. You must type 'apply' to confirm deployment."
+                    exit 1
+                  }
+                  Write-Host "✅ Manual confirmation validated"
+                } else {
+                  Write-Host "ℹ️ Automatic deployment mode - no manual confirmation required"
+                }
+          
+          - task: PowerShell@2
+            displayName: 'Check Branch Protection'
+            inputs:
+              targetType: 'inline'
+              script: |
+                # Verify we're deploying from main branch or manual override
+                if ("$(Build.SourceBranch)" -ne "refs/heads/main" -and "${{ parameters.deploymentMode }}" -ne "manual") {
+                  Write-Host "❌ Terraform apply can only run from main branch"
+                  exit 1
+                }
+                Write-Host "✅ Branch protection check passed"
+          
+          - task: PowerShell@2
+            displayName: 'Set Deployment Matrix'
+            inputs:
+              targetType: 'inline'
+              script: |
+                if ("${{ parameters.deploymentMode }}" -eq "manual") {
+                  # Manual deployment - single environment/module
+                  $environments = @("${{ parameters.environment }}")
+                  $modules = @("${{ parameters.module }}")
+                } else {
+                  # Automatic deployment - all environments and modules
+                  $environments = @("dev-lab", "prod-lab")
+                  $modules = @("main", "vault", "unifi", "vultr", "b2")
+                }
+                
+                Write-Host "##vso[task.setvariable variable=ENVIRONMENTS;isOutput=true]$($environments -join ',')"
+                Write-Host "##vso[task.setvariable variable=MODULES;isOutput=true]$($modules -join ',')"
+                
+                Write-Host "Deployment matrix set:"
+                Write-Host "Environments: $($environments -join ', ')"
+                Write-Host "Modules: $($modules -join ', ')"
+            name: 'SetMatrix'
+
+  - stage: TerraformApply
+    displayName: 'Terraform Apply'
+    dependsOn: PreApplyChecks
+    jobs:
+      - deployment: TerraformApplyMatrix
+        displayName: 'Terraform Apply'
+        timeoutInMinutes: 60
+        cancelTimeoutInMinutes: 10
+        
+        strategy:
+          matrix:
+            ${{ if eq(parameters.deploymentMode, 'manual') }}:
+              Manual_${{ parameters.environment }}_${{ parameters.module }}:
+                Environment: '${{ parameters.environment }}'
+                Module: '${{ parameters.module }}'
+            ${{ if eq(parameters.deploymentMode, 'automatic') }}:
+              DevLab_Main:
+                Environment: 'dev-lab'
+                Module: 'main'
+              DevLab_Vault:
+                Environment: 'dev-lab'
+                Module: 'vault'
+              DevLab_Unifi:
+                Environment: 'dev-lab'
+                Module: 'unifi'
+              DevLab_Vultr:
+                Environment: 'dev-lab'
+                Module: 'vultr'
+              ProdLab_Main:
+                Environment: 'prod-lab'
+                Module: 'main'
+              ProdLab_Vault:
+                Environment: 'prod-lab'
+                Module: 'vault'
+              ProdLab_Unifi:
+                Environment: 'prod-lab'
+                Module: 'unifi'
+              ProdLab_Vultr:
+                Environment: 'prod-lab'
+                Module: 'vultr'
+              ProdLab_B2:
+                Environment: 'prod-lab'
+                Module: 'b2'
+          maxParallel: 2  # Limit concurrent deployments for safety
+        
+        pool:
+          vmImage: 'ubuntu-latest'
+        
+        environment: $(Environment)
+        
+        variables:
+          - group: terraform-$(Environment)
+          - name: WorkingDirectory
+            value: $[eq(variables['Module'], 'main'), 'terraform', format('terraform/modules/{0}', variables['Module'])]
+          - name: StateKey
+            value: '$(Environment)/$(Module).tfstate'
+        
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                  fetchDepth: 0
+                
+                - template: ../templates/terraform-setup.yml
+                  parameters:
+                    azureServiceConnection: 'azure-terraform-backend'
+                    terraformVersion: $(TF_VERSION)
+                    workingDirectory: $(WorkingDirectory)
+                    environment: $(Environment)
+                    module: $(Module)
+                    stateKey: $(StateKey)
+                
+                - task: PowerShell@2
+                  displayName: 'Set Working Directory Variable'
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                      if ("$(Module)" -eq "main") {
+                        $workingDir = "terraform"
+                      } else {
+                        $workingDir = "terraform/modules/$(Module)"
+                      }
+                      Write-Host "##vso[task.setvariable variable=WORKING_DIR]$workingDir"
+                      Write-Host "Working directory set to: $workingDir"
+                
+                - task: DownloadPipelineArtifact@2
+                  displayName: 'Download Plan Artifact (if available)'
+                  inputs:
+                    buildType: 'current'
+                    artifactName: 'terraform-plan-$(Environment)-$(Module)'
+                    targetPath: '$(Pipeline.Workspace)/plan-artifacts'
+                  continueOnError: true
+                
+                - task: TerraformCLI@0
+                  displayName: 'Terraform Init'
+                  inputs:
+                    command: 'init'
+                    terraformVersion: $(TF_VERSION)
+                    workingDirectory: $(WORKING_DIR)
+                    backendType: 'azurerm'
+                    backendServiceArm: 'azure-terraform-backend'
+                    backendAzureRmResourceGroupName: $(AZURE_BACKEND_RESOURCE_GROUP)
+                    backendAzureRmStorageAccountName: $(AZURE_BACKEND_STORAGE_ACCOUNT)
+                    backendAzureRmContainerName: $(AZURE_BACKEND_CONTAINER_NAME)
+                    backendAzureRmKey: $(StateKey)
+                
+                - task: TerraformCLI@0
+                  displayName: 'Terraform Validate'
+                  inputs:
+                    command: 'validate'
+                    terraformVersion: $(TF_VERSION)
+                    workingDirectory: $(WORKING_DIR)
+                
+                - task: TerraformCLI@0
+                  displayName: 'Pre-Apply Plan'
+                  inputs:
+                    command: 'plan'
+                    terraformVersion: $(TF_VERSION)
+                    workingDirectory: $(WORKING_DIR)
+                    environmentServiceName: 'azure-terraform-backend'
+                    commandOptions: '-input=false -out=apply-plan-$(Environment)-$(Module).out -detailed-exitcode'
+                  env:
+                    TF_VAR_api_key: $(RACKSPACE_API_KEY)
+                    TF_VAR_environment: $(Environment)
+                  continueOnError: true
+                  name: 'PreApplyPlan'
+                
+                - task: PowerShell@2
+                  displayName: 'Review Plan Before Apply'
+                  inputs:
+                    targetType: 'inline'
+                    workingDirectory: $(WORKING_DIR)
+                    script: |
+                      # Generate human-readable plan output
+                      terraform show -no-color apply-plan-$(Environment)-$(Module).out > apply-plan-output.txt
+                      
+                      # Check plan exit code
+                      $planExitCode = $env:TERRAFORMCLI_COMMAND_EXIT_CODE
+                      Write-Host "Plan exit code: $planExitCode"
+                      
+                      switch ($planExitCode) {
+                        "0" { 
+                          Write-Host "ℹ️ No changes detected - skipping apply"
+                          Write-Host "##vso[task.setvariable variable=SKIP_APPLY]true"
+                        }
+                        "1" { 
+                          Write-Host "❌ Plan failed - cannot apply"
+                          exit 1
+                        }
+                        "2" { 
+                          Write-Host "📋 Changes detected - proceeding with apply"
+                          Write-Host "##vso[task.setvariable variable=SKIP_APPLY]false"
+                          
+                          # Show plan summary in logs
+                          Write-Host "📋 Plan Summary:"
+                          Get-Content apply-plan-output.txt | Select-Object -First 20
+                        }
+                        default { 
+                          Write-Host "❓ Unknown plan exit code: $planExitCode"
+                          exit 1
+                        }
+                      }
+                
+                - task: TerraformCLI@0
+                  displayName: 'Terraform Apply'
+                  condition: ne(variables['SKIP_APPLY'], 'true')
+                  inputs:
+                    command: 'apply'
+                    terraformVersion: $(TF_VERSION)
+                    workingDirectory: $(WORKING_DIR)
+                    environmentServiceName: 'azure-terraform-backend'
+                    commandOptions: '-input=false -auto-approve apply-plan-$(Environment)-$(Module).out'
+                  env:
+                    TF_VAR_api_key: $(RACKSPACE_API_KEY)
+                    TF_VAR_environment: $(Environment)
+                
+                - task: PowerShell@2
+                  displayName: 'Generate Apply Summary'
+                  condition: always()
+                  inputs:
+                    targetType: 'inline'
+                    workingDirectory: $(WORKING_DIR)
+                    script: |
+                      # Generate deployment summary
+                      $status = if ("$(SKIP_APPLY)" -eq "true") { "No Changes" } else { "Applied Successfully" }
+                      
+                      $summary = @"
+                      # Deployment Summary
+                      
+                      **Environment:** $(Environment)
+                      **Module:** $(Module)
+                      **Status:** $status
+                      **Timestamp:** $(Get-Date -Format "yyyy-MM-dd HH:mm:ss UTC")
+                      **Build:** $(Build.BuildNumber)
+                      **Commit:** $(Build.SourceVersion)
+                      **Triggered by:** $(Build.RequestedFor)
+                      
+                      "@
+                      
+                      # Add plan output if available
+                      if (Test-Path "apply-plan-output.txt") {
+                        $summary += "`n## Plan Output`n`n"
+                        $summary += "``````n"
+                        $summary += Get-Content "apply-plan-output.txt" -Raw
+                        $summary += "``````n"
+                      }
+                      
+                      Set-Content -Path "apply-summary.md" -Value $summary
+                      Write-Host "Apply summary generated"
+                
+                - task: PublishPipelineArtifact@1
+                  displayName: 'Upload Apply Artifacts'
+                  condition: always()
+                  inputs:
+                    targetPath: '$(WORKING_DIR)'
+                    artifactName: 'terraform-apply-$(Environment)-$(Module)'
+                    publishLocation: 'pipeline'
+                
+                - task: PowerShell@2
+                  displayName: 'Post-Apply Verification'
+                  condition: ne(variables['SKIP_APPLY'], 'true')
+                  inputs:
+                    targetType: 'inline'
+                    workingDirectory: $(WORKING_DIR)
+                    script: |
+                      # Verify state after apply
+                      terraform show -json > terraform-state.json
+                      
+                      # Basic verification that state is valid
+                      if (Test-Path "terraform-state.json") {
+                        $stateContent = Get-Content "terraform-state.json" | ConvertFrom-Json
+                        $resourceCount = $stateContent.values.root_module.resources.Count
+                        Write-Host "✅ State verification: $resourceCount resources managed"
+                      } else {
+                        Write-Host "⚠️ Warning: Could not verify terraform state"
+                      }
+
+  - stage: PostApplyNotification
+    displayName: 'Post-Apply Notification'
+    dependsOn: 
+      - PreApplyChecks
+      - TerraformApply
+    condition: always()
+    jobs:
+      - job: NotificationJob
+        displayName: 'Deployment Notification'
+        pool:
+          vmImage: 'ubuntu-latest'
+        
+        steps:
+          - task: PowerShell@2
+            displayName: 'Deployment Summary'
+            inputs:
+              targetType: 'inline'
+              script: |
+                Write-Host "## 🚀 Terraform Deployment Summary"
+                Write-Host ""
+                
+                $applyResult = "$(Agent.JobStatus)"
+                switch ($applyResult) {
+                  "Succeeded" { 
+                    Write-Host "✅ **Status:** Deployment completed successfully"
+                  }
+                  "Failed" { 
+                    Write-Host "❌ **Status:** Deployment failed"
+                  }
+                  default { 
+                    Write-Host "⚠️ **Status:** Deployment completed with warnings"
+                  }
+                }
+                
+                Write-Host ""
+                Write-Host "**Details:**"
+                Write-Host "- **Build:** $(Build.BuildNumber)"
+                Write-Host "- **Commit:** $(Build.SourceVersion)"
+                Write-Host "- **Triggered by:** $(Build.RequestedFor)"
+                Write-Host "- **Timestamp:** $(Get-Date -Format "yyyy-MM-dd HH:mm:ss UTC")"
+                Write-Host ""
+                Write-Host "Check individual job outputs for detailed results."
+          
+          - task: PowerShell@2
+            displayName: 'Notify on Failure'
+            condition: failed()
+            inputs:
+              targetType: 'inline'
+              script: |
+                Write-Host "❌ Terraform deployment failed!"
+                Write-Host "Please check the pipeline logs for details."
+                Write-Host "Consider rolling back changes if necessary."
+                exit 1
+          
+          - task: PowerShell@2
+            displayName: 'Send Teams Notification'
+            condition: always()
+            inputs:
+              targetType: 'inline'
+              script: |
+                # Send notification to Teams webhook if configured
+                $teamsWebhook = "$(TEAMS_WEBHOOK_URL)"
+                
+                if ($teamsWebhook -and $teamsWebhook -ne "") {
+                  $status = "$(Agent.JobStatus)"
+                  $color = switch ($status) {
+                    "Succeeded" { "Good" }
+                    "Failed" { "Attention" }
+                    default { "Warning" }
+                  }
+                  
+                  $message = @{
+                    "@type" = "MessageCard"
+                    "@context" = "http://schema.org/extensions"
+                    "themeColor" = $color
+                    "summary" = "Terraform Deployment $status"
+                    "sections" = @(
+                      @{
+                        "activityTitle" = "🚀 Terraform Deployment"
+                        "activitySubtitle" = "Status: $status"
+                        "facts" = @(
+                          @{ "name" = "Build"; "value" = "$(Build.BuildNumber)" },
+                          @{ "name" = "Branch"; "value" = "$(Build.SourceBranchName)" },
+                          @{ "name" = "Commit"; "value" = "$(Build.SourceVersion)".Substring(0, 7) },
+                          @{ "name" = "Triggered by"; "value" = "$(Build.RequestedFor)" }
+                        )
+                      }
+                    )
+                  }
+                  
+                  try {
+                    $json = $message | ConvertTo-Json -Depth 10
+                    Invoke-RestMethod -Uri $teamsWebhook -Method POST -Body $json -ContentType "application/json"
+                    Write-Host "✅ Teams notification sent"
+                  } catch {
+                    Write-Host "⚠️ Failed to send Teams notification: $($_.Exception.Message)"
+                  }
+                } else {
+                  Write-Host "ℹ️ Teams webhook not configured, skipping notification"
+                }
+            continueOnError: true
