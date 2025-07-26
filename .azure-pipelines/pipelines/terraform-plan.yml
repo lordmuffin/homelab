@@ -38,10 +38,6 @@ stages:
           ProdLab_B2:
             Environment: 'prod-lab'
             Module: 'b2'
-        # Exclude dev-lab/b2 combination (aligned with Gitea workflow)
-        exclude:
-          - Environment: 'dev-lab'
-            Module: 'b2'
         maxParallel: 5
       
       pool:
