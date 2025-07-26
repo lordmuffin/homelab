@@ -53,6 +53,8 @@ spec:
             secretKeyRef:
               name: tandoor-db-postgres-creds-1password
               key: password
+        - name: FORCE_RESTORE
+          value: "false"
         command: ["/bin/sh", "-c"]
         args:
         - |
@@ -150,9 +152,13 @@ spec:
           
           echo "Found $USER_RECIPES recipes, $USER_KEYWORDS keywords, $USER_FOODS foods in database"
           
-          # If there are user recipes or substantial keyword/food data, assume it's real user data
-          if [ "$USER_RECIPES" -gt "0" ] || [ "$USER_KEYWORDS" -gt "10" ] || [ "$USER_FOODS" -gt "10" ]; then
+          # Check if restoration should be forced
+          if [ "${FORCE_RESTORE:-false}" = "true" ]; then
+            echo "⚠️  FORCE_RESTORE=true detected. Proceeding with restoration despite existing user data."
+            echo "⚠️  This will overwrite all existing recipes, keywords, and foods."
+          elif [ "$USER_RECIPES" -gt "0" ] || [ "$USER_KEYWORDS" -gt "10" ] || [ "$USER_FOODS" -gt "10" ]; then
             echo "Database contains user data (recipes: $USER_RECIPES). Skipping restoration to prevent data loss."
+            echo "💡 To force restoration, set FORCE_RESTORE=true environment variable."
             exit 0
           fi
           

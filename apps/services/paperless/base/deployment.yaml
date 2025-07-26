@@ -48,6 +48,8 @@ spec:
             secretKeyRef:
               name: paperless-db-postgres-creds-1password
               key: password
+        - name: FORCE_RESTORE
+          value: "false"
         command: ["/bin/sh", "-c"]
         args:
         - |
@@ -145,9 +147,13 @@ spec:
           
           echo "Found $USER_DOCUMENTS documents, $USER_TAGS tags, $USER_CORRESPONDENTS correspondents in database"
           
-          # If there are user documents or substantial tag/correspondent data, assume it's real user data
-          if [ "$USER_DOCUMENTS" -gt "0" ] || [ "$USER_TAGS" -gt "10" ] || [ "$USER_CORRESPONDENTS" -gt "5" ]; then
+          # Check if restoration should be forced
+          if [ "${FORCE_RESTORE:-false}" = "true" ]; then
+            echo "⚠️  FORCE_RESTORE=true detected. Proceeding with restoration despite existing user data."
+            echo "⚠️  This will overwrite all existing documents, tags, and correspondents."
+          elif [ "$USER_DOCUMENTS" -gt "0" ] || [ "$USER_TAGS" -gt "10" ] || [ "$USER_CORRESPONDENTS" -gt "5" ]; then
             echo "Database contains user data (documents: $USER_DOCUMENTS). Skipping restoration to prevent data loss."
+            echo "💡 To force restoration, set FORCE_RESTORE=true environment variable."
             exit 0
           fi
           
