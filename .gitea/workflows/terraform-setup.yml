@@ -1,0 +1,244 @@
+name: 'Terraform Setup'
+description: 'Shared action for setting up Terraform with Azure backend'
+
+inputs:
+  terraform-version:
+    description: 'Terraform version to install'
+    required: false
+    default: '1.5.7'
+  working-directory:
+    description: 'Working directory for Terraform commands'
+    required: false
+    default: 'terraform'
+  environment:
+    description: 'Target environment (dev-lab, prod-lab)'
+    required: true
+  module:
+    description: 'Terraform module to work with'
+    required: true
+    default: 'main'
+  azure-client-id:
+    description: 'Azure Client ID for authentication'
+    required: true
+  azure-tenant-id:
+    description: 'Azure Tenant ID for authentication'
+    required: true
+  azure-subscription-id:
+    description: 'Azure Subscription ID for authentication'
+    required: true
+  azure-backend-resource-group:
+    description: 'Azure Resource Group for backend storage'
+    required: true
+  azure-backend-storage-account:
+    description: 'Azure Storage Account for backend'
+    required: true
+  azure-backend-container:
+    description: 'Azure Storage Container for backend'
+    required: true
+
+outputs:
+  working-directory:
+    description: 'Computed working directory path'
+    value: ${{ steps.setup-paths.outputs.working-directory }}
+  state-key:
+    description: 'Terraform state key'
+    value: ${{ steps.setup-paths.outputs.state-key }}
+  terraform-initialized:
+    description: 'Whether Terraform was successfully initialized'
+    value: ${{ steps.terraform-init.outputs.initialized }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Paths and Variables
+      id: setup-paths
+      shell: bash
+      run: |
+        # Determine working directory based on module
+        if [ "${{ inputs.module }}" != "main" ]; then
+          WORKING_DIR="${{ inputs.working-directory }}/modules/${{ inputs.module }}"
+        else
+          WORKING_DIR="${{ inputs.working-directory }}"
+        fi
+        
+        # Set state key for Azure backend
+        STATE_KEY="${{ inputs.environment }}/${{ inputs.module }}.tfstate"
+        
+        echo "working-directory=$WORKING_DIR" >> $GITHUB_OUTPUT
+        echo "state-key=$STATE_KEY" >> $GITHUB_OUTPUT
+        
+        echo "✅ Configured paths:"
+        echo "  Working Directory: $WORKING_DIR"
+        echo "  State Key: $STATE_KEY"
+    
+    - name: Validate Inputs
+      shell: bash
+      run: |
+        # Validate required inputs
+        if [ -z "${{ inputs.environment }}" ]; then
+          echo "❌ Environment is required"
+          exit 1
+        fi
+        
+        if [ -z "${{ inputs.module }}" ]; then
+          echo "❌ Module is required"
+          exit 1
+        fi
+        
+        # Validate environment values
+        case "${{ inputs.environment }}" in
+          "dev-lab"|"prod-lab")
+            echo "✅ Valid environment: ${{ inputs.environment }}"
+            ;;
+          *)
+            echo "❌ Invalid environment: ${{ inputs.environment }}"
+            echo "Valid values: dev-lab, prod-lab"
+            exit 1
+            ;;
+        esac
+        
+        # Validate module values
+        case "${{ inputs.module }}" in
+          "main"|"vault"|"unifi"|"vultr"|"b2")
+            echo "✅ Valid module: ${{ inputs.module }}"
+            ;;
+          *)
+            echo "❌ Invalid module: ${{ inputs.module }}"
+            echo "Valid values: main, vault, unifi, vultr, b2"
+            exit 1
+            ;;
+        esac
+    
+    - name: Setup Azure CLI
+      uses: azure/login@v1
+      with:
+        client-id: ${{ inputs.azure-client-id }}
+        tenant-id: ${{ inputs.azure-tenant-id }}
+        subscription-id: ${{ inputs.azure-subscription-id }}
+    
+    - name: Verify Azure Backend Access
+      shell: bash
+      run: |
+        echo "🔍 Verifying Azure backend access..."
+        
+        # Check if storage account exists and is accessible
+        az storage account show \
+          --name "${{ inputs.azure-backend-storage-account }}" \
+          --resource-group "${{ inputs.azure-backend-resource-group }}" \
+          --output table
+        
+        # Check if container exists
+        az storage container show \
+          --name "${{ inputs.azure-backend-container }}" \
+          --account-name "${{ inputs.azure-backend-storage-account }}" \
+          --auth-mode login \
+          --output table
+        
+        echo "✅ Azure backend access verified"
+    
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v2
+      with:
+        terraform_version: ${{ inputs.terraform-version }}
+        terraform_wrapper: false
+    
+    - name: Configure Terraform Backend
+      shell: bash
+      working-directory: ${{ steps.setup-paths.outputs.working-directory }}
+      run: |
+        echo "📝 Configuring Terraform backend..."
+        
+        # Create backend configuration
+        cat > backend.tf << EOF
+        terraform {
+          backend "azurerm" {
+            resource_group_name  = "${{ inputs.azure-backend-resource-group }}"
+            storage_account_name = "${{ inputs.azure-backend-storage-account }}"
+            container_name       = "${{ inputs.azure-backend-container }}"
+            key                  = "${{ steps.setup-paths.outputs.state-key }}"
+          }
+        }
+        EOF
+        
+        echo "✅ Backend configuration created:"
+        cat backend.tf
+    
+    - name: Terraform Version Info
+      shell: bash
+      run: |
+        terraform version
+        echo "✅ Terraform version verified"
+    
+    - name: Terraform Format Check
+      shell: bash
+      working-directory: ${{ steps.setup-paths.outputs.working-directory }}
+      run: |
+        echo "🔍 Checking Terraform formatting..."
+        
+        if terraform fmt -check -diff -recursive; then
+          echo "✅ Terraform formatting is correct"
+        else
+          echo "❌ Terraform formatting issues found"
+          echo "Run 'terraform fmt -recursive' to fix formatting"
+          exit 1
+        fi
+    
+    - name: Terraform Init
+      id: terraform-init
+      shell: bash
+      working-directory: ${{ steps.setup-paths.outputs.working-directory }}
+      run: |
+        echo "🚀 Initializing Terraform..."
+        
+        terraform init \
+          -input=false \
+          -backend-config="resource_group_name=${{ inputs.azure-backend-resource-group }}" \
+          -backend-config="storage_account_name=${{ inputs.azure-backend-storage-account }}" \
+          -backend-config="container_name=${{ inputs.azure-backend-container }}" \
+          -backend-config="key=${{ steps.setup-paths.outputs.state-key }}"
+        
+        if [ $? -eq 0 ]; then
+          echo "initialized=true" >> $GITHUB_OUTPUT
+          echo "✅ Terraform initialized successfully"
+        else
+          echo "initialized=false" >> $GITHUB_OUTPUT
+          echo "❌ Terraform initialization failed"
+          exit 1
+        fi
+    
+    - name: Terraform Validate
+      shell: bash
+      working-directory: ${{ steps.setup-paths.outputs.working-directory }}
+      run: |
+        echo "🔍 Validating Terraform configuration..."
+        
+        if terraform validate; then
+          echo "✅ Terraform configuration is valid"
+        else
+          echo "❌ Terraform configuration validation failed"
+          exit 1
+        fi
+    
+    - name: Show Terraform Workspace
+      shell: bash
+      working-directory: ${{ steps.setup-paths.outputs.working-directory }}
+      run: |
+        echo "📋 Current Terraform workspace:"
+        terraform workspace show
+        
+        echo "📋 Available workspaces:"
+        terraform workspace list
+    
+    - name: Setup Summary
+      shell: bash
+      run: |
+        echo "## 🔧 Terraform Setup Complete" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Configuration:**" >> $GITHUB_STEP_SUMMARY
+        echo "- **Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Module:** ${{ inputs.module }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Working Directory:** ${{ steps.setup-paths.outputs.working-directory }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **State Key:** ${{ steps.setup-paths.outputs.state-key }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Terraform Version:** ${{ inputs.terraform-version }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Status:** ✅ Ready for Terraform operations" >> $GITHUB_STEP_SUMMARY
