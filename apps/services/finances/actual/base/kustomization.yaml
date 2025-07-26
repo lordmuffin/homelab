@@ -5,6 +5,5 @@ resources:
 - svc.yaml
 - cm.yaml
 - ingress.yaml
-- database.yaml
-- actual-db-postgres-creds-1password.yaml
 - backups.yaml
+- restore-job.yaml

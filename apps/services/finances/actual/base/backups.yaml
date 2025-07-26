@@ -1,18 +1,18 @@
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: actual-postgres-backup
+  name: actual-backup
   namespace: services
 spec:
-  schedule: "0 4 * * *" # Daily at 4:00AM (offset from other services)
+  schedule: "30 1 * * *" # Daily at 1:30AM (offset from other services)
   concurrencyPolicy: Forbid
   jobTemplate:
     spec:
       template:
         spec:
           containers:
-            - name: postgres-backup
-              image: postgres:latest
+            - name: actual-backup
+              image: alpine:latest
               resources:
                 requests:
                   memory: "256Mi"
@@ -21,29 +21,17 @@ spec:
                   memory: "512Mi"
                   cpu: "500m"
               env:
-                - name: PGPASSWORD
-                  valueFrom:
-                    secretKeyRef:
-                      name: actual-db-postgres-creds-1password
-                      key: password
-                - name: POSTGRES_USER
-                  valueFrom:
-                    secretKeyRef:
-                      name: actual-db-postgres-creds-1password
-                      key: username
-                - name: POSTGRES_HOST
-                  value: actual-database-rw.services.svc.cluster.local
-                - name: POSTGRES_DB
-                  value: actual
-              command: ["/bin/bash", "-c"]
+                - name: BACKUP_NAME
+                  value: "actual"
+              command: ["/bin/sh", "-c"]
               args:
                 - |
                   # Strict error handling
                   set -euo pipefail
                   
                   # Retry configuration
-                  MAX_RETRIES=5
-                  RETRY_DELAYS=(10 20 40 80 160)
+                  MAX_RETRIES=3
+                  RETRY_DELAYS=(10 20 40)
                   
                   # Logging functions
                   log_info() {
@@ -93,22 +81,29 @@ spec:
                       done
                   }
                   
-                  BACKUP_FILE="pg_backup_$(date +%Y%m%d_%H%M%S).sql.gz"
+                  # Install required tools
+                  apk add --no-cache tar gzip
                   
-                  log_info "🔄 Starting Actual PostgreSQL backup: $BACKUP_FILE"
-                  log_info "Connecting to: $POSTGRES_HOST as $POSTGRES_USER for database $POSTGRES_DB"
+                  BACKUP_FILE="actual_backup_$(date +%Y%m%d_%H%M%S).tar.gz"
                   
-                  # Validate environment variables
-                  if [[ -z "${POSTGRES_HOST:-}" || -z "${POSTGRES_USER:-}" || -z "${POSTGRES_DB:-}" ]]; then
-                      log_error "Missing required environment variables"
+                  log_info "🔄 Starting Actual Budget backup: $BACKUP_FILE"
+                  log_info "Backing up both ACTUAL_SERVER_FILES and ACTUAL_USER_FILES from /data"
+                  
+                  # Validate data directory exists and has content
+                  if [[ ! -d "/data" ]]; then
+                      log_error "Data directory /data does not exist"
                       exit 1
                   fi
                   
-                  # Test connection with retry
-                  retry_with_backoff "pg_isready -h '$POSTGRES_HOST' -U '$POSTGRES_USER' -d '$POSTGRES_DB'"
+                  # Check if there's actually data to backup
+                  if [[ -z "$(find /data -type f -print -quit)" ]]; then
+                      log_error "No files found in /data directory - nothing to backup"
+                      exit 1
+                  fi
                   
-                  # Create backup of specific Actual database with retry
-                  retry_with_backoff "pg_dump -h '$POSTGRES_HOST' -U '$POSTGRES_USER' -d '$POSTGRES_DB' --verbose --no-owner --no-privileges | gzip > /mnt/backup/$BACKUP_FILE"
+                  # Create backup with retry
+                  log_info "Creating compressed backup of /data directory..."
+                  retry_with_backoff "cd /data && tar -czf /mnt/backup/$BACKUP_FILE --exclude='lost+found' ."
                   
                   # Validate backup file
                   if [[ ! -f "/mnt/backup/$BACKUP_FILE" ]]; then
@@ -127,13 +122,17 @@ spec:
                       exit 1
                   fi
                   
-                  # Log success with file size
+                  # Log success with file size and contents summary
                   BACKUP_SIZE=$(du -h "/mnt/backup/$BACKUP_FILE" | cut -f1)
-                  log_info "✅ Backup completed successfully: $BACKUP_FILE ($BACKUP_SIZE)"
+                  FILE_COUNT=$(tar -tzf "/mnt/backup/$BACKUP_FILE" | wc -l)
+                  log_info "✅ Backup completed successfully: $BACKUP_FILE ($BACKUP_SIZE, $FILE_COUNT files)"
                   
-                  # Signal the next container that the dump is completed
-                  touch /mnt/backup/.done                  
+                  # Signal the next container that the backup is completed
+                  touch /mnt/backup/.done
               volumeMounts:
+                - name: actual-data
+                  mountPath: /data
+                  readOnly: true
                 - name: backup-storage
                   mountPath: /mnt/backup
             - name: b2-uploader
@@ -158,7 +157,7 @@ spec:
                       key: applicationKey
                 - name: B2_BUCKET_NAME
                   value: "cloud-homelab-backups"
-              command: ["/bin/bash", "-c"]
+              command: ["/bin/sh", "-c"]
               args:
                 - |
                   # Strict error handling
@@ -216,7 +215,7 @@ spec:
                       done
                   }
                   
-                  log_info "🔄 Starting B2 upload process for Actual..."
+                  log_info "🔄 Starting B2 upload process for Actual Budget..."
                   
                   # Validate environment variables
                   if [[ -z "${B2_APPLICATION_KEY_ID:-}" || -z "${B2_APPLICATION_KEY:-}" || -z "${B2_BUCKET_NAME:-}" ]]; then
@@ -238,9 +237,9 @@ spec:
                   done
                   
                   # Find the backup file
-                  BACKUP_FILE=$(ls /mnt/backup/pg_backup_*.sql.gz | head -1 2>/dev/null || true)
+                  BACKUP_FILE=$(ls /mnt/backup/actual_backup_*.tar.gz | head -1 2>/dev/null || true)
                   if [[ -z "$BACKUP_FILE" ]]; then
-                      log_error "No backup file found matching pattern: pg_backup_*.sql.gz"
+                      log_error "No backup file found matching pattern: actual_backup_*.tar.gz"
                       exit 1
                   fi
                   
@@ -265,11 +264,14 @@ spec:
                   # Note: Retention cleanup is handled by B2 lifecycle rules or external cleanup jobs
                   # to avoid dependency issues with jq in the B2 container image
                   
-                  log_info "✅ Actual backup process completed successfully"                 
+                  log_info "✅ Actual Budget backup process completed successfully"
               volumeMounts:
                 - name: backup-storage
                   mountPath: /mnt/backup
           restartPolicy: OnFailure
           volumes:
+            - name: actual-data
+              persistentVolumeClaim:
+                claimName: actual-storage
             - name: backup-storage
               emptyDir: {}
