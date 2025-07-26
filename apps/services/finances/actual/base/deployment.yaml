@@ -21,7 +21,7 @@ spec:
     spec:
       initContainers:
         - name: auto-restore
-          image: backblazeit/b2:latest
+          image: alpine:latest
           env:
             - name: B2_APPLICATION_KEY_ID
               valueFrom:
@@ -41,8 +41,11 @@ spec:
               # Auto-restore script for fresh deployments
               set -eu
               
-              # Install required tools
-              apk add --no-cache tar gzip curl jq
+              # Install required tools including B2 CLI
+              apk add --no-cache tar gzip curl jq python3 py3-pip
+              
+              # Install B2 CLI
+              pip3 install --break-system-packages b2
               
               # Logging functions
               log_info() {
@@ -71,7 +74,7 @@ spec:
               
               # Try to find the latest backup
               log_info "Searching for latest backup in B2..."
-              BACKUP_TO_RESTORE=$(b2v4 file list --json $B2_BUCKET_NAME actual/ 2>/dev/null | jq -r '.[] | select(.fileName | startswith("actual/actual_backup_")) | .fileName' | sort -r | head -n1 || echo "")
+              BACKUP_TO_RESTORE=$(b2 ls --json b2://$B2_BUCKET_NAME/actual/ 2>/dev/null | jq -r '.[] | select(.fileName | startswith("actual_backup_")) | "actual/" + .fileName' | sort -r | head -n1 || echo "")
               
               if [ -z "$BACKUP_TO_RESTORE" ] || [ "$BACKUP_TO_RESTORE" = "null" ]; then
                 log_info "No backups found in B2 - starting with fresh data"
@@ -85,7 +88,7 @@ spec:
               BACKUP_FILE="/tmp/$(basename $BACKUP_TO_RESTORE)"
               
               log_info "Downloading backup for auto-restore..."
-              if b2v4 file download-file-by-name $B2_BUCKET_NAME "$BACKUP_TO_RESTORE" "$BACKUP_FILE" 2>/dev/null; then
+              if b2 download-file-by-name $B2_BUCKET_NAME "$BACKUP_TO_RESTORE" "$BACKUP_FILE" 2>/dev/null; then
                 
                 # Validate backup
                 if [ -f "$BACKUP_FILE" ] && [ -s "$BACKUP_FILE" ] && gzip -t "$BACKUP_FILE" 2>/dev/null; then

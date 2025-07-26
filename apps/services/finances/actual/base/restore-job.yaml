@@ -8,7 +8,7 @@ spec:
     spec:
       containers:
       - name: actual-restore
-        image: backblazeit/b2:latest
+        image: alpine:latest
         env:
         - name: B2_APPLICATION_KEY_ID
           valueFrom:
@@ -32,8 +32,11 @@ spec:
             # Strict error handling
             set -eu
             
-            # Install required tools
-            apk add --no-cache tar gzip curl jq
+            # Install required tools including B2 CLI
+            apk add --no-cache tar gzip curl jq python3 py3-pip
+            
+            # Install B2 CLI
+            pip3 install --break-system-packages b2
             
             # Logging functions
             log_info() {
@@ -94,10 +97,10 @@ spec:
               
               if [ -n "$BACKUP_DATE" ]; then
                 log_info "Looking for backup from date: $BACKUP_DATE"
-                BACKUP_TO_RESTORE=$(b2v4 file list --json $B2_BUCKET_NAME actual/ | jq -r '.[] | select(.fileName | startswith("actual/actual_backup_'$BACKUP_DATE'")) | .fileName' | sort -r | head -n1)
+                BACKUP_TO_RESTORE=$(b2 ls --json b2://$B2_BUCKET_NAME/actual/ | jq -r '.[] | select(.fileName | startswith("actual_backup_'$BACKUP_DATE'")) | "actual/" + .fileName' | sort -r | head -n1)
               else
                 log_info "Looking for latest backup..."
-                BACKUP_TO_RESTORE=$(b2v4 file list --json $B2_BUCKET_NAME actual/ | jq -r '.[] | select(.fileName | startswith("actual/actual_backup_")) | .fileName' | sort -r | head -n1)
+                BACKUP_TO_RESTORE=$(b2 ls --json b2://$B2_BUCKET_NAME/actual/ | jq -r '.[] | select(.fileName | startswith("actual_backup_")) | "actual/" + .fileName' | sort -r | head -n1)
               fi
               
               if [ -n "$BACKUP_TO_RESTORE" ] && [ "$BACKUP_TO_RESTORE" != "null" ]; then
@@ -131,7 +134,7 @@ spec:
                 
                 # Download the backup
                 log_info "Downloading backup from B2..."
-                b2v4 file download-file-by-name $B2_BUCKET_NAME "$BACKUP_TO_RESTORE" "$BACKUP_FILE"
+                b2 download-file-by-name $B2_BUCKET_NAME "$BACKUP_TO_RESTORE" "$BACKUP_FILE"
                 
                 # Validate downloaded backup
                 if [ ! -f "$BACKUP_FILE" ] || [ ! -s "$BACKUP_FILE" ]; then
@@ -178,7 +181,7 @@ spec:
                 if [ -n "$BACKUP_DATE" ]; then
                   log_error "No backup found for date: $BACKUP_DATE"
                   log_info "Available backups:"
-                  b2v4 file list --json $B2_BUCKET_NAME actual/ | jq -r '.[] | select(.fileName | startswith("actual/actual_backup_")) | .fileName' | sort -r | head -10
+                  b2 ls --json b2://$B2_BUCKET_NAME/actual/ | jq -r '.[] | select(.fileName | startswith("actual_backup_")) | "actual/" + .fileName' | sort -r | head -10
                 else
                   log_error "No backups found in B2 bucket under actual/ path"
                 fi
