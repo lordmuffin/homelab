@@ -19,171 +19,203 @@ spec:
         app: n8n-server
     spec:
       initContainers:
-        - name: restore-db-backup
-          image: alpine:latest
-          env:
-            - name: B2_APPLICATION_KEY_ID
-              valueFrom:
-                secretKeyRef:
-                  name: backblaze-cloud-homelab-creds-1password
-                  key: username
-            - name: B2_APPLICATION_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: backblaze-cloud-homelab-creds-1password
-                  key: password
-            - name: B2_BUCKET_NAME
-              value: "cloud-homelab-backups"
-            - name: POSTGRES_HOST
-              value: "n8n-database-rw.services.svc.cluster.local"
-            - name: POSTGRES_PORT
-              value: "5432"
-            - name: POSTGRES_DB
-              value: "n8n"
-            - name: POSTGRES_USER
-              valueFrom:
-                secretKeyRef:
-                  name: n8n-db-postgres-creds-1password
-                  key: username
-            - name: POSTGRES_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: n8n-db-postgres-creds-1password
-                  key: password
-          command:
-            - /bin/sh
-            - -c
-            - |
-              set -e
-              echo "Installing dependencies..."
-              apk add --no-cache postgresql-client curl unzip
+      - name: restore-db-backup
+        image: alpine:latest
+        # This init container combines PostgreSQL and B2 CLI for backup restoration
+        env:
+        - name: B2_APPLICATION_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: backblaze-cloud-homelab-creds-1password
+              key: keyID
+        - name: B2_APPLICATION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: backblaze-cloud-homelab-creds-1password
+              key: applicationKey
+        - name: B2_BUCKET_NAME
+          value: "cloud-homelab-backups"
+        - name: POSTGRES_HOST
+          value: n8n-database-rw.services.svc.cluster.local
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: POSTGRES_DB
+          value: n8n
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: n8n-db-postgres-creds-1password
+              key: username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: n8n-db-postgres-creds-1password
+              key: password
+        - name: FORCE_RESTORE
+          value: "false"
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          echo "Installing required dependencies..."
+          apk add --no-cache postgresql-client curl unzip bash
+          
+          echo "Validating environment variables..."
+          echo "B2_APPLICATION_KEY_ID length: ${#B2_APPLICATION_KEY_ID}"
+          echo "B2_APPLICATION_KEY length: ${#B2_APPLICATION_KEY}"
+          echo "B2_BUCKET_NAME: $B2_BUCKET_NAME"
+          
+          if [ -z "$B2_APPLICATION_KEY_ID" ] || [ -z "$B2_APPLICATION_KEY" ]; then
+            echo "ERROR: B2 credentials not available. Skipping backup restoration."
+            exit 0
+          fi
+          
+          echo "Installing B2 CLI..."
+          curl -L https://github.com/Backblaze/B2_Command_Line_Tool/releases/latest/download/b2-linux -o /usr/local/bin/b2
+          chmod +x /usr/local/bin/b2
+          
+          echo "Authenticating with B2..."
+          /usr/local/bin/b2 authorize-account $B2_APPLICATION_KEY_ID $B2_APPLICATION_KEY
+          
+          echo "Checking for backups in B2 bucket..."
+          # List backups using correct B2 URI syntax
+          echo "Searching for n8n backups in B2..."
+          BACKUP_LIST=$(/usr/local/bin/b2 ls "b2://$B2_BUCKET_NAME/n8n/" --recursive 2>/dev/null || echo "")
+          
+          if [ -z "$BACKUP_LIST" ]; then
+            echo "No files found in n8n/ folder. Checking if folder exists..."
+            FOLDER_CHECK=$(/usr/local/bin/b2 ls "b2://$B2_BUCKET_NAME" 2>/dev/null | grep "n8n/" || echo "")
+            if [ -z "$FOLDER_CHECK" ]; then
+              echo "No n8n/ folder found in bucket. No backups available."
+            else
+              echo "n8n/ folder exists but contains no backup files."
+            fi
+            echo "Skipping restoration - starting with empty database."
+            exit 0
+          fi
+          
+          # Find the latest backup file
+          echo "Found backup files, searching for latest..."
+          LATEST_BACKUP=$(echo "$BACKUP_LIST" | grep -E 'pg_backup_[0-9]{8}_[0-9]{6}\.sql\.gz' | sort -r | head -n 1 | awk '{print $NF}')
+          
+          if [ -z "$LATEST_BACKUP" ]; then
+            echo "No valid backup files found matching pattern pg_backup_YYYYMMDD_HHMMSS.sql.gz"
+            echo "Available files in n8n/ folder:"
+            echo "$BACKUP_LIST"
+            echo "Skipping restoration - starting with empty database."
+            exit 0
+          fi
+          
+          # Strip n8n/ prefix if present (since ls includes folder path)
+          BACKUP_FILENAME=$(echo "$LATEST_BACKUP" | sed 's|^n8n/||')
+          echo "Found latest backup file: $BACKUP_FILENAME"
+          echo "Debug - Original: $LATEST_BACKUP, Cleaned: $BACKUP_FILENAME"
+          
+          # Create temp directory for backup
+          mkdir -p /tmp/backup
+          
+          # Download the backup using B2 CLI
+          echo "Downloading backup: $BACKUP_FILENAME"
+          echo "B2 CLI version:"
+          /usr/local/bin/b2 version
+          
+          # Try older B2 CLI download syntax first (legacy compatibility)
+          echo "Attempting legacy B2 download syntax..."
+          if /usr/local/bin/b2 download_file_by_name "$B2_BUCKET_NAME" "n8n/$BACKUP_FILENAME" /tmp/backup/latest.sql.gz 2>/dev/null; then
+            echo "Downloaded successfully using legacy syntax"
+          else
+            echo "Legacy syntax failed, trying modern file download..."
+            # Try modern B2 URI format
+            BACKUP_URI="b2://$B2_BUCKET_NAME/n8n/$BACKUP_FILENAME"
+            if ! /usr/local/bin/b2 file download "$BACKUP_URI" /tmp/backup/latest.sql.gz 2>/dev/null; then
+              echo "Both download methods failed. Skipping restoration."
+              exit 0
+            fi
+          fi
+          
+          echo "Backup downloaded successfully."
+          
+          # Check database connectivity and if it has data
+          echo "Testing database connectivity..."
+          if ! PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_HOST -U $POSTGRES_USER -d $POSTGRES_DB -c "SELECT 1;" >/dev/null 2>&1; then
+            echo "ERROR: Cannot connect to database at $POSTGRES_HOST. Check database configuration."
+            exit 1
+          fi
+          
+          echo "Checking if database contains user data..."
+          # Check for actual user content in key N8n tables instead of just schema
+          # These tables would only have meaningful data if users have actually used the app
+          USER_WORKFLOWS=$(PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_HOST -U $POSTGRES_USER -d $POSTGRES_DB -t -c "SELECT COUNT(*) FROM workflow_entity WHERE id > 0;" 2>/dev/null | tr -d ' ' || echo "0")
+          USER_CREDENTIALS=$(PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_HOST -U $POSTGRES_USER -d $POSTGRES_DB -t -c "SELECT COUNT(*) FROM credentials_entity WHERE id > 0;" 2>/dev/null | tr -d ' ' || echo "0")
+          USER_EXECUTIONS=$(PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_HOST -U $POSTGRES_USER -d $POSTGRES_DB -t -c "SELECT COUNT(*) FROM execution_entity WHERE id > 0;" 2>/dev/null | tr -d ' ' || echo "0")
+          
+          echo "Found $USER_WORKFLOWS workflows, $USER_CREDENTIALS credentials, $USER_EXECUTIONS executions in database"
+          
+          # Check if restoration should be forced
+          if [ "${FORCE_RESTORE:-false}" = "true" ]; then
+            echo "⚠️  FORCE_RESTORE=true detected. Proceeding with restoration despite existing user data."
+            echo "⚠️  This will overwrite all existing workflows, credentials, and executions."
+          elif [ "$USER_WORKFLOWS" -gt "0" ] || [ "$USER_CREDENTIALS" -gt "5" ] || [ "$USER_EXECUTIONS" -gt "10" ]; then
+            echo "Database contains user data (workflows: $USER_WORKFLOWS, credentials: $USER_CREDENTIALS, executions: $USER_EXECUTIONS). Skipping restoration to prevent data loss."
+            echo "💡 To force restoration, set FORCE_RESTORE=true environment variable."
+            exit 0
+          fi
+          
+          echo "Database appears to contain only default/seed data. Proceeding with backup restoration..."
+          
+          # Validate backup file
+          echo "Validating backup file..."
+          if [ ! -f /tmp/backup/latest.sql.gz ]; then
+            echo "ERROR: Backup file not found after download."
+            exit 1
+          fi
+          
+          # Check if file is valid gzip
+          if ! gunzip -t /tmp/backup/latest.sql.gz 2>/dev/null; then
+            echo "ERROR: Downloaded backup file is corrupted or not a valid gzip file."
+            exit 1
+          fi
+          
+          # Clear existing database to avoid conflicts
+          echo "Clearing existing database for clean restoration..."
+          PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_HOST -U $POSTGRES_USER -d $POSTGRES_DB -c "
+            DO \$\$ DECLARE
+              r RECORD;
+            BEGIN
+              -- Drop all tables in the public schema
+              FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') LOOP
+                EXECUTE 'DROP TABLE IF EXISTS public.' || quote_ident(r.tablename) || ' CASCADE';
+              END LOOP;
               
-              # Install B2 CLI
-              curl -L -o b2 https://github.com/Backblaze/B2_Command_Line_Tool/releases/latest/download/b2-linux
-              chmod +x b2
-              mv b2 /usr/local/bin/
-              
-              echo "Authorizing with B2..."
-              b2 authorize-account "$B2_APPLICATION_KEY_ID" "$B2_APPLICATION_KEY"
-              
-              echo "Searching for database backups..."
-              BACKUP_FILES=$(b2 ls --recursive "$B2_BUCKET_NAME" n8n/ | grep "pg_backup_.*\.sql\.gz" | sort -r || true)
-              
-              if [ -z "$BACKUP_FILES" ]; then
-                echo "No database backups found. Skipping restoration."
-                exit 0
-              fi
-              
-              LATEST_BACKUP=$(echo "$BACKUP_FILES" | head -n 1 | awk '{print $NF}')
-              echo "Found latest backup: $LATEST_BACKUP"
-              
-              echo "Testing database connection..."
-              until pg_isready -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER"; do
-                echo "Waiting for database to be ready..."
-                sleep 2
-              done
-              
-              echo "Checking for existing user data..."
-              export PGPASSWORD="$POSTGRES_PASSWORD"
-              
-              # Check if n8n tables exist and have user data
-              WORKFLOW_COUNT=0
-              CREDENTIALS_COUNT=0
-              
-              if psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "\dt" | grep -q "workflow_entity"; then
-                WORKFLOW_COUNT=$(psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -t -c "SELECT COUNT(*) FROM workflow_entity WHERE id > 0;" | xargs)
-                echo "Found $WORKFLOW_COUNT existing workflows"
-              fi
-              
-              if psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "\dt" | grep -q "credentials_entity"; then
-                CREDENTIALS_COUNT=$(psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -t -c "SELECT COUNT(*) FROM credentials_entity WHERE id > 0;" | xargs)
-                echo "Found $CREDENTIALS_COUNT existing credentials"
-              fi
-              
-              if [ "$WORKFLOW_COUNT" -gt 0 ] || [ "$CREDENTIALS_COUNT" -gt 5 ]; then
-                echo "Existing user data found (workflows: $WORKFLOW_COUNT, credentials: $CREDENTIALS_COUNT). Skipping restoration to prevent data loss."
-                exit 0
-              fi
-              
-              echo "No significant user data found. Proceeding with restoration..."
-              
-              echo "Downloading backup file..."
-              b2 download-file-by-name "$B2_BUCKET_NAME" "$LATEST_BACKUP" /tmp/backup.sql.gz
-              
-              echo "Clearing existing database..."
-              psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
-              
-              echo "Restoring database from backup..."
-              gunzip -c /tmp/backup.sql.gz | psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB"
-              
-              echo "Validating restoration..."
-              if psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "\dt" | grep -q "workflow_entity" && \
-                 psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "\dt" | grep -q "credentials_entity"; then
-                echo "Database restoration completed successfully!"
-              else
-                echo "Database restoration validation failed!"
-                exit 1
-              fi
-        - name: restore-file-backup
-          image: backblazeit/b2:latest
-          env:
-            - name: B2_APPLICATION_KEY_ID
-              valueFrom:
-                secretKeyRef:
-                  name: backblaze-cloud-homelab-creds-1password
-                  key: username
-            - name: B2_APPLICATION_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: backblaze-cloud-homelab-creds-1password
-                  key: password
-            - name: B2_BUCKET_NAME
-              value: "cloud-homelab-backups"
-          volumeMounts:
-            - name: config-storage
-              mountPath: /home/node/.n8n
-          command:
-            - /bin/sh
-            - -c
-            - |
-              set -e
-              echo "Authorizing with B2..."
-              b2 authorize-account "$B2_APPLICATION_KEY_ID" "$B2_APPLICATION_KEY"
-              
-              echo "Checking if n8n directory is empty or minimal..."
-              FILE_COUNT=$(find /home/node/.n8n -type f 2>/dev/null | wc -l || echo "0")
-              echo "Found $FILE_COUNT files in n8n directory"
-              
-              if [ "$FILE_COUNT" -gt 10 ]; then
-                echo "Directory contains substantial user data ($FILE_COUNT files). Skipping file restoration to prevent data loss."
-                exit 0
-              fi
-              
-              echo "Directory is empty or minimal. Searching for file backups..."
-              BACKUP_FILES=$(b2 ls --recursive "$B2_BUCKET_NAME" n8n/ | grep "n8n_files_.*\.tar\.gz" | sort -r || true)
-              
-              if [ -z "$BACKUP_FILES" ]; then
-                echo "No file backups found. Skipping file restoration."
-                exit 0
-              fi
-              
-              LATEST_BACKUP=$(echo "$BACKUP_FILES" | head -n 1 | awk '{print $NF}')
-              echo "Found latest file backup: $LATEST_BACKUP"
-              
-              echo "Downloading file backup..."
-              b2 download-file-by-name "$B2_BUCKET_NAME" "$LATEST_BACKUP" /tmp/n8n_files_backup.tar.gz
-              
-              echo "Extracting workflow data to n8n directory..."
-              cd /home/node/.n8n
-              tar -xzf /tmp/n8n_files_backup.tar.gz --strip-components=1
-              
-              echo "File restoration completed successfully!"
-        - name: volume-permissions
-          image: busybox:1.36
-          command: ["sh", "-c", "chown 1000:1000 /data"]
-          volumeMounts:
-            - name: config-storage
-              mountPath: /data
+              -- Drop all sequences in the public schema
+              FOR r IN (SELECT sequencename FROM pg_sequences WHERE schemaname = 'public') LOOP
+                EXECUTE 'DROP SEQUENCE IF EXISTS public.' || quote_ident(r.sequencename) || ' CASCADE';
+              END LOOP;
+            END \$\$;
+          "
+          
+          echo "Database cleared successfully. Starting restoration..."
+          
+          # Restore the backup
+          echo "Restoring database from backup: $LATEST_BACKUP"
+          if gunzip -c /tmp/backup/latest.sql.gz | PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_HOST -U $POSTGRES_USER -d $POSTGRES_DB -q; then
+            echo "Database restoration completed successfully."
+            
+            # Verify restoration by checking table count
+            RESTORED_TABLES=$(PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_HOST -U $POSTGRES_USER -d $POSTGRES_DB -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null | tr -d ' ')
+            echo "Restored database contains $RESTORED_TABLES tables."
+            
+            # Check for restored user data
+            USER_WORKFLOWS_RESTORED=$(PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_HOST -U $POSTGRES_USER -d $POSTGRES_DB -t -c "SELECT COUNT(*) FROM workflow_entity WHERE id > 0;" 2>/dev/null | tr -d ' ' || echo "0")
+            USER_CREDENTIALS_RESTORED=$(PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_HOST -U $POSTGRES_USER -d $POSTGRES_DB -t -c "SELECT COUNT(*) FROM credentials_entity WHERE id > 0;" 2>/dev/null | tr -d ' ' || echo "0")
+            echo "Restored $USER_WORKFLOWS_RESTORED workflows and $USER_CREDENTIALS_RESTORED credentials from backup."
+          else
+            echo "ERROR: Database restoration failed."
+            exit 1
+          fi
+      - name: wait-for-db
+        image: busybox:1.37
+        command: ['sh', '-c', 'until nc -z n8n-database-rw.services.svc.cluster.local 5432; do echo "Waiting for Postgres..."; sleep 5; done']
+        imagePullPolicy: IfNotPresent
       containers:
       - name: n8n
         image: n8nio/n8n:1.94.1
