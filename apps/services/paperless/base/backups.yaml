@@ -158,8 +158,6 @@ spec:
                       key: applicationKey
                 - name: B2_BUCKET_NAME
                   value: "cloud-homelab-backups"
-                - name: RETENTION_DAYS
-                  value: "30"
               command: ["/bin/bash", "-c"]
               args:
                 - |
@@ -264,57 +262,10 @@ spec:
                   
                   log_info "✅ B2 upload completed successfully: $UPLOAD_PATH"
                   
-                  # Install jq for JSON processing (Alpine Linux) - for retention cleanup
-                  if ! command -v jq >/dev/null 2>&1; then
-                      log_info "Installing jq for retention cleanup..."
-                      apk update && apk add --no-cache jq
-                  fi
+                  # Note: Retention cleanup is handled by B2 lifecycle rules or external cleanup jobs
+                  # to avoid dependency issues with jq in the B2 container image
                   
-                  # Cleanup old backups using retention policy
-                  log_info "🧹 Starting backup retention cleanup (${RETENTION_DAYS} days)..."
-                  CUTOFF_DATE=$(date -d "$RETENTION_DAYS days ago" +%s)
-                  
-                  # List all paperless backup files in the bucket
-                  if ! b2v4 ls "$B2_BUCKET_NAME" paperless/ --recursive --json > /tmp/backup_list.json; then
-                      log_error "Failed to list B2 files, skipping cleanup"
-                      exit 0
-                  fi
-                  
-                  # Process backup files for cleanup using jq
-                  if [[ -s /tmp/backup_list.json ]]; then
-                      deleted_count=0
-                      kept_count=0
-                      
-                      # Use jq to extract file information and process each backup
-                      jq -r '.[] | select(.fileName | test("^paperless/.*\\.sql\\.gz$")) | "\(.fileName) \(.fileId) \(.uploadTimestamp)"' /tmp/backup_list.json | \
-                      while read -r file_name file_id upload_timestamp; do
-                          # Convert milliseconds to seconds
-                          file_timestamp=$((upload_timestamp / 1000))
-                          
-                          # Check if file is older than retention period
-                          if [[ "$file_timestamp" -lt "$CUTOFF_DATE" ]]; then
-                              file_age_days=$(( (CUTOFF_DATE - file_timestamp) / 86400 ))
-                              log_info "Deleting old backup: $file_name (age: ${file_age_days} days)"
-                              
-                              if retry_with_backoff "b2v4 delete-file-version '$file_name' '$file_id'"; then
-                                  ((deleted_count++))
-                              else
-                                  log_error "Failed to delete $file_name"
-                              fi
-                          else
-                              ((kept_count++))
-                          fi
-                      done
-                      
-                      log_info "🧹 Retention cleanup completed: $deleted_count files deleted, $kept_count files kept"
-                  else
-                      log_info "No existing backups found in bucket"
-                  fi
-                  
-                  # Cleanup temporary files
-                  rm -f /tmp/backup_list.json
-                  
-                  log_info "✅ Paperless backup and retention process completed successfully"                 
+                  log_info "✅ Paperless backup process completed successfully"                 
               volumeMounts:
                 - name: backup-storage
                   mountPath: /mnt/backup

@@ -11,7 +11,7 @@ This standard implements a robust, reliable PostgreSQL backup system using Kuber
 - **Comprehensive error handling** with detailed logging
 - **Backup integrity verification** using gzip compression testing
 - **Cloud storage upload** to Backblaze B2
-- **Automated retention management** with configurable cleanup
+- **Cloud storage lifecycle management** for retention (handled by B2 lifecycle rules)
 - **Resource-optimized containers** with proper resource limits
 
 ## Architecture
@@ -75,7 +75,6 @@ resources:
 - `B2_APPLICATION_KEY_ID` - From 1Password secret (`keyID`)
 - `B2_APPLICATION_KEY` - From 1Password secret (`applicationKey`)
 - `B2_BUCKET_NAME` - Target bucket (`cloud-homelab-backups`)
-- `RETENTION_DAYS` - Backup retention period (default: `30`)
 
 ## Implementation Guide
 
@@ -163,12 +162,29 @@ Multi-layer validation process:
 
 ### Retention Management
 
-Automated cleanup based on `RETENTION_DAYS`:
+**B2 Lifecycle Rules Approach:**
 
-- Lists existing backups using B2 API
-- Processes files with `jq` for robust JSON parsing
-- Deletes files older than retention period
-- Reports cleanup statistics
+Retention is managed through Backblaze B2 lifecycle rules rather than in-container cleanup to avoid:
+- Dependency issues with additional tools (`jq`, etc.)
+- Container image compatibility problems
+- Complex error handling in backup scripts
+
+**Configure B2 Lifecycle Rules:**
+```bash
+# Example: Delete files older than 30 days in paperless/ folder
+b2 create-key --bucket cloud-homelab-backups lifecycle-management listFiles,deleteFiles
+b2 update-bucket --lifecycleRules '[{
+  "daysFromHidingToDeleting": null,
+  "daysFromUploadingToHiding": 30,
+  "fileNamePrefix": "paperless/"
+}]' cloud-homelab-backups
+```
+
+**Benefits:**
+- Automatic cleanup without container dependencies
+- Reliable cloud-native retention management
+- Reduced backup script complexity
+- Better error isolation
 
 ## File Naming Convention
 
