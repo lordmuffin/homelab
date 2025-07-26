@@ -1,242 +1,73 @@
 # Azure DevOps Template: Terraform Setup
-# Shared template for setting up Terraform with Azure backend
+# Common setup steps for Terraform operations
 
 parameters:
-  - name: azureServiceConnection
-    type: string
-    displayName: 'Azure Service Connection'
-    default: 'azure-terraform-backend'
-  
-  - name: terraformVersion
-    type: string
-    displayName: 'Terraform Version'
-    default: '1.5.7'
-  
-  - name: workingDirectory
-    type: string
-    displayName: 'Working Directory'
-    default: 'terraform'
-  
-  - name: environment
-    type: string
-    displayName: 'Target Environment'
-    values:
-      - dev-lab
-      - prod-lab
-  
-  - name: module
-    type: string
-    displayName: 'Terraform Module'
-    values:
-      - main
-      - vault
-      - unifi
-      - vultr
-      - b2
-  
-  - name: stateKey
-    type: string
-    displayName: 'Terraform State Key'
+- name: azureServiceConnection
+  type: string
+  default: 'azure-terraform-backend'
+- name: terraformVersion
+  type: string
+  default: '1.5.7'
+- name: workingDirectory
+  type: string
+  default: 'terraform'
+- name: environment
+  type: string
+- name: module
+  type: string
+- name: stateKey
+  type: string
 
 steps:
-  - task: PowerShell@2
-    displayName: 'Validate Template Parameters'
-    inputs:
-      targetType: 'inline'
-      script: |
-        # Validate required parameters
-        if ("${{ parameters.environment }}" -eq "") {
-          Write-Host "❌ Environment parameter is required"
-          exit 1
+- task: AzureCLI@2
+  displayName: 'Azure CLI Login'
+  inputs:
+    azureSubscription: ${{ parameters.azureServiceConnection }}
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      echo "✅ Azure CLI authenticated successfully"
+      az account show --output table
+
+- task: TerraformInstaller@0
+  displayName: 'Install Terraform'
+  inputs:
+    terraformVersion: ${{ parameters.terraformVersion }}
+
+- task: PowerShell@2
+  displayName: 'Verify Terraform Installation'
+  inputs:
+    targetType: 'inline'
+    script: |
+      Write-Host "Terraform version:"
+      terraform version
+      
+      Write-Host "Environment: ${{ parameters.environment }}"
+      Write-Host "Module: ${{ parameters.module }}"
+      Write-Host "Working Directory: ${{ parameters.workingDirectory }}"
+      Write-Host "State Key: ${{ parameters.stateKey }}"
+
+- task: PowerShell@2
+  displayName: 'Configure Terraform Backend'
+  inputs:
+    targetType: 'inline'
+    workingDirectory: ${{ parameters.workingDirectory }}
+    script: |
+      # Create backend configuration for Azure Storage
+      $backendConfig = @"
+      terraform {
+        backend "azurerm" {
+          resource_group_name  = "$(AZURE_BACKEND_RESOURCE_GROUP)"
+          storage_account_name = "$(AZURE_BACKEND_STORAGE_ACCOUNT)"
+          container_name       = "$(AZURE_BACKEND_CONTAINER_NAME)"
+          key                  = "${{ parameters.stateKey }}"
         }
-        
-        if ("${{ parameters.module }}" -eq "") {
-          Write-Host "❌ Module parameter is required"
-          exit 1
-        }
-        
-        # Validate environment values
-        $validEnvironments = @("dev-lab", "prod-lab")
-        if ("${{ parameters.environment }}" -notin $validEnvironments) {
-          Write-Host "❌ Invalid environment: ${{ parameters.environment }}"
-          Write-Host "Valid values: $($validEnvironments -join ', ')"
-          exit 1
-        }
-        
-        # Validate module values
-        $validModules = @("main", "vault", "unifi", "vultr", "b2")
-        if ("${{ parameters.module }}" -notin $validModules) {
-          Write-Host "❌ Invalid module: ${{ parameters.module }}"
-          Write-Host "Valid values: $($validModules -join ', ')"
-          exit 1
-        }
-        
-        Write-Host "✅ Template parameters validated:"
-        Write-Host "  Environment: ${{ parameters.environment }}"
-        Write-Host "  Module: ${{ parameters.module }}"
-        Write-Host "  Working Directory: ${{ parameters.workingDirectory }}"
-        Write-Host "  State Key: ${{ parameters.stateKey }}"
-
-  - task: PowerShell@2
-    displayName: 'Setup Paths and Variables'
-    inputs:
-      targetType: 'inline'
-      script: |
-        # Determine working directory based on module
-        if ("${{ parameters.module }}" -eq "main") {
-          $workingDir = "terraform"
-        } else {
-          $workingDir = "terraform/modules/${{ parameters.module }}"
-        }
-        
-        # Set state key for Azure backend
-        $stateKey = "${{ parameters.environment }}/${{ parameters.module }}.tfstate"
-        
-        Write-Host "##vso[task.setvariable variable=COMPUTED_WORKING_DIR]$workingDir"
-        Write-Host "##vso[task.setvariable variable=COMPUTED_STATE_KEY]$stateKey"
-        
-        Write-Host "✅ Configured paths:"
-        Write-Host "  Working Directory: $workingDir"
-        Write-Host "  State Key: $stateKey"
-
-  - task: AzureCLI@2
-    displayName: 'Verify Azure Backend Access'
-    inputs:
-      azureSubscription: '${{ parameters.azureServiceConnection }}'
-      scriptType: 'pscore'
-      scriptLocation: 'inlineScript'
-      inlineScript: |
-        Write-Host "🔍 Verifying Azure backend access..."
-        
-        # Check if storage account exists and is accessible
-        try {
-          $storageAccount = az storage account show `
-            --name "$(AZURE_BACKEND_STORAGE_ACCOUNT)" `
-            --resource-group "$(AZURE_BACKEND_RESOURCE_GROUP)" `
-            --output table
-          
-          Write-Host "✅ Storage account accessible"
-          
-          # Check if container exists
-          $container = az storage container show `
-            --name "$(AZURE_BACKEND_CONTAINER_NAME)" `
-            --account-name "$(AZURE_BACKEND_STORAGE_ACCOUNT)" `
-            --auth-mode login `
-            --output table
-          
-          Write-Host "✅ Storage container accessible"
-          Write-Host "✅ Azure backend access verified"
-        } catch {
-          Write-Host "❌ Azure backend access failed: $($_.Exception.Message)"
-          exit 1
-        }
-
-  - task: TerraformInstaller@0
-    displayName: 'Install Terraform'
-    inputs:
-      terraformVersion: '${{ parameters.terraformVersion }}'
-
-  - task: PowerShell@2
-    displayName: 'Terraform Version Info'
-    inputs:
-      targetType: 'inline'
-      script: |
-        terraform version
-        Write-Host "✅ Terraform version verified"
-
-  - task: PowerShell@2
-    displayName: 'Configure Terraform Backend'
-    inputs:
-      targetType: 'inline'
-      workingDirectory: '${{ parameters.workingDirectory }}'
-      script: |
-        Write-Host "📝 Configuring Terraform backend..."
-        
-        # Create backend configuration
-        $backendConfig = @"
-        terraform {
-          backend "azurerm" {
-            resource_group_name  = "$(AZURE_BACKEND_RESOURCE_GROUP)"
-            storage_account_name = "$(AZURE_BACKEND_STORAGE_ACCOUNT)"
-            container_name       = "$(AZURE_BACKEND_CONTAINER_NAME)"
-            key                  = "${{ parameters.stateKey }}"
-          }
-        }
-        "@
-        
-        Set-Content -Path "backend.tf" -Value $backendConfig
-        
-        Write-Host "✅ Backend configuration created:"
-        Get-Content "backend.tf"
-
-  - task: PowerShell@2
-    displayName: 'Terraform Format Check'
-    inputs:
-      targetType: 'inline'
-      workingDirectory: '${{ parameters.workingDirectory }}'
-      script: |
-        Write-Host "🔍 Checking Terraform formatting..."
-        
-        $formatResult = terraform fmt -check -diff -recursive
-        $exitCode = $LASTEXITCODE
-        
-        if ($exitCode -eq 0) {
-          Write-Host "✅ Terraform formatting is correct"
-        } else {
-          Write-Host "❌ Terraform formatting issues found"
-          Write-Host "Run 'terraform fmt -recursive' to fix formatting"
-          Write-Host "Formatting diff:"
-          terraform fmt -check -diff -recursive
-          exit 1
-        }
-
-  - task: PowerShell@2
-    displayName: 'Setup Environment Variables'
-    inputs:
-      targetType: 'inline'
-      script: |
-        Write-Host "🔧 Setting up Terraform environment variables..."
-        
-        # Set Azure provider environment variables
-        Write-Host "##vso[task.setvariable variable=ARM_USE_AZUREAD]true"
-        Write-Host "##vso[task.setvariable variable=ARM_USE_CLI]false"
-        Write-Host "##vso[task.setvariable variable=ARM_STORAGE_USE_AZUREAD]true"
-        Write-Host "##vso[task.setvariable variable=TF_IN_AUTOMATION]true"
-        Write-Host "##vso[task.setvariable variable=TF_INPUT]false"
-        
-        Write-Host "✅ Terraform environment variables set"
-
-  - task: PowerShell@2
-    displayName: 'Terraform Workspace Info'
-    inputs:
-      targetType: 'inline'
-      workingDirectory: '${{ parameters.workingDirectory }}'
-      script: |
-        # Note: This will be run after terraform init in the calling pipeline
-        Write-Host "📋 Terraform workspace information:"
-        Write-Host "  Target Environment: ${{ parameters.environment }}"
-        Write-Host "  Target Module: ${{ parameters.module }}"
-        Write-Host "  Working Directory: ${{ parameters.workingDirectory }}"
-        Write-Host "  State Key: ${{ parameters.stateKey }}"
-
-  - task: PowerShell@2
-    displayName: 'Setup Summary'
-    inputs:
-      targetType: 'inline'
-      script: |
-        Write-Host "## 🔧 Terraform Setup Complete"
-        Write-Host ""
-        Write-Host "**Configuration:**"
-        Write-Host "- **Environment:** ${{ parameters.environment }}"
-        Write-Host "- **Module:** ${{ parameters.module }}"
-        Write-Host "- **Working Directory:** ${{ parameters.workingDirectory }}"
-        Write-Host "- **State Key:** ${{ parameters.stateKey }}"
-        Write-Host "- **Terraform Version:** ${{ parameters.terraformVersion }}"
-        Write-Host "- **Azure Service Connection:** ${{ parameters.azureServiceConnection }}"
-        Write-Host ""
-        Write-Host "**Status:** ✅ Ready for Terraform operations"
-        
-        # Set output variables for use in calling pipeline
-        Write-Host "##vso[task.setvariable variable=TERRAFORM_SETUP_COMPLETE;isOutput=true]true"
-        Write-Host "##vso[task.setvariable variable=SETUP_WORKING_DIR;isOutput=true]${{ parameters.workingDirectory }}"
-        Write-Host "##vso[task.setvariable variable=SETUP_STATE_KEY;isOutput=true]${{ parameters.stateKey }}"
+      }
+      "@
+      
+      # Write backend configuration to file
+      $backendConfig | Out-File -FilePath "backend.tf" -Encoding UTF8
+      
+      Write-Host "✅ Created backend configuration for ${{ parameters.environment }}/${{ parameters.module }}"
+      Write-Host "Backend configuration:"
+      Get-Content "backend.tf"

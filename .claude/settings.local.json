@@ -60,7 +60,8 @@
       "Bash(echo:*)",
       "WebFetch(domain:actualbudget.org)",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:learn.microsoft.com)"
+      "WebFetch(domain:learn.microsoft.com)",
+      "Bash(tree:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
