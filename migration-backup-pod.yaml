@@ -1,0 +1,42 @@
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: actual-migration-backup
+  namespace: services
+  labels:
+    app: actual-migration
+spec:
+  restartPolicy: Never
+  containers:
+  - name: backup-container
+    image: alpine:latest
+    command: ["/bin/sh"]
+    args: ["-c", "sleep 3600"]  # Keep pod alive for 1 hour
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "50m"
+      limits:
+        memory: "256Mi"
+        cpu: "200m"
+    volumeMounts:
+    - name: actual-data
+      mountPath: /data
+      readOnly: true
+    - name: backup-storage
+      mountPath: /backup
+    workingDir: /backup
+  volumes:
+  - name: actual-data
+    persistentVolumeClaim:
+      claimName: actual-storage
+  - name: backup-storage
+    emptyDir: {}
+---
+# ServiceAccount for backup operations (if needed)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: actual-migration-sa
+  namespace: services

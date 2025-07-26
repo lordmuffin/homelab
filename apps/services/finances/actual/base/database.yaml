@@ -1,0 +1,64 @@
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: actual-database
+  namespace: services
+spec:
+  instances: 1
+  
+  postgresql:
+    parameters:
+      max_connections: "200"
+      shared_buffers: "256MB"
+      effective_cache_size: "1GB"
+      maintenance_work_mem: "64MB"
+      checkpoint_completion_target: "0.9"
+      wal_buffers: "16MB"
+      default_statistics_target: "100"
+      random_page_cost: "1.1"
+      effective_io_concurrency: "200"
+
+  bootstrap:
+    initdb:
+      database: actual
+      owner: actual
+      secret:
+        name: actual-db-postgres-creds-1password
+
+  storage:
+    size: 8Gi
+    storageClass: local-path
+
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+
+  monitoring:
+    enabled: true
+    prometheusRule:
+      enabled: false
+
+  backup:
+    retentionPolicy: "30d"
+    barmanObjectStore:
+      destinationPath: "s3://cloud-homelab-backups/actual-cnpg"
+      s3Credentials:
+        accessKeyId:
+          name: backblaze-cloud-homelab-creds-1password
+          key: keyID
+        secretAccessKey:
+          name: backblaze-cloud-homelab-creds-1password
+          key: applicationKey
+        region:
+          name: backblaze-cloud-homelab-creds-1password
+          key: region
+      endpointURL: "https://s3.us-west-004.backblazeb2.com"
+      wal:
+        retention: "7d"
+      data:
+        retention: "30d"

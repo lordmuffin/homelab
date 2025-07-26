@@ -48,6 +48,18 @@ The following applications in the homelab currently implement this standardized 
 - **Data Protection**: Workflows, credentials, executions
 - **B2 Path**: `n8n/pg_backup_YYYYMMDD_HHMMSS.sql.gz`
 
+### ✅ Actual Budget (Financial Management)
+- **Namespace**: `services`
+- **Database**: `actual`
+- **Schedule**: `0 4 * * *` (4:00 AM daily)
+- **Files**:
+  - **Backup Configuration**: [`apps/services/finances/actual/base/backups.yaml`](apps/services/finances/actual/base/backups.yaml)
+  - **Restoration Logic**: [`apps/services/finances/actual/base/deployment.yaml`](apps/services/finances/actual/base/deployment.yaml)
+  - **Database Configuration**: [`apps/services/finances/actual/base/database.yaml`](apps/services/finances/actual/base/database.yaml)
+- **Data Protection**: Accounts, transactions, budgets, financial data
+- **B2 Path**: `actual/pg_backup_YYYYMMDD_HHMMSS.sql.gz`
+- **Migration**: Upgraded from file-based storage to PostgreSQL with automated backup and restoration
+
 ### 🔄 Future Candidates
 
 The following services use PostgreSQL and could benefit from standardization:
@@ -81,7 +93,8 @@ Services use staggered backup schedules to avoid resource conflicts:
 - **Tandoor**: `0 2 * * *` (2:00 AM)
 - **Paperless**: `30 2 * * *` (2:30 AM)
 - **N8n**: `0 3 * * *` (3:00 AM)
-- **Future Services**: nightly intervals (3:00 AM, 4:00 AM, etc.)
+- **Actual Budget**: `0 4 * * *` (4:00 AM)
+- **Future Services**: nightly intervals (4:30 AM, 5:00 AM, etc.)
 
 ### Resource Allocation
 
@@ -884,6 +897,27 @@ GRANT ALL ON SCHEMA public TO n8n; GRANT ALL ON SCHEMA public TO public;"
 kubectl rollout restart deployment/n8n-server -n services
 ```
 
+#### Actual Budget Manual Restoration
+
+```bash
+NAMESPACE="services"
+SERVICE="actual"
+
+# Check current data
+kubectl exec -n $NAMESPACE deployment/actual-database -- psql -U actual -d actual -c "
+SELECT 
+  (SELECT COUNT(*) FROM information_schema.tables WHERE table_name IN ('accounts', 'transactions', 'budgets')) as core_tables,
+  (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public') as total_tables;
+"
+
+# Clear and restore
+kubectl exec -n $NAMESPACE deployment/actual-database -- psql -U actual -d actual -c "
+DROP SCHEMA public CASCADE; CREATE SCHEMA public; 
+GRANT ALL ON SCHEMA public TO actual; GRANT ALL ON SCHEMA public TO public;"
+
+kubectl rollout restart deployment/actual -n services
+```
+
 ### Monitoring Manual Restoration
 
 #### Real-time Monitoring
@@ -1139,6 +1173,16 @@ kubectl exec -n $NAMESPACE $DB_POD -- psql -U postgres -d $SERVICE -c "DROP SCHE
 kubectl rollout restart deployment/n8n-server -n $NAMESPACE
 ```
 
+**Actual Budget Quick Restore:**
+```bash
+# Method 2 - Database Reset (Most Reliable)
+NAMESPACE="services" && SERVICE="actual"
+DB_POD=$(kubectl get pods -n $NAMESPACE --selector=cnpg.io/instanceRole=primary -o jsonpath='{.items[0].metadata.name}')
+kubectl exec -n $NAMESPACE $DB_POD -- pg_dump -U postgres -d $SERVICE > emergency_backup_$(date +%Y%m%d_%H%M%S).sql
+kubectl exec -n $NAMESPACE $DB_POD -- psql -U postgres -d $SERVICE -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO $SERVICE; GRANT ALL ON SCHEMA public TO public;"
+kubectl rollout restart deployment/$SERVICE -n $NAMESPACE
+```
+
 ### Monitoring Commands
 
 ```bash
@@ -1177,13 +1221,18 @@ kubectl exec -n $NAMESPACE deployment/$SERVICE -c restore-db-backup -- gunzip -t
 
 - **Paperless Deployment**: `apps/services/paperless/base/deployment.yaml`
 - **Tandoor Deployment**: `apps/services/tandoor/base/deployment.yaml`  
+- **N8n Deployment**: `apps/services/n8n/base/deployment.yaml`
+- **Actual Budget Deployment**: `apps/services/finances/actual/base/deployment.yaml`
 - **Paperless Backup**: `apps/services/paperless/base/backups.yaml`
 - **Tandoor Backup**: `apps/services/tandoor/base/backups.yaml`
+- **N8n Backup**: `apps/services/n8n/base/backups.yaml`
+- **Actual Budget Backup**: `apps/services/finances/actual/base/backups.yaml`
+- **Actual Budget Database**: `apps/services/finances/actual/base/database.yaml`
 - **Documentation**: `POSTGRES_BACKUPS.md`
 
 ### Support Information
 
-- **Backup Schedule**: Tandoor (2:00 AM), Paperless (2:30 AM)
+- **Backup Schedule**: Tandoor (2:00 AM), Paperless (2:30 AM), N8n (3:00 AM), Actual Budget (4:00 AM)
 - **Retention**: Managed by B2 lifecycle rules (30 days default)
 - **Storage**: Backblaze B2 bucket `cloud-homelab-backups`
 - **Naming**: `pg_backup_YYYYMMDD_HHMMSS.sql.gz`
