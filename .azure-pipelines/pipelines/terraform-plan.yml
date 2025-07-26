@@ -1,6 +1,27 @@
 # Azure DevOps Pipeline: Terraform Plan
 # Validates Terraform configurations and generates plans for review
 
+trigger:
+  branches:
+    include:
+    - main
+    - develop
+    - feature/*
+  paths:
+    include:
+    - terraform/**
+    - .azure-pipelines/**
+
+pr:
+  branches:
+    include:
+    - main
+    - develop
+  paths:
+    include:
+    - terraform/**
+    - .azure-pipelines/**
+
 strategy:
   matrix:
     DevLab_Main:
