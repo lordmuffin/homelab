@@ -39,7 +39,7 @@ spec:
           args:
             - |
               # Auto-restore script for fresh deployments
-              set -euo pipefail
+              set -eu
               
               # Install required tools
               apk add --no-cache tar gzip curl jq
@@ -63,7 +63,7 @@ spec:
               log_info "Empty data directory detected, attempting auto-restore..."
               
               # Validate B2 credentials
-              if [[ -z "${B2_APPLICATION_KEY_ID:-}" || -z "${B2_APPLICATION_KEY:-}" || -z "${B2_BUCKET_NAME:-}" ]]; then
+              if [ -z "${B2_APPLICATION_KEY_ID:-}" ] || [ -z "${B2_APPLICATION_KEY:-}" ] || [ -z "${B2_BUCKET_NAME:-}" ]; then
                   log_info "B2 credentials not available - starting with fresh data"
                   mkdir -p /data/server-files /data/user-files
                   exit 0

@@ -30,7 +30,7 @@ spec:
         args:
           - |
             # Strict error handling
-            set -euo pipefail
+            set -eu
             
             # Install required tools
             apk add --no-cache tar gzip curl jq
@@ -60,7 +60,7 @@ spec:
             log_info "Backup date filter: $BACKUP_DATE"
             
             # Validate environment variables
-            if [[ -z "${B2_APPLICATION_KEY_ID:-}" || -z "${B2_APPLICATION_KEY:-}" || -z "${B2_BUCKET_NAME:-}" ]]; then
+            if [ -z "${B2_APPLICATION_KEY_ID:-}" ] || [ -z "${B2_APPLICATION_KEY:-}" ] || [ -z "${B2_BUCKET_NAME:-}" ]; then
                 log_error "Missing required B2 environment variables"
                 exit 1
             fi
@@ -134,7 +134,7 @@ spec:
                 b2v4 file download-file-by-name $B2_BUCKET_NAME "$BACKUP_TO_RESTORE" "$BACKUP_FILE"
                 
                 # Validate downloaded backup
-                if [[ ! -f "$BACKUP_FILE" ]] || [[ ! -s "$BACKUP_FILE" ]]; then
+                if [ ! -f "$BACKUP_FILE" ] || [ ! -s "$BACKUP_FILE" ]; then
                     log_error "Downloaded backup file is missing or empty: $BACKUP_FILE"
                     exit 1
                 fi
