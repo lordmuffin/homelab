@@ -53,11 +53,11 @@ spec:
             secretKeyRef:
               name: tandoor-db-postgres-creds-1password
               key: password
-        command: ["/bin/bash", "-c"]
+        command: ["/bin/sh", "-c"]
         args:
         - |
           echo "Installing required dependencies..."
-          apk add --no-cache postgresql-client curl unzip
+          apk add --no-cache postgresql-client curl unzip bash
           
           echo "Validating environment variables..."
           echo "B2_APPLICATION_KEY_ID length: ${#B2_APPLICATION_KEY_ID}"
