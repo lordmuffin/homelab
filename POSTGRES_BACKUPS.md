@@ -14,6 +14,49 @@ This standard implements a robust, reliable PostgreSQL backup system using Kuber
 - **Cloud storage lifecycle management** for retention (handled by B2 lifecycle rules)
 - **Resource-optimized containers** with proper resource limits
 
+## Applications Using This Standard
+
+The following applications in the homelab currently implement this standardized PostgreSQL backup and restoration system:
+
+### ✅ Paperless-ngx (Document Management)
+- **Namespace**: `paperless`
+- **Database**: `paperless`
+- **Schedule**: `30 2 * * *` (2:30 AM daily)
+- **Files**:
+  - **Backup Configuration**: [`apps/services/paperless/base/backups.yaml`](apps/services/paperless/base/backups.yaml)
+  - **Restoration Logic**: [`apps/services/paperless/base/deployment.yaml`](apps/services/paperless/base/deployment.yaml)
+- **Data Protection**: Documents, tags, correspondents
+- **B2 Path**: `paperless/pg_backup_YYYYMMDD_HHMMSS.sql.gz`
+
+### ✅ Tandoor Recipes (Recipe Management)
+- **Namespace**: `tandoor`
+- **Database**: `tandoor`
+- **Schedule**: `0 2 * * *` (2:00 AM daily)
+- **Files**:
+  - **Backup Configuration**: [`apps/services/tandoor/base/backups.yaml`](apps/services/tandoor/base/backups.yaml)
+  - **Restoration Logic**: [`apps/services/tandoor/base/deployment.yaml`](apps/services/tandoor/base/deployment.yaml)
+- **Data Protection**: Recipes, keywords, foods
+- **B2 Path**: `tandoor/pg_backup_YYYYMMDD_HHMMSS.sql.gz`
+
+### ✅ N8n (Workflow Automation)
+- **Namespace**: `services`
+- **Database**: `n8n`
+- **Schedule**: `0 3 * * *` (3:00 AM daily)
+- **Files**:
+  - **Backup Configuration**: [`apps/services/n8n/base/backups.yaml`](apps/services/n8n/base/backups.yaml)
+  - **Restoration Logic**: [`apps/services/n8n/base/deployment.yaml`](apps/services/n8n/base/deployment.yaml)
+- **Data Protection**: Workflows, credentials, executions
+- **B2 Path**: `n8n/pg_backup_YYYYMMDD_HHMMSS.sql.gz`
+
+### 🔄 Future Candidates
+
+The following services use PostgreSQL and could benefit from standardization:
+
+- **Gitea** (Git repository hosting) - `gitea` namespace
+- **Authentik** (Identity provider) - `authentik` namespace  
+- **Grafana** (Monitoring dashboards) - `monitoring` namespace
+- **Uptime Kuma** (Status monitoring) - `monitoring` namespace
+
 ## Architecture
 
 ### Two-Container Pattern
@@ -37,7 +80,8 @@ Services use staggered backup schedules to avoid resource conflicts:
 
 - **Tandoor**: `0 2 * * *` (2:00 AM)
 - **Paperless**: `30 2 * * *` (2:30 AM)
-- **Future Services**: 30-minute intervals (3:00 AM, 3:30 AM, etc.)
+- **N8n**: `0 3 * * *` (3:00 AM)
+- **Future Services**: nightly intervals (3:00 AM, 4:00 AM, etc.)
 
 ### Resource Allocation
 
@@ -818,6 +862,28 @@ GRANT ALL ON SCHEMA public TO tandoor; GRANT ALL ON SCHEMA public TO public;"
 kubectl rollout restart deployment/tandoor -n tandoor
 ```
 
+#### N8n Manual Restoration
+
+```bash
+NAMESPACE="services"
+SERVICE="n8n"
+
+# Check current data
+kubectl exec -n $NAMESPACE deployment/n8n-database -- psql -U n8n -d n8n -c "
+SELECT 
+  (SELECT COUNT(*) FROM workflow_entity) as workflows,
+  (SELECT COUNT(*) FROM credentials_entity) as credentials,
+  (SELECT COUNT(*) FROM execution_entity) as executions;
+"
+
+# Clear and restore
+kubectl exec -n $NAMESPACE deployment/n8n-database -- psql -U n8n -d n8n -c "
+DROP SCHEMA public CASCADE; CREATE SCHEMA public; 
+GRANT ALL ON SCHEMA public TO n8n; GRANT ALL ON SCHEMA public TO public;"
+
+kubectl rollout restart deployment/n8n-server -n services
+```
+
 ### Monitoring Manual Restoration
 
 #### Real-time Monitoring
@@ -859,6 +925,20 @@ SELECT
 
 -- Check latest recipe dates
 SELECT MAX(created) as latest_recipe FROM cookbook_recipe;
+```
+
+**N8n Verification:**
+```sql
+-- Check restored data counts
+SELECT 
+  (SELECT COUNT(*) FROM workflow_entity) as workflows_restored,
+  (SELECT COUNT(*) FROM credentials_entity) as credentials_restored,
+  (SELECT COUNT(*) FROM execution_entity) as executions_restored,
+  (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public') as tables_restored;
+
+-- Check latest workflow activity
+SELECT MAX("updatedAt") as latest_workflow_update FROM workflow_entity;
+SELECT MAX("startedAt") as latest_execution FROM execution_entity;
 ```
 
 ### Troubleshooting Manual Restoration
@@ -1049,6 +1129,16 @@ kubectl exec -n $NAMESPACE $DB_POD -- psql -U postgres -d $SERVICE -c "DROP SCHE
 kubectl rollout restart deployment/$SERVICE -n $NAMESPACE
 ```
 
+**N8n Quick Restore:**
+```bash
+# Method 2 - Database Reset (Most Reliable)
+NAMESPACE="services" && SERVICE="n8n"
+DB_POD=$(kubectl get pods -n $NAMESPACE --selector=cnpg.io/instanceRole=primary -o jsonpath='{.items[0].metadata.name}')
+kubectl exec -n $NAMESPACE $DB_POD -- pg_dump -U postgres -d $SERVICE > emergency_backup_$(date +%Y%m%d_%H%M%S).sql
+kubectl exec -n $NAMESPACE $DB_POD -- psql -U postgres -d $SERVICE -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO $SERVICE; GRANT ALL ON SCHEMA public TO public;"
+kubectl rollout restart deployment/n8n-server -n $NAMESPACE
+```
+
 ### Monitoring Commands
 
 ```bash
@@ -1062,8 +1152,10 @@ kubectl logs -n $NAMESPACE deployment/$SERVICE -c restore-db-backup -f
 # Verify data after restoration
 kubectl exec -n $NAMESPACE $DB_POD -- psql -U postgres -d $SERVICE -c "
 SELECT 
-  (SELECT COUNT(*) FROM documents_document) as documents,  -- paperless
-  (SELECT COUNT(*) FROM cookbook_recipe) as recipes,       -- tandoor
+  (SELECT COUNT(*) FROM documents_document) as documents,    -- paperless
+  (SELECT COUNT(*) FROM cookbook_recipe) as recipes,         -- tandoor
+  (SELECT COUNT(*) FROM workflow_entity) as workflows,       -- n8n
+  (SELECT COUNT(*) FROM credentials_entity) as credentials,  -- n8n
   (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public') as tables;"
 ```
 
