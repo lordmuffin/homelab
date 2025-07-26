@@ -7,6 +7,7 @@ metadata:
     app: actual
   annotations:
     link.argocd.argoproj.io/external-link: https://finance.gruber.dev.br
+    deployment.kubernetes.io/revision: "2"
 spec:
   replicas: 1
   strategy:
