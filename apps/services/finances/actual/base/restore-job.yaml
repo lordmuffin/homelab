@@ -47,16 +47,16 @@ spec:
                 echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] ERROR: $*" >&2
             }
             
-            # Error trap handler
+            # Error trap handler - simplified for sh compatibility
             error_trap() {
-                local exit_code=$?
-                local line_number=$1
-                log_error "Actual restore failed at line $line_number with exit code $exit_code"
-                log_error "Command: ${BASH_COMMAND}"
-                exit $exit_code
+                exit_code=$?
+                if [ $exit_code -ne 0 ]; then
+                    log_error "Actual restore failed with exit code $exit_code"
+                    exit $exit_code
+                fi
             }
             
-            trap 'error_trap $LINENO' ERR
+            trap 'error_trap' EXIT
             
             log_info "🔄 Starting Actual Budget manual restoration process..."
             log_info "Force restore: $FORCE_RESTORE"
