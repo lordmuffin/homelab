@@ -1,148 +1,149 @@
 # Azure DevOps Stage Template: Terraform Apply
 # Applies Terraform configurations to infrastructure
-stages:
-  - stage: TerraformApply
+
+- stage: TerraformApply
+  displayName: 'Terraform Apply'
+  dependsOn: TerraformPlan
+  condition: and(succeeded(), or(eq(variables['Build.SourceBranch'], 'refs/heads/main'), eq(variables['Build.Reason'], 'Manual')))
+  jobs:
+  - job: TerraformApplyMatrix
     displayName: 'Terraform Apply'
-    dependsOn: TerraformPlan
-    condition: and(succeeded(), or(eq(variables['Build.SourceBranch'], 'refs/heads/main'), eq(variables['Build.Reason'], 'Manual')))
-    jobs:
-    - deployment: TerraformApplyMatrix
+    timeoutInMinutes: 60
+    cancelTimeoutInMinutes: 10
+    
+    strategy:
+      matrix:
+        DevLab_Main:
+          Environment: 'dev-lab'
+          Module: 'main'
+        DevLab_Vault:
+          Environment: 'dev-lab'
+          Module: 'vault'
+        DevLab_Unifi:
+          Environment: 'dev-lab'
+          Module: 'unifi'
+        DevLab_Vultr:
+          Environment: 'dev-lab'
+          Module: 'vultr'
+        ProdLab_Main:
+          Environment: 'prod-lab'
+          Module: 'main'
+        ProdLab_Vault:
+          Environment: 'prod-lab'
+          Module: 'vault'
+        ProdLab_Unifi:
+          Environment: 'prod-lab'
+          Module: 'unifi'
+        ProdLab_Vultr:
+          Environment: 'prod-lab'
+          Module: 'vultr'
+        ProdLab_B2:
+          Environment: 'prod-lab'
+          Module: 'b2'
+      # Exclude dev-lab/b2 combination (aligned with Gitea workflow)
+      exclude:
+        - Environment: 'dev-lab'
+          Module: 'b2'
+      maxParallel: 3
+    
+    pool:
+      vmImage: 'ubuntu-latest'
+    
+    variables:
+    - group: terraform-$(Environment)
+    - name: TF_VERSION
+      value: '1.5.7'
+    - name: WorkingDirectory
+      value: $[eq(variables['Module'], 'main'), 'terraform', format('terraform/modules/{0}', variables['Module'])]
+    - name: StateKey
+      value: '$(Environment)/$(Module).tfstate'
+    # Terraform environment variables
+    - name: ARM_USE_AZUREAD
+      value: 'true'
+    - name: ARM_USE_CLI
+      value: 'false'
+    - name: ARM_STORAGE_USE_AZUREAD
+      value: 'true'
+    - name: TF_IN_AUTOMATION
+      value: 'true'
+    - name: TF_INPUT
+      value: 'false'
+    
+    steps:
+    - template: ../templates/terraform-setup.yml
+      parameters:
+        azureServiceConnection: 'azure-terraform-backend'
+        terraformVersion: $(TF_VERSION)
+        workingDirectory: $(WorkingDirectory)
+        environment: $(Environment)
+        module: $(Module)
+        stateKey: $(StateKey)
+    
+    - task: PowerShell@2
+      displayName: 'Set Working Directory Variable'
+      inputs:
+        targetType: 'inline'
+        script: |
+          if ("$(Module)" -eq "main") {
+            $workingDir = "terraform"
+          } else {
+            $workingDir = "terraform/modules/$(Module)"
+          }
+          Write-Host "##vso[task.setvariable variable=WORKING_DIR]$workingDir"
+          Write-Host "Working directory set to: $workingDir"
+    
+    - task: DownloadPipelineArtifact@2
+      displayName: 'Download Plan Artifact'
+      inputs:
+        buildType: 'current'
+        artifactName: 'terraform-plan-$(Environment)-$(Module)'
+        targetPath: '$(Pipeline.Workspace)/terraform-plan-$(Environment)-$(Module)'
+    
+    - task: TerraformCLI@0
+      displayName: 'Terraform Init'
+      inputs:
+        command: 'init'
+        terraformVersion: $(TF_VERSION)
+        workingDirectory: $(WORKING_DIR)
+        backendType: 'azurerm'
+        backendServiceArm: 'azure-terraform-backend'
+        backendAzureRmResourceGroupName: $(AZURE_BACKEND_RESOURCE_GROUP)
+        backendAzureRmStorageAccountName: $(AZURE_BACKEND_STORAGE_ACCOUNT)
+        backendAzureRmContainerName: $(AZURE_BACKEND_CONTAINER_NAME)
+        backendAzureRmKey: $(StateKey)
+    
+    - task: PowerShell@2
+      displayName: 'Copy Plan File'
+      inputs:
+        targetType: 'inline'
+        script: |
+          $planFile = "$(Pipeline.Workspace)/terraform-plan-$(Environment)-$(Module)/tfplan-$(Environment)-$(Module).out"
+          $targetFile = "$(WORKING_DIR)/tfplan-$(Environment)-$(Module).out"
+          
+          if (Test-Path $planFile) {
+            Copy-Item $planFile $targetFile
+            Write-Host "✅ Plan file copied successfully"
+          } else {
+            Write-Host "❌ Plan file not found: $planFile"
+            exit 1
+          }
+    
+    - task: TerraformCLI@0
       displayName: 'Terraform Apply'
-      timeoutInMinutes: 60
-      cancelTimeoutInMinutes: 10
-      environment: 'terraform-production'
-      strategy:
-        matrix:
-          DevLab_Main:
-            Environment: 'dev-lab'
-            Module: 'main'
-          DevLab_Vault:
-            Environment: 'dev-lab'
-            Module: 'vault'
-          DevLab_Unifi:
-            Environment: 'dev-lab'
-            Module: 'unifi'
-          DevLab_Vultr:
-            Environment: 'dev-lab'
-            Module: 'vultr'
-          ProdLab_Main:
-            Environment: 'prod-lab'
-            Module: 'main'
-          ProdLab_Vault:
-            Environment: 'prod-lab'
-            Module: 'vault'
-          ProdLab_Unifi:
-            Environment: 'prod-lab'
-            Module: 'unifi'
-          ProdLab_Vultr:
-            Environment: 'prod-lab'
-            Module: 'vultr'
-          ProdLab_B2:
-            Environment: 'prod-lab'
-            Module: 'b2'
-        maxParallel: 3
-      
-      pool:
-        vmImage: 'ubuntu-latest'
-      
-      variables:
-      - group: terraform-$(Environment)
-      - name: TF_VERSION
-        value: '1.5.7'
-      - name: WorkingDirectory
-        value: $[eq(variables['Module'], 'main'), 'terraform', format('terraform/modules/{0}', variables['Module'])]
-      - name: StateKey
-        value: '$(Environment)/$(Module).tfstate'
-      # Terraform environment variables
-      - name: ARM_USE_AZUREAD
-        value: 'true'
-      - name: ARM_USE_CLI
-        value: 'false'
-      - name: ARM_STORAGE_USE_AZUREAD
-        value: 'true'
-      - name: TF_IN_AUTOMATION
-        value: 'true'
-      - name: TF_INPUT
-        value: 'false'
-      
-      strategy:
-        runOnce:
-          deploy:
-            steps:
-            - template: ../templates/terraform-setup.yml
-              parameters:
-                azureServiceConnection: 'azure-terraform-backend'
-                terraformVersion: $(TF_VERSION)
-                workingDirectory: $(WorkingDirectory)
-                environment: $(Environment)
-                module: $(Module)
-                stateKey: $(StateKey)
-            
-            - task: PowerShell@2
-              displayName: 'Set Working Directory Variable'
-              inputs:
-                targetType: 'inline'
-                script: |
-                  if ("$(Module)" -eq "main") {
-                    $workingDir = "terraform"
-                  } else {
-                    $workingDir = "terraform/modules/$(Module)"
-                  }
-                  Write-Host "##vso[task.setvariable variable=WORKING_DIR]$workingDir"
-                  Write-Host "Working directory set to: $workingDir"
-            
-            - task: DownloadPipelineArtifact@2
-              displayName: 'Download Plan Artifact'
-              inputs:
-                buildType: 'current'
-                artifactName: 'terraform-plan-$(Environment)-$(Module)'
-                targetPath: '$(Pipeline.Workspace)/terraform-plan-$(Environment)-$(Module)'
-            
-            - task: TerraformCLI@0
-              displayName: 'Terraform Init'
-              inputs:
-                command: 'init'
-                terraformVersion: $(TF_VERSION)
-                workingDirectory: $(WORKING_DIR)
-                backendType: 'azurerm'
-                backendServiceArm: 'azure-terraform-backend'
-                backendAzureRmResourceGroupName: $(AZURE_BACKEND_RESOURCE_GROUP)
-                backendAzureRmStorageAccountName: $(AZURE_BACKEND_STORAGE_ACCOUNT)
-                backendAzureRmContainerName: $(AZURE_BACKEND_CONTAINER_NAME)
-                backendAzureRmKey: $(StateKey)
-            
-            - task: PowerShell@2
-              displayName: 'Copy Plan File'
-              inputs:
-                targetType: 'inline'
-                script: |
-                  $planFile = "$(Pipeline.Workspace)/terraform-plan-$(Environment)-$(Module)/tfplan-$(Environment)-$(Module).out"
-                  $targetFile = "$(WORKING_DIR)/tfplan-$(Environment)-$(Module).out"
-                  
-                  if (Test-Path $planFile) {
-                    Copy-Item $planFile $targetFile
-                    Write-Host "✅ Plan file copied successfully"
-                  } else {
-                    Write-Host "❌ Plan file not found: $planFile"
-                    exit 1
-                  }
-            
-            - task: TerraformCLI@0
-              displayName: 'Terraform Apply'
-              inputs:
-                command: 'apply'
-                terraformVersion: $(TF_VERSION)
-                workingDirectory: $(WORKING_DIR)
-                environmentServiceName: 'azure-terraform-backend'
-                commandOptions: 'tfplan-$(Environment)-$(Module).out'
-              env:
-                TF_VAR_api_key: $(RACKSPACE_API_KEY)
-                TF_VAR_environment: $(Environment)
-            
-            - task: PowerShell@2
-              displayName: 'Apply Summary'
-              inputs:
-                targetType: 'inline'
-                script: |
-                  Write-Host "✅ Terraform apply completed successfully for $(Environment)/$(Module)"
-                  Write-Host "Infrastructure changes have been deployed"
+      inputs:
+        command: 'apply'
+        terraformVersion: $(TF_VERSION)
+        workingDirectory: $(WORKING_DIR)
+        environmentServiceName: 'azure-terraform-backend'
+        commandOptions: 'tfplan-$(Environment)-$(Module).out'
+      env:
+        TF_VAR_api_key: $(RACKSPACE_API_KEY)
+        TF_VAR_environment: $(Environment)
+    
+    - task: PowerShell@2
+      displayName: 'Apply Summary'
+      inputs:
+        targetType: 'inline'
+        script: |
+          Write-Host "✅ Terraform apply completed successfully for $(Environment)/$(Module)"
+          Write-Host "Infrastructure changes have been deployed"
