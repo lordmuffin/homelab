@@ -4,198 +4,321 @@ metadata:
   name: paperless-postgres-backup
   namespace: paperless
 spec:
-  schedule: "30 2 * * *"
+  schedule: "30 2 * * *" # Daily at 2:30AM (offset from tandoor)
   concurrencyPolicy: Forbid
   jobTemplate:
     spec:
       template:
         spec:
           containers:
-          - name: postgres-backup
-            image: postgres:latest
-            resources:
-              requests:
-                memory: "256Mi"
-                cpu: "250m"
-              limits:
-                memory: "512Mi"
-                cpu: "500m"
-            env:
-            - name: PGPASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: paperless-db-postgres-creds-1password
-                  key: password
-            - name: POSTGRES_USER
-              valueFrom:
-                secretKeyRef:
-                  name: paperless-db-postgres-creds-1password
-                  key: username
-            - name: POSTGRES_HOST
-              value: paperless-database-rw.paperless.svc.cluster.local
-            - name: POSTGRES_DB
-              value: paperless
-            command:
-            - /bin/bash
-            - -c
-            - |
-              set -e
-              echo "Starting backup process..."
-              
-              # Test database connection with exponential backoff
-              echo "Testing database connection..."
-              MAX_RETRIES=5
-              RETRY_COUNT=0
-              BASE_DELAY=10
-              
-              while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-                RETRY_COUNT=$((RETRY_COUNT + 1))
-                echo "Attempt $RETRY_COUNT/$MAX_RETRIES: Testing database connection..."
-                
-                if pg_isready -h $POSTGRES_HOST -U $POSTGRES_USER -d $POSTGRES_DB -t 10 -q; then
-                  echo "Database connection successful!"
-                  break
-                fi
-                
-                if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
-                  # Calculate exponential backoff delay: 10, 20, 40, 80, 160 seconds
-                  DELAY=$((BASE_DELAY * (2 ** (RETRY_COUNT - 1))))
-                  echo "Database connection failed. Retrying in $DELAY seconds..."
-                  sleep $DELAY
-                else
-                  echo "Database connection failed after $MAX_RETRIES attempts."
-                  exit 1
-                fi
-              done
-              
-              # Create backup
-              BACKUP_FILE="/mnt/backup/pg_backup_$(date +%Y%m%d_%H%M%S).sql.gz"
-              echo "Creating backup: $BACKUP_FILE"
-              pg_dump -h $POSTGRES_HOST -U $POSTGRES_USER -d $POSTGRES_DB \
-                --verbose --no-owner --no-privileges | gzip > "$BACKUP_FILE"
-              
-              # Verify backup integrity
-              echo "Verifying backup integrity..."
-              if gzip -t "$BACKUP_FILE"; then
-                echo "✅ Backup integrity verification passed"
-                echo "Database backup size: $(du -h "$BACKUP_FILE" | cut -f1)"
-                # Signal completion only after successful verification
-                touch /mnt/backup/.db_done
-                echo "Database backup completed successfully"
-              else
-                echo "❌ Backup integrity verification failed"
-                exit 1
-              fi
-            volumeMounts:
-            - name: backup-storage
-              mountPath: /mnt/backup
-          - name: b2-uploader
-            image: backblazeit/b2:latest
-            resources:
-              requests:
-                memory: "64Mi"
-                cpu: "50m"
-              limits:
-                memory: "128Mi"
-                cpu: "100m"
-            env:
-            - name: B2_APPLICATION_KEY_ID
-              valueFrom:
-                secretKeyRef:
-                  name: backblaze-cloud-homelab-creds-1password
-                  key: keyID
-            - name: B2_APPLICATION_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: backblaze-cloud-homelab-creds-1password
-                  key: applicationKey
-            - name: B2_BUCKET_NAME
-              value: cloud-homelab-backups
-            - name: RETENTION_DAYS
-              value: "30"
-            command:
-            - /bin/bash
-            - -c
-            - |
-              set -e
-              echo "Waiting for backup to complete..."
-              
-              # Wait for backup completion
-              while [ ! -f /mnt/backup/.db_done ]; do
-                echo "Waiting for database backup to complete..."
-                sleep 5
-              done
-              
-              echo "Database backup completed, starting upload to B2..."
-              
-              # Install jq for JSON processing
-              apk add --no-cache jq
-              
-              # Authenticate with B2
-              b2v4 authorize-account "$B2_APPLICATION_KEY_ID" "$B2_APPLICATION_KEY"
-              
-              # Upload database backup files only
-              for file in /mnt/backup/*.sql.gz; do
-                if [ -f "$file" ]; then
-                  echo "Uploading $file to B2..."
-                  b2v4 file upload "$B2_BUCKET_NAME" "$file" "paperless/$(basename $file)"
-                fi
-              done
-              
-              echo "Database backup uploaded successfully to B2"
-              
-              # Cleanup old backups using jq for robust JSON parsing
-              echo "Starting backup retention cleanup..."
-              CUTOFF_DATE=$(date -d "$RETENTION_DAYS days ago" +%s)
-              
-              # List all paperless backup files in the bucket
-              echo "Listing existing backups for retention cleanup..."
-              if ! b2v4 ls "$B2_BUCKET_NAME" paperless/ --recursive --json > /tmp/backup_list.json; then
-                echo "Warning: Failed to list B2 files, skipping cleanup"
-                exit 0
-              fi
-              
-              # Process backup files for cleanup using jq
-              if [ -s /tmp/backup_list.json ]; then
-                echo "Processing backup files for retention policy..."
-                
-                deleted_count=0
-                kept_count=0
-                
-                # Use jq to extract file information and process each backup
-                jq -r '.[] | select(.fileName | test("^paperless/.*\\.sql\\.gz$")) | "\(.fileName) \(.fileId) \(.uploadTimestamp)"' /tmp/backup_list.json | \
-                while read -r file_name file_id upload_timestamp; do
-                  # Convert milliseconds to seconds
-                  file_timestamp=$((upload_timestamp / 1000))
+            - name: postgres-backup
+              image: postgres:latest
+              resources:
+                requests:
+                  memory: "256Mi"
+                  cpu: "250m"
+                limits:
+                  memory: "512Mi"
+                  cpu: "500m"
+              env:
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: paperless-db-postgres-creds-1password
+                      key: password
+                - name: POSTGRES_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: paperless-db-postgres-creds-1password
+                      key: username
+                - name: POSTGRES_HOST
+                  value: paperless-database-rw.paperless.svc.cluster.local
+                - name: POSTGRES_DB
+                  value: paperless
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  # Strict error handling
+                  set -euo pipefail
                   
-                  # Check if file is older than retention period
-                  if [ "$file_timestamp" -lt "$CUTOFF_DATE" ]; then
-                    file_age_days=$(( (CUTOFF_DATE - file_timestamp) / 86400 ))
-                    echo "Deleting old backup: $file_name (age: ${file_age_days} days)"
-                    
-                    if b2v4 delete-file-version "$file_name" "$file_id"; then
-                      deleted_count=$((deleted_count + 1))
-                    else
-                      echo "Error deleting $file_name"
-                    fi
-                  else
-                    kept_count=$((kept_count + 1))
+                  # Retry configuration
+                  MAX_RETRIES=5
+                  RETRY_DELAYS=(10 20 40 80 160)
+                  
+                  # Logging functions
+                  log_info() {
+                      echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] INFO: $*" >&2
+                  }
+                  
+                  log_error() {
+                      echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] ERROR: $*" >&2
+                  }
+                  
+                  # Error trap handler
+                  error_trap() {
+                      local exit_code=$?
+                      local line_number=$1
+                      log_error "Paperless backup failed at line $line_number with exit code $exit_code"
+                      log_error "Command: ${BASH_COMMAND}"
+                      exit $exit_code
+                  }
+                  
+                  trap 'error_trap $LINENO' ERR
+                  
+                  # Retry function with exponential backoff
+                  retry_with_backoff() {
+                      local cmd="$1"
+                      local attempt=1
+                      
+                      while [[ $attempt -le $MAX_RETRIES ]]; do
+                          log_info "Attempt $attempt/$MAX_RETRIES: $cmd"
+                          
+                          if eval "$cmd"; then
+                              log_info "Command succeeded on attempt $attempt"
+                              return 0
+                          else
+                              local exit_code=$?
+                              log_error "Command failed on attempt $attempt with exit code $exit_code"
+                              
+                              if [[ $attempt -eq $MAX_RETRIES ]]; then
+                                  log_error "All $MAX_RETRIES attempts failed"
+                                  return $exit_code
+                              fi
+                              
+                              local delay=${RETRY_DELAYS[$((attempt-1))]}
+                              log_info "Waiting $delay seconds before next attempt..."
+                              sleep "$delay"
+                              ((attempt++))
+                          fi
+                      done
+                  }
+                  
+                  BACKUP_FILE="pg_backup_$(date +%Y%m%d_%H%M%S).sql.gz"
+                  
+                  log_info "🔄 Starting Paperless PostgreSQL backup: $BACKUP_FILE"
+                  log_info "Connecting to: $POSTGRES_HOST as $POSTGRES_USER for database $POSTGRES_DB"
+                  
+                  # Validate environment variables
+                  if [[ -z "${POSTGRES_HOST:-}" || -z "${POSTGRES_USER:-}" || -z "${POSTGRES_DB:-}" ]]; then
+                      log_error "Missing required environment variables"
+                      exit 1
                   fi
-                done
-                
-                echo "Retention cleanup completed: $deleted_count files deleted, $kept_count files kept"
-              else
-                echo "No existing backups found in bucket"
-              fi
-              
-              # Cleanup temporary files
-              rm -f /tmp/backup_list.json
-              
-              echo "Backup upload and retention cleanup completed successfully"
-            volumeMounts:
-            - name: backup-storage
-              mountPath: /mnt/backup
-          volumes:
-          - name: backup-storage
-            emptyDir: {}
+                  
+                  # Test connection with retry
+                  retry_with_backoff "pg_isready -h '$POSTGRES_HOST' -U '$POSTGRES_USER' -d '$POSTGRES_DB'"
+                  
+                  # Create backup of specific Paperless database with retry
+                  retry_with_backoff "pg_dump -h '$POSTGRES_HOST' -U '$POSTGRES_USER' -d '$POSTGRES_DB' --verbose --no-owner --no-privileges | gzip > /mnt/backup/$BACKUP_FILE"
+                  
+                  # Validate backup file
+                  if [[ ! -f "/mnt/backup/$BACKUP_FILE" ]]; then
+                      log_error "Backup file not created: /mnt/backup/$BACKUP_FILE"
+                      exit 1
+                  fi
+                  
+                  if [[ ! -s "/mnt/backup/$BACKUP_FILE" ]]; then
+                      log_error "Backup file is empty: /mnt/backup/$BACKUP_FILE"
+                      exit 1
+                  fi
+                  
+                  # Test compressed file integrity
+                  if ! gzip -t "/mnt/backup/$BACKUP_FILE"; then
+                      log_error "Backup file is corrupted: /mnt/backup/$BACKUP_FILE"
+                      exit 1
+                  fi
+                  
+                  # Log success with file size
+                  BACKUP_SIZE=$(du -h "/mnt/backup/$BACKUP_FILE" | cut -f1)
+                  log_info "✅ Backup completed successfully: $BACKUP_FILE ($BACKUP_SIZE)"
+                  
+                  # Signal the next container that the dump is completed
+                  touch /mnt/backup/.done                  
+              volumeMounts:
+                - name: backup-storage
+                  mountPath: /mnt/backup
+            - name: b2-uploader
+              image: backblazeit/b2:latest
+              resources:
+                requests:
+                  memory: "64Mi"
+                  cpu: "50m"
+                limits:
+                  memory: "128Mi"
+                  cpu: "100m"
+              env:
+                - name: B2_APPLICATION_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: backblaze-cloud-homelab-creds-1password
+                      key: keyID
+                - name: B2_APPLICATION_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: backblaze-cloud-homelab-creds-1password
+                      key: applicationKey
+                - name: B2_BUCKET_NAME
+                  value: "cloud-homelab-backups"
+                - name: RETENTION_DAYS
+                  value: "30"
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  # Strict error handling
+                  set -euo pipefail
+                  
+                  # Retry configuration
+                  MAX_RETRIES=5
+                  RETRY_DELAYS=(10 20 40 80 160)
+                  
+                  # Logging functions
+                  log_info() {
+                      echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] INFO: $*" >&2
+                  }
+                  
+                  log_error() {
+                      echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] ERROR: $*" >&2
+                  }
+                  
+                  # Error trap handler
+                  error_trap() {
+                      local exit_code=$?
+                      local line_number=$1
+                      log_error "B2 upload failed at line $line_number with exit code $exit_code"
+                      log_error "Command: ${BASH_COMMAND}"
+                      exit $exit_code
+                  }
+                  
+                  trap 'error_trap $LINENO' ERR
+                  
+                  # Retry function with exponential backoff
+                  retry_with_backoff() {
+                      local cmd="$1"
+                      local attempt=1
+                      
+                      while [[ $attempt -le $MAX_RETRIES ]]; do
+                          log_info "Attempt $attempt/$MAX_RETRIES: $cmd"
+                          
+                          if eval "$cmd"; then
+                              log_info "Command succeeded on attempt $attempt"
+                              return 0
+                          else
+                              local exit_code=$?
+                              log_error "Command failed on attempt $attempt with exit code $exit_code"
+                              
+                              if [[ $attempt -eq $MAX_RETRIES ]]; then
+                                  log_error "All $MAX_RETRIES attempts failed"
+                                  return $exit_code
+                              fi
+                              
+                              local delay=${RETRY_DELAYS[$((attempt-1))]}
+                              log_info "Waiting $delay seconds before next attempt..."
+                              sleep "$delay"
+                              ((attempt++))
+                          fi
+                      done
+                  }
+                  
+                  log_info "🔄 Starting B2 upload process for Paperless..."
+                  
+                  # Validate environment variables
+                  if [[ -z "${B2_APPLICATION_KEY_ID:-}" || -z "${B2_APPLICATION_KEY:-}" || -z "${B2_BUCKET_NAME:-}" ]]; then
+                      log_error "Missing required B2 environment variables"
+                      exit 1
+                  fi
+                  
+                  # Wait for backup completion with timeout (max 30 minutes)
+                  timeout=1800  # 30 minutes
+                  elapsed=0
+                  while [[ ! -f /mnt/backup/.done ]]; do
+                      if [[ $elapsed -ge $timeout ]]; then
+                          log_error "Timeout waiting for backup completion"
+                          exit 1
+                      fi
+                      log_info "Waiting for backup completion... (${elapsed}s elapsed)"
+                      sleep 5
+                      ((elapsed+=5))
+                  done
+                  
+                  # Find the backup file
+                  BACKUP_FILE=$(ls /mnt/backup/pg_backup_*.sql.gz | head -1 2>/dev/null || true)
+                  if [[ -z "$BACKUP_FILE" ]]; then
+                      log_error "No backup file found matching pattern: pg_backup_*.sql.gz"
+                      exit 1
+                  fi
+                  
+                  # Validate backup file exists and has content
+                  if [[ ! -f "$BACKUP_FILE" ]]; then
+                      log_error "Backup file not found: $BACKUP_FILE"
+                      exit 1
+                  fi
+                  
+                  if [[ ! -s "$BACKUP_FILE" ]]; then
+                      log_error "Backup file is empty: $BACKUP_FILE"
+                      exit 1
+                  fi
+                  
+                  # Upload to B2 with retry
+                  UPLOAD_PATH="paperless/$(basename "$BACKUP_FILE")"
+                  log_info "Uploading to B2: $UPLOAD_PATH"
+                  retry_with_backoff "b2v4 file upload '$B2_BUCKET_NAME' '$BACKUP_FILE' '$UPLOAD_PATH'"
+                  
+                  log_info "✅ B2 upload completed successfully: $UPLOAD_PATH"
+                  
+                  # Install jq for JSON processing (Alpine Linux) - for retention cleanup
+                  if ! command -v jq >/dev/null 2>&1; then
+                      log_info "Installing jq for retention cleanup..."
+                      apk update && apk add --no-cache jq
+                  fi
+                  
+                  # Cleanup old backups using retention policy
+                  log_info "🧹 Starting backup retention cleanup (${RETENTION_DAYS} days)..."
+                  CUTOFF_DATE=$(date -d "$RETENTION_DAYS days ago" +%s)
+                  
+                  # List all paperless backup files in the bucket
+                  if ! b2v4 ls "$B2_BUCKET_NAME" paperless/ --recursive --json > /tmp/backup_list.json; then
+                      log_error "Failed to list B2 files, skipping cleanup"
+                      exit 0
+                  fi
+                  
+                  # Process backup files for cleanup using jq
+                  if [[ -s /tmp/backup_list.json ]]; then
+                      deleted_count=0
+                      kept_count=0
+                      
+                      # Use jq to extract file information and process each backup
+                      jq -r '.[] | select(.fileName | test("^paperless/.*\\.sql\\.gz$")) | "\(.fileName) \(.fileId) \(.uploadTimestamp)"' /tmp/backup_list.json | \
+                      while read -r file_name file_id upload_timestamp; do
+                          # Convert milliseconds to seconds
+                          file_timestamp=$((upload_timestamp / 1000))
+                          
+                          # Check if file is older than retention period
+                          if [[ "$file_timestamp" -lt "$CUTOFF_DATE" ]]; then
+                              file_age_days=$(( (CUTOFF_DATE - file_timestamp) / 86400 ))
+                              log_info "Deleting old backup: $file_name (age: ${file_age_days} days)"
+                              
+                              if retry_with_backoff "b2v4 delete-file-version '$file_name' '$file_id'"; then
+                                  ((deleted_count++))
+                              else
+                                  log_error "Failed to delete $file_name"
+                              fi
+                          else
+                              ((kept_count++))
+                          fi
+                      done
+                      
+                      log_info "🧹 Retention cleanup completed: $deleted_count files deleted, $kept_count files kept"
+                  else
+                      log_info "No existing backups found in bucket"
+                  fi
+                  
+                  # Cleanup temporary files
+                  rm -f /tmp/backup_list.json
+                  
+                  log_info "✅ Paperless backup and retention process completed successfully"                 
+              volumeMounts:
+                - name: backup-storage
+                  mountPath: /mnt/backup
           restartPolicy: OnFailure
+          volumes:
+            - name: backup-storage
+              emptyDir: {}

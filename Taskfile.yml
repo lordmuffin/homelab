@@ -357,7 +357,9 @@ tasks:
       COMPONENT: '{{.CLI_ARGS | default "all"}}'
     cmds:
       - echo "⚡ Executing maintenance workflow for: {{.COMPONENT}}"
-      - task: maintenance:execute:full -- {{.COMPONENT}}
+      - task: maintenance:execute:full
+        vars:
+          COMPONENT: "{{.COMPONENT}}"
       - echo "✅ Maintenance execution completed."
 
   workflow:validate:

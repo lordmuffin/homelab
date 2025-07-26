@@ -51,7 +51,9 @@
       "Bash(mkdir:*)",
       "Bash(ONENOTE_PAGE_NAME_FILTER=\"\" python migrate.py --import-files test_recipes --skip-tandoor-auth --dry-run)",
       "Bash(touch:*)",
-      "Bash(kubectl scale:*)"
+      "Bash(kubectl scale:*)",
+      "Bash(task validate)",
+      "Bash(yamllint:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
