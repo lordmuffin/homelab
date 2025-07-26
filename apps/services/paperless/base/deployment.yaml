@@ -24,12 +24,12 @@ spec:
           valueFrom:
             secretKeyRef:
               name: backblaze-cloud-homelab-creds-1password
-              key: application_key_id
+              key: keyID
         - name: B2_APPLICATION_KEY
           valueFrom:
             secretKeyRef:
               name: backblaze-cloud-homelab-creds-1password
-              key: application_key
+              key: applicationKey
         - name: B2_BUCKET_NAME
           value: cloud-homelab-backups
         - name: POSTGRES_HOST

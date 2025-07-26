@@ -22,6 +22,7 @@ includes:
   commit: ./tasks/commit.yaml
   milvus: ./tasks/milvus.yaml
   utilities: ./tasks/utilities.yaml
+  maintenance: ./tasks/maintenance.yaml
 
 vars:
   PATH_ERROR: is not installed or correctly configured in PATH.
@@ -77,6 +78,15 @@ tasks:
           find . -maxdepth 20 -name ${obj}.yaml -exec kubeconform -summary -exit-on-error -ignore-missing-schemas -kubernetes-version "{{.K8S_VERSION}}" -schema-location default {} \;
         done
     silent: true
+
+  validate:comprehensive:
+    desc: Comprehensive validation including kustomize builds and ArgoCD apps
+    deps: [validate]
+    cmds:
+      - task: maintenance:validate:kustomize
+      - task: maintenance:validate:argocd
+      - task: maintenance:validate:helm
+      - echo "✅ Comprehensive validation completed"
 
   calc:
     preconditions:
@@ -165,6 +175,30 @@ tasks:
       - helm repo update
     ignore_error: true
 
+  help:
+    desc: Show general help and available commands
+    cmds:
+      - echo "🏠 Homelab Task Runner - Enhanced Automation"
+      - echo ""
+      - echo "🚀 Quick Start:"
+      - echo "  task help:automation            - Automation workflows overview"
+      - echo "  task help:maintenance           - Detailed maintenance help"
+      - echo "  task status                     - Current cluster status"
+      - echo "  task workflow:prepare           - Prepare for maintenance"
+      - echo ""
+      - echo "🗚 Core Operations:"
+      - echo "  task validate                   - Validate Kubernetes manifests"
+      - echo "  task lint                       - YAML syntax checking"
+      - echo "  task inventory                  - Infrastructure inventory"
+      - echo ""
+      - echo "🔄 CI/CD Integration:"
+      - echo "  task ci:validate                - GitHub Actions validation"
+      - echo "  task ci:security                - GitHub Actions security scan"
+      - echo "  task ci:status                  - Workflow status and metrics"
+      - echo ""
+      - echo "For complete command list: task --list"
+      - echo "For automation help: task help:automation"
+
   dns:
     desc: Creates the DNS entry required for the local domain to work.
     preconditions:
@@ -186,7 +220,204 @@ tasks:
       - task: cli:reset
     ignore_error: true
 
+  inventory:
+    desc: Generate comprehensive infrastructure inventory
+    cmds:
+      - task: maintenance:inventory
+
+  health-check:
+    desc: Run comprehensive cluster health check
+    cmds:
+      - task: maintenance:health:check
+
+  upgrade:cert-manager:
+    desc: Upgrade cert-manager with safety checks
+    cmds:
+      - task: maintenance:upgrade:cert-manager
+
+  upgrade:argocd:
+    desc: Upgrade ArgoCD with safety checks
+    cmds:
+      - task: maintenance:upgrade:argocd
+
+  upgrade:monitoring:
+    desc: Upgrade monitoring stack with safety checks
+    cmds:
+      - task: maintenance:upgrade:monitoring
+
+  backup:create:
+    desc: Create cluster backup
+    cmds:
+      - task: maintenance:backup:create
+
+  backup:restore:
+    desc: Restore from cluster backup
+    cmds:
+      - task: maintenance:backup:restore
+
+  security:scan:
+    desc: Run security vulnerability scan
+    cmds:
+      - task: maintenance:security:scan
+
+  # GitHub Actions Integration
+  ci:validate:
+    desc: Run GitHub Actions validation workflow
+    preconditions:
+      - sh: "which gh"
+        msg: "GitHub CLI is required for CI integration"
+    cmds:
+      - echo "🔄 Triggering GitHub Actions validation workflow..."
+      - gh workflow run validate.yml --ref {{.GIT_BRANCH | default "main"}}
+      - echo "✅ Validation workflow triggered"
+
+  ci:security:
+    desc: Run GitHub Actions security scan workflow
+    preconditions:
+      - sh: "which gh"
+        msg: "GitHub CLI is required for CI integration"
+    cmds:
+      - echo "🔒 Triggering GitHub Actions security scan workflow..."
+      - gh workflow run security-scan.yml --ref {{.GIT_BRANCH | default "main"}}
+      - echo "✅ Security scan workflow triggered"
+
+  ci:status:
+    desc: Check GitHub Actions workflow status
+    preconditions:
+      - sh: "which gh"
+        msg: "GitHub CLI is required for CI status check"
+    cmds:
+      - echo "📊 Checking GitHub Actions workflow status..."
+      - gh run list --limit 10
+      - echo ""
+      - echo "📈 Workflow Success Rate:"
+      - |
+        total=$(gh run list --limit 20 --json conclusion | jq length)
+        success=$(gh run list --limit 20 --json conclusion | jq '[.[] | select(.conclusion == "success")] | length')
+        if [ $total -gt 0 ]; then
+          percentage=$(( (success * 100) / total ))
+          echo "Success rate: $success/$total ($percentage%)"
+        fi
+
+  # Enhanced automation commands
+  maintenance:prepare:
+    desc: Prepare for maintenance window with comprehensive checks
+    cmds:
+      - task: maintenance:prepare:full
+
+  maintenance:execute:
+    desc: Execute planned maintenance with validation
+    cmds:
+      - task: maintenance:execute:full
+
+  maintenance:validate:
+    desc: Post-maintenance validation and reporting
+    cmds:
+      - task: maintenance:validate:full
+
+  # Automated remediation commands
+  remediate:certificates:
+    desc: Automated certificate issue remediation
+    cmds:
+      - task: maintenance:remediate:certificates
+
+  remediate:pods:
+    desc: Automated pod issue remediation
+    cmds:
+      - task: maintenance:remediate:pods
+
+  # Monitoring and status commands
+  health:enhanced:
+    desc: Enhanced health check with GitHub Actions integration
+    cmds:
+      - task: maintenance:health:enhanced
+
+  monitoring:setup:
+    desc: Setup monitoring and alerting for maintenance tasks
+    cmds:
+      - task: maintenance:monitoring:setup
+
+  # Quick command shortcuts
+  status:
+    desc: Quick cluster and CI/CD status overview
+    cmds:
+      - task: maintenance:status:overview
+
+  # Automation workflow shortcuts
+  workflow:prepare:
+    desc: Full maintenance preparation workflow
+    cmds:
+      - echo "🚀 Starting comprehensive maintenance preparation..."
+      - task: maintenance:prepare:full
+      - echo "📋 Preparation completed. Ready for maintenance execution."
+
+  workflow:execute:
+    desc: Execute maintenance with validation checkpoints
+    vars:
+      COMPONENT: '{{.CLI_ARGS | default "all"}}'
+    cmds:
+      - echo "⚡ Executing maintenance workflow for: {{.COMPONENT}}"
+      - task: maintenance:execute:full -- {{.COMPONENT}}
+      - echo "✅ Maintenance execution completed."
+
+  workflow:validate:
+    desc: Comprehensive post-maintenance validation
+    cmds:
+      - echo "🔍 Running post-maintenance validation workflow..."
+      - task: maintenance:validate:full
+      - echo "📊 Validation workflow completed."
+
+  # GitHub Actions wait command
+  ci:wait:
+    desc: Wait for running GitHub Actions workflows to complete
+    preconditions:
+      - sh: "which gh"
+        msg: "GitHub CLI is required"
+    cmds:
+      - task: maintenance:ci:wait
+
   run:
     cmds:
       - task: validate
       - task: commit
+
+  # Enhanced help and documentation
+  help:maintenance:
+    desc: Show comprehensive maintenance automation help
+    cmds:
+      - task: maintenance:help
+
+  help:automation:
+    desc: Show automation workflow help
+    cmds:
+      - echo "🚀 Homelab Automation Workflows - Enhanced"
+      - echo ""
+      - echo "📅 Maintenance Workflows:"
+      - echo "  task workflow:prepare           - Complete pre-maintenance preparation"
+      - echo "  task workflow:execute -- <comp> - Execute maintenance with validation"
+      - echo "  task workflow:validate          - Post-maintenance validation"
+      - echo ""
+      - echo "🔄 GitHub Actions Integration:"
+      - echo "  task ci:validate                - Trigger validation workflow"
+      - echo "  task ci:security                - Trigger security scan workflow"
+      - echo "  task ci:status                  - Check workflow status with metrics"
+      - echo "  task ci:wait                    - Wait for workflows to complete"
+      - echo ""
+      - echo "🔧 Automated Remediation:"
+      - echo "  task remediate:certificates     - Fix certificate issues"
+      - echo "  task remediate:pods             - Fix pod restart issues"
+      - echo ""
+      - echo "📊 Enhanced Monitoring:"
+      - echo "  task health:enhanced            - Health check with CI/CD integration"
+      - echo "  task monitoring:setup           - Setup maintenance monitoring"
+      - echo "  task status                     - Comprehensive status overview"
+      - echo ""
+      - echo "🗚 Legacy Commands (still available):"
+      - echo "  task inventory                  - Generate infrastructure inventory"
+      - echo "  task health-check               - Run comprehensive health check"
+      - echo "  task upgrade:cert-manager       - Upgrade cert-manager"
+      - echo "  task upgrade:argocd             - Upgrade ArgoCD"
+      - echo "  task upgrade:monitoring         - Upgrade monitoring stack"
+      - echo ""
+      - echo "📁 For detailed maintenance help: task help:maintenance"
+      - echo "📆 For complete task list: task --list"

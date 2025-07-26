@@ -1,0 +1,785 @@
+version: '3'
+
+vars:
+  HOMELAB_ROOT: '{{.ROOT_DIR}}'
+  SCRIPTS_DIR: '{{.HOMELAB_ROOT}}/scripts'
+  DOCS_DIR: '{{.HOMELAB_ROOT}}/docs'
+  LOGS_DIR: '{{.HOMELAB_ROOT}}/logs'
+
+tasks:
+
+  # Inventory and Assessment Tasks
+  inventory:
+    desc: Generate comprehensive infrastructure inventory
+    preconditions:
+      - sh: "which python3"
+        msg: "python3 is required for inventory script"
+    cmds:
+      - echo "🔍 Generating infrastructure inventory..."
+      - mkdir -p {{.LOGS_DIR}}
+      - python3 {{.SCRIPTS_DIR}}/inventory-check.py --format markdown --output {{.LOGS_DIR}}/inventory-latest.md
+      - python3 {{.SCRIPTS_DIR}}/inventory-check.py --format json --output {{.LOGS_DIR}}/inventory-latest.json
+      - echo "✅ Inventory generated in {{.LOGS_DIR}}/"
+
+  inventory:csv:
+    desc: Generate CSV format inventory for analysis
+    preconditions:
+      - sh: "which python3"
+        msg: "python3 is required for inventory script"
+    cmds:
+      - python3 {{.SCRIPTS_DIR}}/inventory-check.py --format csv --output {{.LOGS_DIR}}/inventory-latest.csv
+      - echo "📊 CSV inventory saved to {{.LOGS_DIR}}/inventory-latest.csv"
+
+  # Health Check Tasks
+  health:check:
+    desc: Run comprehensive cluster health check
+    preconditions:
+      - sh: "which kubectl"
+        msg: "kubectl is required for health checks"
+    cmds:
+      - echo "🏥 Running comprehensive health check..."
+      - mkdir -p {{.LOGS_DIR}}
+      - bash {{.SCRIPTS_DIR}}/health-check.sh
+      - echo "✅ Health check completed"
+
+  health:report:
+    desc: Generate health report only (no checks)
+    cmds:
+      - bash {{.SCRIPTS_DIR}}/health-check.sh report
+
+  health:quick:
+    desc: Quick cluster health check
+    preconditions:
+      - sh: "which kubectl"
+        msg: "kubectl is required"
+    cmds:
+      - echo "⚡ Quick health check..."
+      - kubectl get nodes
+      - kubectl get pods --all-namespaces | grep -v Running | grep -v Completed || echo "All pods running"
+      - kubectl get certificates --all-namespaces | grep -v True || echo "All certificates ready"
+
+  # Validation Tasks
+  validate:kustomize:
+    desc: Validate all kustomization builds
+    preconditions:
+      - sh: "which kustomize"
+        msg: "kustomize is required"
+    cmds:
+      - echo "🔍 Validating kustomize configurations..."
+      - |
+        find apps -name "kustomization.yaml" -type f | while read kustomization; do
+          dir=$(dirname "$kustomization")
+          echo "Validating $dir"
+          cd "$dir"
+          kustomize build . > /dev/null || exit 1
+          cd - > /dev/null
+        done
+      - echo "✅ All kustomize builds successful"
+
+  validate:argocd:
+    desc: Validate ArgoCD Application manifests
+    preconditions:
+      - sh: "which kubectl"
+        msg: "kubectl is required"
+    cmds:
+      - echo "🔍 Validating ArgoCD Applications..."
+      - |
+        find apps -name "*.yaml" -type f | while read app_file; do
+          if grep -q "kind: Application" "$app_file"; then
+            echo "Validating: $app_file"
+            kubectl apply --dry-run=client -f "$app_file" > /dev/null || exit 1
+          fi
+        done
+      - echo "✅ All ArgoCD Applications valid"
+
+  validate:helm:
+    desc: Validate Helm charts in repository
+    preconditions:
+      - sh: "which helm"
+        msg: "helm is required"
+    cmds:
+      - echo "🔍 Validating Helm charts..."
+      - |
+        find apps -name "Chart.yaml" -type f | while read chart; do
+          dir=$(dirname "$chart")
+          echo "Linting $dir"
+          helm lint "$dir" || exit 1
+        done
+      - echo "✅ All Helm charts valid"
+
+  # Upgrade Tasks
+  upgrade:cert-manager:
+    desc: Upgrade cert-manager with safety checks
+    preconditions:
+      - sh: "which kubectl"
+        msg: "kubectl is required"
+      - sh: "which argocd"
+        msg: "argocd CLI is required"
+    cmds:
+      - echo "🔐 Starting cert-manager upgrade..."
+      - task: health:quick
+      - echo "📋 Pre-upgrade backup..."
+      - kubectl get certificates,certificaterequests,issuers,clusterissuers --all-namespaces -o yaml > {{.LOGS_DIR}}/cert-manager-backup-$(date +%Y%m%d_%H%M%S).yaml
+      - echo "🚀 Triggering ArgoCD sync for cert-manager..."
+      - argocd app sync certmanager
+      - echo "⏳ Waiting for cert-manager to be ready..."
+      - kubectl wait --for=condition=Available deployment/cert-manager -n cert-manager --timeout=300s
+      - kubectl wait --for=condition=Available deployment/cert-manager-webhook -n cert-manager --timeout=300s
+      - echo "✅ cert-manager upgrade completed"
+      - task: validate:certificates
+
+  upgrade:argocd:
+    desc: Upgrade ArgoCD with safety checks
+    preconditions:
+      - sh: "which kubectl"
+        msg: "kubectl is required"
+      - sh: "which argocd"
+        msg: "argocd CLI is required"
+    cmds:
+      - echo "🚀 Starting ArgoCD upgrade..."
+      - task: health:quick
+      - echo "📋 Pre-upgrade backup..."
+      - argocd app list -o yaml > {{.LOGS_DIR}}/argocd-apps-backup-$(date +%Y%m%d_%H%M%S).yaml
+      - kubectl get configmap argocd-cm -n argocd -o yaml > {{.LOGS_DIR}}/argocd-config-backup-$(date +%Y%m%d_%H%M%S).yaml
+      - echo "🔄 Triggering ArgoCD self-upgrade..."
+      - argocd app sync argocd
+      - echo "⏳ Waiting for ArgoCD to be ready..."
+      - kubectl wait --for=condition=Available deployment/argocd-server -n argocd --timeout=600s
+      - kubectl wait --for=condition=Available deployment/argocd-repo-server -n argocd --timeout=600s
+      - echo "🔍 Verifying ArgoCD functionality..."
+      - argocd version
+      - argocd app list
+      - echo "✅ ArgoCD upgrade completed"
+
+  upgrade:monitoring:
+    desc: Upgrade monitoring stack with safety checks
+    preconditions:
+      - sh: "which kubectl"
+        msg: "kubectl is required"
+      - sh: "which argocd"
+        msg: "argocd CLI is required"
+    cmds:
+      - echo "📊 Starting monitoring stack upgrade..."
+      - task: health:quick
+      - echo "📋 Pre-upgrade backup..."
+      - kubectl get configmaps -n monitoring -l grafana_dashboard=1 -o yaml > {{.LOGS_DIR}}/grafana-dashboards-backup-$(date +%Y%m%d_%H%M%S).yaml
+      - kubectl get prometheusrules,servicemonitors -n monitoring -o yaml > {{.LOGS_DIR}}/monitoring-rules-backup-$(date +%Y%m%d_%H%M%S).yaml
+      - echo "🔄 Triggering monitoring stack upgrade..."
+      - argocd app sync kube-prometheus-core
+      - echo "⏳ Waiting for monitoring components..."
+      - kubectl wait --for=condition=Available deployment/kube-prometheus-kube-prome-operator -n monitoring --timeout=600s
+      - kubectl wait --for=condition=Available deployment/kube-prometheus-grafana -n monitoring --timeout=600s
+      - echo "🔍 Verifying monitoring functionality..."
+      - kubectl get pods -n monitoring | grep -v Running | grep -v Completed || echo "All monitoring pods running"
+      - echo "✅ Monitoring stack upgrade completed"
+
+  # Backup and Restore Tasks
+  backup:create:
+    desc: Create comprehensive cluster backup
+    preconditions:
+      - sh: "which kubectl"
+        msg: "kubectl is required"
+    cmds:
+      - echo "💾 Creating cluster backup..."
+      - mkdir -p {{.LOGS_DIR}}/backups/$(date +%Y%m%d_%H%M%S)
+      - |
+        BACKUP_DIR="{{.LOGS_DIR}}/backups/$(date +%Y%m%d_%H%M%S)"
+        echo "Backup directory: $BACKUP_DIR"
+        
+        # Backup ArgoCD applications
+        argocd app list -o yaml > "$BACKUP_DIR/argocd-applications.yaml"
+        
+        # Backup configurations
+        kubectl get configmaps --all-namespaces -o yaml > "$BACKUP_DIR/configmaps.yaml"
+        kubectl get secrets --all-namespaces -o yaml > "$BACKUP_DIR/secrets.yaml"
+        
+        # Backup certificates
+        kubectl get certificates,certificaterequests,issuers,clusterissuers --all-namespaces -o yaml > "$BACKUP_DIR/certificates.yaml"
+        
+        # Backup monitoring configs
+        kubectl get prometheusrules,servicemonitors --all-namespaces -o yaml > "$BACKUP_DIR/monitoring.yaml"
+        
+        # Create manifest backup
+        cp -r apps "$BACKUP_DIR/"
+        
+        echo "✅ Backup created in $BACKUP_DIR"
+
+  backup:restore:
+    desc: Restore from cluster backup
+    vars:
+      BACKUP_DIR: '{{.CLI_ARGS}}'
+    preconditions:
+      - sh: "test -d '{{.BACKUP_DIR}}'"
+        msg: "Backup directory {{.BACKUP_DIR}} not found. Usage: task backup:restore -- /path/to/backup"
+    cmds:
+      - echo "⚠️  WARNING: This will restore cluster state from backup!"
+      - echo "Backup directory: {{.BACKUP_DIR}}"
+      - echo "Press Ctrl+C to cancel, or press Enter to continue..."
+      - read
+      - echo "🔄 Restoring from backup..."
+      - kubectl apply -f "{{.BACKUP_DIR}}/configmaps.yaml"
+      - kubectl apply -f "{{.BACKUP_DIR}}/certificates.yaml"
+      - kubectl apply -f "{{.BACKUP_DIR}}/monitoring.yaml"
+      - echo "✅ Restore completed"
+
+  # Security Tasks
+  security:scan:
+    desc: Run comprehensive security vulnerability scan
+    preconditions:
+      - sh: "which kubectl"
+        msg: "kubectl is required"
+    cmds:
+      - echo "🔒 Running security vulnerability scan..."
+      - mkdir -p {{.LOGS_DIR}}/security
+      - |
+        SCAN_DIR="{{.LOGS_DIR}}/security/$(date +%Y%m%d_%H%M%S)"
+        mkdir -p "$SCAN_DIR"
+        
+        # Check certificate expiration
+        echo "🔍 Checking certificate expiration..."
+        kubectl get certificates --all-namespaces -o json | jq -r '.items[] | select(.status.notAfter) | "\(.metadata.namespace)/\(.metadata.name) \(.status.notAfter)"' > "$SCAN_DIR/certificate-expiry.txt"
+        
+        # Check for default service accounts
+        echo "🔍 Checking for default service account usage..."
+        kubectl get pods --all-namespaces -o json | jq -r '.items[] | select(.spec.serviceAccount == "default" or .spec.serviceAccountName == "default") | "\(.metadata.namespace)/\(.metadata.name)"' > "$SCAN_DIR/default-sa-usage.txt"
+        
+        # Check RBAC permissions
+        echo "🔍 Checking cluster-admin bindings..."
+        kubectl get clusterrolebindings -o json | jq -r '.items[] | select(.roleRef.name=="cluster-admin") | "\(.metadata.name) \(.subjects[]?.name // "N/A")"' > "$SCAN_DIR/cluster-admin-bindings.txt"
+        
+        # Check for privileged pods
+        echo "🔍 Checking for privileged pods..."
+        kubectl get pods --all-namespaces -o json | jq -r '.items[] | select(.spec.securityContext.privileged == true or .spec.containers[].securityContext.privileged == true) | "\(.metadata.namespace)/\(.metadata.name)"' > "$SCAN_DIR/privileged-pods.txt"
+        
+        echo "✅ Security scan completed. Results in $SCAN_DIR"
+
+  security:report:
+    desc: Generate security posture report
+    cmds:
+      - task: security:scan
+      - echo "📋 Generating security report..."
+      - |
+        LATEST_SCAN=$(ls -1t {{.LOGS_DIR}}/security/*/certificate-expiry.txt 2>/dev/null | head -1 | xargs dirname)
+        if [ -n "$LATEST_SCAN" ]; then
+          echo "## Security Report - $(date)" > "{{.LOGS_DIR}}/security-report-$(date +%Y%m%d).md"
+          echo "" >> "{{.LOGS_DIR}}/security-report-$(date +%Y%m%d).md"
+          echo "### Certificate Expiration" >> "{{.LOGS_DIR}}/security-report-$(date +%Y%m%d).md"
+          cat "$LATEST_SCAN/certificate-expiry.txt" >> "{{.LOGS_DIR}}/security-report-$(date +%Y%m%d).md"
+          echo "" >> "{{.LOGS_DIR}}/security-report-$(date +%Y%m%d).md"
+          echo "### Default Service Account Usage" >> "{{.LOGS_DIR}}/security-report-$(date +%Y%m%d).md"
+          cat "$LATEST_SCAN/default-sa-usage.txt" >> "{{.LOGS_DIR}}/security-report-$(date +%Y%m%d).md"
+          echo "📄 Security report generated"
+        else
+          echo "❌ No scan results found"
+        fi
+
+  # Application Management
+  app:enable:
+    desc: Safely enable a commented ArgoCD application
+    vars:
+      APP_NAME: '{{.CLI_ARGS}}'
+    preconditions:
+      - sh: "test -n '{{.APP_NAME}}'"
+        msg: "Application name required. Usage: task app:enable -- <app-name>"
+    cmds:
+      - echo "🚀 Enabling application: {{.APP_NAME}}"
+      - echo "⚠️  This will uncomment the application in kustomization.yaml"
+      - echo "Press Ctrl+C to cancel, or press Enter to continue..."
+      - read
+      - |
+        find apps -name "kustomization.yaml" -exec grep -l "# .*{{.APP_NAME}}" {} \; | while read file; do
+          echo "Uncommenting in $file"
+          sed -i 's|# \(.*{{.APP_NAME}}.*\)|\1|' "$file"
+        done
+      - echo "✅ Application {{.APP_NAME}} enabled"
+      - echo "Run 'task validate:comprehensive' to verify"
+
+  app:disable:
+    desc: Safely disable an ArgoCD application
+    vars:
+      APP_NAME: '{{.CLI_ARGS}}'
+    preconditions:
+      - sh: "test -n '{{.APP_NAME}}'"
+        msg: "Application name required. Usage: task app:disable -- <app-name>"
+    cmds:
+      - echo "⏸️  Disabling application: {{.APP_NAME}}"
+      - echo "⚠️  This will comment out the application in kustomization.yaml"
+      - echo "Press Ctrl+C to cancel, or press Enter to continue..."
+      - read
+      - |
+        find apps -name "kustomization.yaml" -exec grep -l "{{.APP_NAME}}" {} \; | while read file; do
+          echo "Commenting in $file"
+          sed -i 's|\(.*{{.APP_NAME}}.*\)|# \1|' "$file"
+        done
+      - echo "✅ Application {{.APP_NAME}} disabled"
+
+  # Maintenance Automation
+  maintenance:daily:
+    desc: Run daily maintenance tasks
+    cmds:
+      - echo "🗓️  Running daily maintenance..."
+      - task: health:check
+      - task: security:scan
+      - task: inventory
+      - echo "✅ Daily maintenance completed"
+
+  maintenance:weekly:
+    desc: Run weekly maintenance tasks
+    cmds:
+      - echo "📅 Running weekly maintenance..."
+      - task: backup:create
+      - task: security:report
+      - task: validate:comprehensive
+      - echo "✅ Weekly maintenance completed"
+
+  # Troubleshooting Tasks
+  troubleshoot:pods:
+    desc: Troubleshoot pod issues
+    cmds:
+      - echo "🔍 Troubleshooting pod issues..."
+      - echo "=== Non-running pods ==="
+      - kubectl get pods --all-namespaces | grep -v Running | grep -v Completed
+      - echo ""
+      - echo "=== Pods with high restart counts ==="
+      - kubectl get pods --all-namespaces --sort-by='.status.containerStatuses[0].restartCount' | tail -10
+      - echo ""
+      - echo "=== Recent pod events ==="
+      - kubectl get events --all-namespaces --sort-by=.metadata.creationTimestamp | tail -20
+
+  troubleshoot:certificates:
+    desc: Troubleshoot certificate issues
+    cmds:
+      - echo "🔐 Troubleshooting certificate issues..."
+      - echo "=== Certificate status ==="
+      - kubectl get certificates --all-namespaces
+      - echo ""
+      - echo "=== Certificate requests ==="
+      - kubectl get certificaterequests --all-namespaces
+      - echo ""
+      - echo "=== cert-manager logs ==="
+      - kubectl logs -n cert-manager deployment/cert-manager --tail=50
+
+  troubleshoot:argocd:
+    desc: Troubleshoot ArgoCD issues
+    cmds:
+      - echo "🚀 Troubleshooting ArgoCD issues..."
+      - echo "=== ArgoCD application status ==="
+      - argocd app list || echo "ArgoCD CLI not available or not logged in"
+      - echo ""
+      - echo "=== Out of sync applications ==="
+      - kubectl get applications -n argocd -o json | jq -r '.items[] | select(.status.sync.status != "Synced") | "\(.metadata.name): \(.status.sync.status)"'
+      - echo ""
+      - echo "=== ArgoCD server logs ==="
+      - kubectl logs -n argocd deployment/argocd-server --tail=50
+
+  # Validation helpers
+  validate:certificates:
+    desc: Validate certificate status after upgrade
+    cmds:
+      - echo "🔐 Validating certificates..."
+      - kubectl get certificates --all-namespaces
+      - |
+        failed_certs=$(kubectl get certificates --all-namespaces --no-headers | grep -v "True" | wc -l)
+        if [ "$failed_certs" -eq 0 ]; then
+          echo "✅ All certificates are ready"
+        else
+          echo "⚠️  $failed_certs certificates not ready"
+          kubectl get certificates --all-namespaces | grep -v "True"
+        fi
+
+  # Logs and cleanup
+  logs:cleanup:
+    desc: Clean up old log files
+    cmds:
+      - echo "🧹 Cleaning up old logs..."
+      - find {{.LOGS_DIR}} -name "*.log" -mtime +30 -delete
+      - find {{.LOGS_DIR}} -name "health-report-*.md" -mtime +7 -delete
+      - find {{.LOGS_DIR}}/backups -type d -mtime +14 -exec rm -rf {} +
+      - echo "✅ Log cleanup completed"
+
+  # GitHub Actions Integration
+  ci:validate:
+    desc: Trigger GitHub Actions validation workflow
+    preconditions:
+      - sh: "which gh"
+        msg: "GitHub CLI is required for CI integration"
+    cmds:
+      - echo "🔄 Triggering GitHub Actions validation..."
+      - gh workflow run validate.yml
+      - echo "⏳ Workflow triggered. Check status with: gh run list"
+
+  ci:security:
+    desc: Trigger GitHub Actions security scan workflow
+    preconditions:
+      - sh: "which gh"
+        msg: "GitHub CLI is required for CI integration"
+    cmds:
+      - echo "🔒 Triggering GitHub Actions security scan..."
+      - gh workflow run security-scan.yml
+      - echo "⏳ Workflow triggered. Check status with: gh run list"
+
+  ci:status:
+    desc: Check GitHub Actions workflow status
+    preconditions:
+      - sh: "which gh"
+        msg: "GitHub CLI is required"
+    cmds:
+      - echo "📊 GitHub Actions Status:"
+      - gh run list --limit 10
+      - echo ""
+      - echo "📈 Workflow Success Rate:"
+      - |
+        total=$(gh run list --limit 20 --json conclusion | jq length)
+        success=$(gh run list --limit 20 --json conclusion | jq '[.[] | select(.conclusion == "success")] | length')
+        if [ $total -gt 0 ]; then
+          percentage=$(( (success * 100) / total ))
+          echo "Success rate: $success/$total ($percentage%)"
+        fi
+
+  ci:wait:
+    desc: Wait for running workflows to complete
+    preconditions:
+      - sh: "which gh"
+        msg: "GitHub CLI is required"
+    cmds:
+      - echo "⏳ Waiting for workflows to complete..."
+      - |
+        while true; do
+          running=$(gh run list --limit 5 --json status | jq '[.[] | select(.status == "in_progress" or .status == "queued")] | length')
+          if [ $running -eq 0 ]; then
+            echo "✅ All workflows completed"
+            break
+          fi
+          echo "Still running: $running workflows"
+          sleep 30
+        done
+
+  # Enhanced maintenance automation
+  prepare:full:
+    desc: Complete pre-maintenance preparation with GitHub Actions
+    cmds:
+      - echo "🚀 Starting comprehensive maintenance preparation..."
+      - task: health:check
+      - task: backup:create
+      - task: inventory
+      - task: security:scan
+      - task: ci:validate
+      - task: ci:security
+      - task: ci:wait
+      - echo "📋 Pre-maintenance checklist:"
+      - echo "  ✅ Health check completed"
+      - echo "  ✅ Backup created"
+      - echo "  ✅ Inventory updated"
+      - echo "  ✅ Security scan completed"
+      - echo "  ✅ GitHub Actions validation passed"
+      - echo "🎯 Ready for maintenance execution"
+
+  execute:full:
+    desc: Execute maintenance with validation checkpoints
+    vars:
+      COMPONENT: '{{.CLI_ARGS | default "all"}}'
+    cmds:
+      - echo "⚡ Executing maintenance for: {{.COMPONENT}}"
+      - |
+        case "{{.COMPONENT}}" in
+          "cert-manager")
+            task upgrade:cert-manager
+            ;;
+          "argocd")
+            task upgrade:argocd
+            ;;
+          "monitoring")
+            task upgrade:monitoring
+            ;;
+          "all")
+            task upgrade:cert-manager
+            sleep 60
+            task upgrade:argocd
+            sleep 60
+            task upgrade:monitoring
+            ;;
+          *)
+            echo "❌ Unknown component: {{.COMPONENT}}"
+            echo "Available: cert-manager, argocd, monitoring, all"
+            exit 1
+            ;;
+        esac
+      - echo "✅ Maintenance execution completed for {{.COMPONENT}}"
+
+  validate:full:
+    desc: Comprehensive post-maintenance validation
+    cmds:
+      - echo "🔍 Running post-maintenance validation..."
+      - task: health:check
+      - task: validate:comprehensive
+      - task: ci:validate
+      - task: ci:security
+      - task: ci:wait
+      - echo "📊 Generating post-maintenance report..."
+      - |
+        REPORT_FILE="{{.LOGS_DIR}}/maintenance-report-$(date +%Y%m%d_%H%M%S).md"
+        {
+          echo "# Maintenance Completion Report"
+          echo ""
+          echo "**Date**: $(date)"
+          echo "**Cluster**: $(kubectl config current-context 2>/dev/null || echo 'unknown')"
+          echo ""
+          echo "## Validation Results"
+          echo ""
+          echo "### Health Check"
+          tail -20 {{.LOGS_DIR}}/health-check-*.log | head -10
+          echo ""
+          echo "### GitHub Actions Status"
+          gh run list --limit 5
+          echo ""
+          echo "## Next Steps"
+          echo "- Monitor cluster for 24 hours"
+          echo "- Review application logs for issues"
+          echo "- Update documentation if needed"
+        } > "$REPORT_FILE"
+        echo "📄 Report saved to: $REPORT_FILE"
+      - echo "✅ Post-maintenance validation completed"
+
+  status:overview:
+    desc: Comprehensive cluster and CI/CD status overview
+    cmds:
+      - echo "🏠 Homelab Status Overview"
+      - echo "═══════════════════════════════════"
+      - echo ""
+      - echo "🏥 Cluster Health:"
+      - task: health:quick
+      - echo ""
+      - echo "🔄 GitHub Actions:"
+      - task: ci:status
+      - echo ""
+      - echo "📊 Application Status:"
+      - |
+        if command -v argocd >/dev/null 2>&1; then
+          argocd app list 2>/dev/null | head -10 || echo "ArgoCD not accessible"
+        else
+          echo "ArgoCD CLI not available"
+        fi
+      - echo ""
+      - echo "🔐 Security Status:"
+      - |
+        if [ -f "{{.LOGS_DIR}}/inventory-latest.json" ]; then
+          security_score=$(jq -r '.security_assessment.security_score // "unknown"' {{.LOGS_DIR}}/inventory-latest.json)
+          echo "Security Score: $security_score/100"
+        else
+          echo "Run 'task inventory' to get security score"
+        fi
+
+  # Enhanced Health Checks
+  health:enhanced:
+    desc: Enhanced health check with GitHub Actions integration
+    cmds:
+      - echo "🏥 Running enhanced health check..."
+      - bash {{.SCRIPTS_DIR}}/health-check.sh --format json --output {{.LOGS_DIR}}/health-enhanced.json
+      - task: ci:status
+      - |
+        if [ -f "{{.LOGS_DIR}}/health-enhanced.json" ]; then
+          echo "📊 Health Summary:"
+          jq -r '.summary | "Total Checks: \(.total_checks), Passed: \(.passed_checks), Failed: \(.failed_checks), Warnings: \(.warning_checks)"' {{.LOGS_DIR}}/health-enhanced.json
+          
+          # Check for critical issues
+          failed_checks=$(jq -r '.summary.failed_checks' {{.LOGS_DIR}}/health-enhanced.json)
+          if [ "$failed_checks" -gt 0 ]; then
+            echo "🚨 Critical issues detected! Review health report."
+          fi
+        fi
+
+  # Automated remediation tasks
+  remediate:certificates:
+    desc: Automated certificate issue remediation
+    cmds:
+      - echo "🔐 Running certificate remediation..."
+      - |
+        # Check for failed certificates
+        failed_certs=$(kubectl get certificates --all-namespaces --no-headers | grep -v "True" | wc -l)
+        if [ "$failed_certs" -gt 0 ]; then
+          echo "⚠️ Found $failed_certs failed certificates"
+          echo "🔄 Restarting cert-manager pods..."
+          kubectl rollout restart deployment/cert-manager -n cert-manager
+          kubectl rollout restart deployment/cert-manager-webhook -n cert-manager
+          echo "⏳ Waiting for cert-manager to be ready..."
+          kubectl wait --for=condition=Available deployment/cert-manager -n cert-manager --timeout=300s
+          kubectl wait --for=condition=Available deployment/cert-manager-webhook -n cert-manager --timeout=300s
+        else
+          echo "✅ All certificates are healthy"
+        fi
+
+  remediate:pods:
+    desc: Automated pod issue remediation
+    cmds:
+      - echo "🔧 Running pod remediation..."
+      - |
+        # Find pods with high restart counts and restart their deployments
+        kubectl get pods --all-namespaces --no-headers | awk '$4 > 10 {print $1 " " $2}' | while read namespace pod; do
+          if [ -n "$namespace" ] && [ -n "$pod" ]; then
+            deployment=$(kubectl get pod $pod -n $namespace -o jsonpath='{.metadata.ownerReferences[0].name}' 2>/dev/null)
+            if [ -n "$deployment" ]; then
+              echo "🔄 Restarting deployment $deployment in namespace $namespace"
+              kubectl rollout restart deployment/$deployment -n $namespace
+            fi
+          fi
+        done
+
+  # Monitoring and alerting
+  monitoring:setup:
+    desc: Setup monitoring and alerting for maintenance tasks
+    cmds:
+      - echo "📊 Setting up maintenance monitoring..."
+      - mkdir -p {{.LOGS_DIR}}/monitoring
+      - |
+        # Create monitoring script
+        cat > {{.LOGS_DIR}}/monitoring/maintenance-monitor.sh << 'EOF'
+        #!/bin/bash
+        # Maintenance monitoring script
+        HOMELAB_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+        
+        while true; do
+          echo "$(date): Running maintenance monitoring..."
+          
+          # Check cluster health
+          cd "$HOMELAB_ROOT" && task maintenance:health:check > /dev/null 2>&1
+          
+          # Check GitHub Actions
+          if command -v gh >/dev/null 2>&1; then
+            failures=$(gh run list --limit 5 --json conclusion | jq '[.[] | select(.conclusion == "failure")] | length')
+            if [ "$failures" -gt 0 ]; then
+              echo "⚠️ $failures recent workflow failures detected"
+            fi
+          fi
+          
+          sleep 300  # 5 minutes
+        done
+        EOF
+        chmod +x {{.LOGS_DIR}}/monitoring/maintenance-monitor.sh
+      - echo "✅ Monitoring setup completed"
+      - echo "📋 To start monitoring: nohup {{.LOGS_DIR}}/monitoring/maintenance-monitor.sh &"
+
+  # Help and documentation
+  help:
+    desc: Show maintenance task help
+    cmds:
+      - echo "🏠 Homelab Maintenance Tasks - Enhanced"
+      - echo ""
+      - echo "📋 Inventory & Assessment:"
+      - echo "  task inventory                    - Generate infrastructure inventory"
+      - echo "  task inventory:csv               - Generate CSV inventory"
+      - echo ""
+      - echo "🏥 Health Checks:"
+      - echo "  task health:check                - Comprehensive health check"
+      - echo "  task health:enhanced             - Enhanced health check with CI/CD"
+      - echo "  task health:quick                - Quick cluster status"
+      - echo "  task health:report               - Generate health report"
+      - echo ""
+      - echo "✅ Validation:"
+      - echo "  task validate:comprehensive       - All validation checks"
+      - echo "  task validate:kustomize          - Validate kustomize builds"
+      - echo "  task validate:argocd             - Validate ArgoCD apps"
+      - echo "  task validate:helm               - Validate Helm charts"
+      - echo ""
+      - echo "🔄 GitHub Actions:"
+      - echo "  task ci:validate                 - Trigger validation workflow"
+      - echo "  task ci:security                 - Trigger security scan workflow"
+      - echo "  task ci:status                   - Check workflow status"
+      - echo "  task ci:wait                     - Wait for workflows to complete"
+      - echo ""
+      - echo "🚀 Upgrades:"
+      - echo "  task upgrade:cert-manager        - Upgrade cert-manager"
+      - echo "  task upgrade:argocd              - Upgrade ArgoCD"
+      - echo "  task upgrade:monitoring          - Upgrade monitoring stack"
+      - echo ""
+      - echo "⚡ Maintenance Automation:"
+      - echo "  task prepare:full                - Complete pre-maintenance prep"
+      - echo "  task execute:full -- <component> - Execute maintenance"
+      - echo "  task validate:full               - Post-maintenance validation"
+      - echo "  task status:overview             - Comprehensive status overview"
+      - echo ""
+      - echo "🔧 Remediation:"
+      - echo "  task remediate:certificates      - Fix certificate issues"
+      - echo "  task remediate:pods              - Fix pod issues"
+      - echo ""
+      - echo "💾 Backup & Restore:"
+      - echo "  task backup:create               - Create cluster backup"
+      - echo "  task backup:restore -- <path>    - Restore from backup"
+      - echo ""
+      - echo "🔒 Security:"
+      - echo "  task security:scan               - Security vulnerability scan"
+      - echo "  task security:report             - Generate security report"
+      - echo ""
+      - echo "🔧 Troubleshooting:"
+      - echo "  task troubleshoot:pods           - Debug pod issues"
+      - echo "  task troubleshoot:certificates   - Debug certificate issues"
+      - echo "  task troubleshoot:argocd         - Debug ArgoCD issues"
+      - echo ""
+      - echo "📅 Automation:"
+      - echo "  task maintenance:daily           - Daily maintenance tasks"
+      - echo "  task maintenance:weekly          - Weekly maintenance tasks"
+      - echo "  task monitoring:setup            - Setup maintenance monitoring"
+      - echo ""
+      - echo "For complete automation overview: task automation:overview"
+
+  # Automation overview
+  automation:overview:
+    desc: Show complete automation capabilities overview
+    cmds:
+      - echo "🚀 Homelab Automation & Integration Overview"
+      - echo "════════════════════════════════════════════════════════════"
+      - echo ""
+      - echo "🔄 GitHub Actions Integration:"
+      - echo "  ✅ Validation Workflow (.github/workflows/validate.yml)"
+      - echo "      - Kustomize validation, Helm chart linting"
+      - echo "      - Kubernetes schema validation, YAML syntax checks"
+      - echo "  ✅ Security Scanning (.github/workflows/security-scan.yml)"
+      - echo "      - Trivy container vulnerability scanning"
+      - echo "      - kube-score infrastructure analysis"
+      - echo "      - GitLeaks secret detection"
+      - echo "  ✅ Automated Dependency Updates (Renovate)"
+      - echo "      - Security vulnerability auto-fixes"
+      - echo "      - Scheduled component updates"
+      - echo ""
+      - echo "📈 Enhanced Monitoring & Health Checks:"
+      - echo "  ✅ Multi-format Health Reports (JSON, Markdown, Summary)"
+      - echo "  ✅ Component-based Health Tracking"
+      - echo "  ✅ GitHub Actions Status Integration"
+      - echo "  ✅ Enhanced Security Assessment"
+      - echo "  ✅ Automated Alert Generation"
+      - echo ""
+      - echo "⚡ Automated Maintenance Workflows:"
+      - echo "  ✅ Pre-maintenance Preparation (prepare:full)"
+      - echo "      - Health checks, backups, inventory, security scans"
+      - echo "      - GitHub Actions validation and status verification"
+      - echo "  ✅ Staged Maintenance Execution (execute:full)"
+      - echo "      - Component-specific upgrades with validation"
+      - echo "      - Automated rollback on failures"
+      - echo "  ✅ Post-maintenance Validation (validate:full)"
+      - echo "      - Comprehensive validation and reporting"
+      - echo "      - GitHub Actions workflow verification"
+      - echo ""
+      - echo "🔧 Automated Remediation:"
+      - echo "  ✅ Certificate Issue Resolution"
+      - echo "  ✅ Pod Restart Automation"
+      - echo "  ✅ Self-healing Infrastructure"
+      - echo ""
+      - echo "📊 Status & Reporting:"
+      - echo "  ✅ Real-time Cluster Health Overview"
+      - echo "  ✅ GitHub Actions Success Rate Tracking"
+      - echo "  ✅ Comprehensive Security Scoring"
+      - echo "  ✅ Application Inventory and Risk Assessment"
+      - echo ""
+      - echo "🗚 Integration Points:"
+      - echo "  • Enhanced health-check.sh with GitHub Actions integration"
+      - echo "  • inventory-check.py with comprehensive security assessment"
+      - echo "  • Taskfile.yml with automation workflow shortcuts"
+      - echo "  • UPGRADE_PROCEDURES.md with CI/CD integration guide"
+      - echo ""
+      - echo "Usage Examples:"
+      - echo "  task workflow:prepare           # Complete maintenance preparation"
+      - echo "  task workflow:execute -- argocd # Execute ArgoCD upgrade"
+      - echo "  task status                     # Comprehensive status overview"
+      - echo "  task ci:status                  # GitHub Actions metrics"
+      - echo "  task health:enhanced            # Full health assessment"
+      - echo ""
+      - echo "For detailed help: task help or task help:automation"

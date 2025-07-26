@@ -1,0 +1,651 @@
+name: 🔍 Homelab Validation
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - 'feature/**'
+    paths:
+      - 'apps/**'
+      - 'charts/**'
+      - 'pulumi/**'
+      - '.github/workflows/**'
+      - 'Taskfile.yml'
+      - 'renovate.json'
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'apps/**'
+      - 'charts/**'
+      - 'pulumi/**'
+      - '.github/workflows/**'
+      - 'Taskfile.yml'
+      - 'renovate.json'
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: 'Validation scope'
+        required: false
+        default: 'full'
+        type: choice
+        options:
+          - full
+          - apps-only
+          - security-only
+
+env:
+  KUBERNETES_VERSION: "1.28.1"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Job 1: Kustomize Validation
+  kustomize-validation:
+    name: 🔧 Kustomize Build Validation
+    runs-on: ubuntu-latest
+    if: github.event.inputs.scope != 'security-only'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Kustomize
+        uses: imranismail/setup-kustomize@v2
+        with:
+          kustomize-version: "5.0.1"
+
+      - name: Cache Kustomize builds
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/kustomize
+          key: ${{ runner.os }}-kustomize-${{ hashFiles('**/kustomization.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-kustomize-
+
+      - name: Find and validate kustomization files
+        run: |
+          echo "🔍 Finding kustomization files..."
+          find apps -name "kustomization.yaml" -type f > kustomize_files.txt
+          echo "Found $(wc -l < kustomize_files.txt) kustomization files"
+          
+          echo "📋 Kustomization files to validate:"
+          cat kustomize_files.txt
+          
+          # Validate each kustomization
+          failed_builds=0
+          while IFS= read -r kustomization; do
+            dir=$(dirname "$kustomization")
+            echo ""
+            echo "🔧 Validating: $dir"
+            
+            if kustomize build "$dir" > /dev/null 2>&1; then
+              echo "✅ $dir - Build successful"
+            else
+              echo "❌ $dir - Build failed"
+              echo "Error details:"
+              kustomize build "$dir" 2>&1 || true
+              failed_builds=$((failed_builds + 1))
+            fi
+          done < kustomize_files.txt
+          
+          echo ""
+          if [ $failed_builds -eq 0 ]; then
+            echo "✅ All kustomize builds successful!"
+          else
+            echo "❌ $failed_builds kustomize build(s) failed"
+            exit 1
+          fi
+
+      - name: Generate kustomize build summary
+        if: always()
+        run: |
+          echo "## 🔧 Kustomize Validation Results" >> $GITHUB_STEP_SUMMARY
+          if [ -f kustomize_files.txt ]; then
+            total=$(wc -l < kustomize_files.txt)
+            echo "- **Total kustomization files**: $total" >> $GITHUB_STEP_SUMMARY
+            echo "- **Status**: $([ $? -eq 0 ] && echo '✅ All builds successful' || echo '❌ Some builds failed')" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # Job 2: Helm Chart Validation
+  helm-validation:
+    name: ⚓ Helm Chart Validation
+    runs-on: ubuntu-latest
+    if: github.event.inputs.scope != 'security-only'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: '3.12.3'
+
+      - name: Cache Helm charts
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/helm
+          key: ${{ runner.os }}-helm-${{ hashFiles('**/Chart.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-helm-
+
+      - name: Find and validate Helm charts
+        run: |
+          echo "🔍 Finding Helm charts..."
+          find . -name "Chart.yaml" -type f > helm_charts.txt
+          chart_count=$(wc -l < helm_charts.txt)
+          
+          echo "Found $chart_count Helm charts"
+          
+          if [ $chart_count -eq 0 ]; then
+            echo "ℹ️ No Helm charts found in repository"
+            exit 0
+          fi
+          
+          echo "📋 Helm charts to validate:"
+          cat helm_charts.txt
+          
+          # Validate each chart
+          failed_charts=0
+          while IFS= read -r chart_file; do
+            chart_dir=$(dirname "$chart_file")
+            chart_name=$(basename "$chart_dir")
+            echo ""
+            echo "⚓ Validating chart: $chart_name ($chart_dir)"
+            
+            # Helm lint
+            if helm lint "$chart_dir"; then
+              echo "✅ $chart_name - Lint successful"
+              
+              # Helm template (dry-run)
+              if helm template "$chart_name" "$chart_dir" > /dev/null 2>&1; then
+                echo "✅ $chart_name - Template rendering successful"
+              else
+                echo "❌ $chart_name - Template rendering failed"
+                echo "Template error details:"
+                helm template "$chart_name" "$chart_dir" 2>&1 || true
+                failed_charts=$((failed_charts + 1))
+              fi
+            else
+              echo "❌ $chart_name - Lint failed"
+              failed_charts=$((failed_charts + 1))
+            fi
+          done < helm_charts.txt
+          
+          echo ""
+          if [ $failed_charts -eq 0 ]; then
+            echo "✅ All Helm charts validated successfully!"
+          else
+            echo "❌ $failed_charts Helm chart(s) failed validation"
+            exit 1
+          fi
+
+      - name: Generate Helm validation summary
+        if: always()
+        run: |
+          echo "## ⚓ Helm Validation Results" >> $GITHUB_STEP_SUMMARY
+          if [ -f helm_charts.txt ]; then
+            total=$(wc -l < helm_charts.txt)
+            echo "- **Total Helm charts**: $total" >> $GITHUB_STEP_SUMMARY
+            echo "- **Status**: $([ $? -eq 0 ] && echo '✅ All charts valid' || echo '❌ Some charts failed')" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- **Total Helm charts**: 0" >> $GITHUB_STEP_SUMMARY
+            echo "- **Status**: ℹ️ No charts found" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # Job 3: Kubernetes Schema Validation
+  kubeconform-validation:
+    name: 📋 Kubernetes Schema Validation
+    runs-on: ubuntu-latest
+    if: github.event.inputs.scope != 'security-only'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup kubeconform
+        run: |
+          curl -L https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz | tar xz
+          sudo mv kubeconform /usr/local/bin
+          kubeconform -v
+
+      - name: Setup Kustomize for manifest generation
+        uses: imranismail/setup-kustomize@v2
+        with:
+          kustomize-version: "5.0.1"
+
+      - name: Cache kubeconform schemas
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/kubeconform
+          key: ${{ runner.os }}-kubeconform-${{ env.KUBERNETES_VERSION }}
+          restore-keys: |
+            ${{ runner.os }}-kubeconform-
+
+      - name: Validate Kubernetes manifests
+        run: |
+          echo "📋 Validating Kubernetes manifests against schemas..."
+          
+          # Create temporary directory for generated manifests
+          mkdir -p temp_manifests
+          
+          # Generate manifests from kustomizations
+          find apps -name "kustomization.yaml" -type f | while IFS= read -r kustomization; do
+            dir=$(dirname "$kustomization")
+            output_file="temp_manifests/$(echo "$dir" | tr '/' '_').yaml"
+            
+            echo "Generating manifest from: $dir"
+            if kustomize build "$dir" > "$output_file" 2>/dev/null; then
+              echo "✅ Generated: $output_file"
+            else
+              echo "⚠️ Failed to generate: $dir"
+            fi
+          done
+          
+          # Find standalone YAML files (not in kustomizations)
+          find apps -name "*.yaml" -type f -not -path "*/kustomization.yaml" | while IFS= read -r yaml_file; do
+            # Check if this file is part of a kustomization
+            dir=$(dirname "$yaml_file")
+            if [ ! -f "$dir/kustomization.yaml" ]; then
+              cp "$yaml_file" "temp_manifests/$(echo "$yaml_file" | tr '/' '_')"
+            fi
+          done
+          
+          # Count total manifests
+          manifest_count=$(find temp_manifests -name "*.yaml" -type f | wc -l)
+          echo "📊 Total manifests to validate: $manifest_count"
+          
+          if [ $manifest_count -eq 0 ]; then
+            echo "ℹ️ No manifests found for validation"
+            exit 0
+          fi
+          
+          # Validate with kubeconform
+          echo ""
+          echo "🔍 Running kubeconform validation..."
+          
+          if kubeconform \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            -kubernetes-version "$KUBERNETES_VERSION" \
+            -summary \
+            -verbose \
+            temp_manifests/*.yaml; then
+            echo ""
+            echo "✅ All Kubernetes manifests are valid!"
+          else
+            echo ""
+            echo "❌ Some Kubernetes manifests failed validation"
+            exit 1
+          fi
+
+      - name: Generate kubeconform summary
+        if: always()
+        run: |
+          echo "## 📋 Kubernetes Schema Validation Results" >> $GITHUB_STEP_SUMMARY
+          if [ -d temp_manifests ]; then
+            total=$(find temp_manifests -name "*.yaml" -type f | wc -l)
+            echo "- **Total manifests validated**: $total" >> $GITHUB_STEP_SUMMARY
+            echo "- **Kubernetes version**: $KUBERNETES_VERSION" >> $GITHUB_STEP_SUMMARY
+            echo "- **Status**: $([ $? -eq 0 ] && echo '✅ All manifests valid' || echo '❌ Some manifests failed')" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # Job 4: YAML Linting
+  yaml-lint:
+    name: 📝 YAML Linting
+    runs-on: ubuntu-latest
+    if: github.event.inputs.scope != 'security-only'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install yamllint
+        run: |
+          pip install yamllint
+          yamllint --version
+
+      - name: Cache yamllint results
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/yamllint
+          key: ${{ runner.os }}-yamllint-${{ hashFiles('**/*.yaml', '**/*.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-yamllint-
+
+      - name: Run YAML linting
+        run: |
+          echo "📝 Running YAML linting..."
+          
+          # Check if .yamllint.yml exists, create basic config if not
+          if [ ! -f .yamllint.yml ]; then
+            echo "Creating basic yamllint configuration..."
+            cat > .yamllint.yml << 'EOF'
+          extends: default
+          rules:
+            line-length:
+              max: 120
+              allow-non-breakable-words: true
+              allow-non-breakable-inline-mappings: true
+            document-start:
+              present: false
+            comments:
+              require-starting-space: true
+              min-spaces-from-content: 1
+            trailing-spaces:
+              level: warning
+            indentation:
+              spaces: 2
+              indent-sequences: true
+              check-multi-line-strings: false
+            empty-values:
+              forbid-in-block-mappings: false
+              forbid-in-flow-mappings: false
+            key-ordering: disable
+            quoted-strings:
+              quote-type: any
+              required: false
+            truthy:
+              allowed-values: ['true', 'false', 'yes', 'no', 'on', 'off']
+              check-keys: false
+          ignore: |
+            **/charts/*/templates/
+            **/templates/
+            **/*.tpl
+            **/*.gotmpl
+            **/values.yaml
+            **/values-*.yaml
+          EOF
+          fi
+          
+          # Run yamllint
+          if yamllint -c .yamllint.yml apps/; then
+            echo "✅ YAML linting completed successfully!"
+          else
+            echo "❌ YAML linting found issues"
+            exit 1
+          fi
+
+      - name: Generate yamllint summary
+        if: always()
+        run: |
+          echo "## 📝 YAML Linting Results" >> $GITHUB_STEP_SUMMARY
+          yaml_count=$(find apps -name "*.yaml" -o -name "*.yml" | wc -l)
+          echo "- **Total YAML files**: $yaml_count" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: $([ $? -eq 0 ] && echo '✅ All YAML files valid' || echo '❌ YAML issues found')" >> $GITHUB_STEP_SUMMARY
+
+  # Job 5: ArgoCD Application Validation
+  argocd-validation:
+    name: 🚀 ArgoCD Application Validation
+    runs-on: ubuntu-latest
+    if: github.event.inputs.scope != 'security-only'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup ArgoCD CLI
+        run: |
+          curl -sSL -o argocd https://github.com/argoproj/argo-cd/releases/download/v3.0.0/argocd-linux-amd64
+          chmod +x argocd
+          sudo mv argocd /usr/local/bin/
+          argocd version --client
+
+      - name: Setup kubectl for manifest validation
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.28.1'
+
+      - name: Validate ArgoCD Applications
+        run: |
+          echo "🚀 Validating ArgoCD Applications..."
+          
+          # Find ArgoCD Application manifests
+          find apps -name "*.yaml" -type f -exec grep -l "kind: Application" {} \; > argocd_apps.txt
+          app_count=$(wc -l < argocd_apps.txt)
+          
+          echo "📊 Found $app_count ArgoCD Applications"
+          
+          if [ $app_count -eq 0 ]; then
+            echo "ℹ️ No ArgoCD Applications found"
+            exit 0
+          fi
+          
+          echo "📋 ArgoCD Applications to validate:"
+          cat argocd_apps.txt
+          
+          # Validate each application
+          failed_apps=0
+          while IFS= read -r app_file; do
+            echo ""
+            echo "🔍 Validating: $app_file"
+            
+            # Basic YAML syntax check
+            if ! kubectl apply --dry-run=client -f "$app_file" > /dev/null 2>&1; then
+              echo "❌ Invalid Kubernetes manifest: $app_file"
+              kubectl apply --dry-run=client -f "$app_file" 2>&1 || true
+              failed_apps=$((failed_apps + 1))
+              continue
+            fi
+            
+            # Check for required ArgoCD Application fields
+            if ! grep -q "apiVersion: argoproj.io/v1alpha1" "$app_file"; then
+              echo "❌ Missing ArgoCD API version: $app_file"
+              failed_apps=$((failed_apps + 1))
+              continue
+            fi
+            
+            if ! grep -q "kind: Application" "$app_file"; then
+              echo "❌ Not an ArgoCD Application: $app_file"
+              failed_apps=$((failed_apps + 1))
+              continue
+            fi
+            
+            # Check for required spec fields
+            if ! grep -A 20 "spec:" "$app_file" | grep -q "source:"; then
+              echo "⚠️ Missing source specification: $app_file"
+            fi
+            
+            if ! grep -A 20 "spec:" "$app_file" | grep -q "destination:"; then
+              echo "⚠️ Missing destination specification: $app_file"
+            fi
+            
+            echo "✅ Valid ArgoCD Application: $app_file"
+            
+          done < argocd_apps.txt
+          
+          echo ""
+          if [ $failed_apps -eq 0 ]; then
+            echo "✅ All ArgoCD Applications are valid!"
+          else
+            echo "❌ $failed_apps ArgoCD Application(s) failed validation"
+            exit 1
+          fi
+
+      - name: Generate ArgoCD validation summary
+        if: always()
+        run: |
+          echo "## 🚀 ArgoCD Application Validation Results" >> $GITHUB_STEP_SUMMARY
+          if [ -f argocd_apps.txt ]; then
+            total=$(wc -l < argocd_apps.txt)
+            echo "- **Total ArgoCD Applications**: $total" >> $GITHUB_STEP_SUMMARY
+            echo "- **Status**: $([ $? -eq 0 ] && echo '✅ All applications valid' || echo '❌ Some applications failed')" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- **Total ArgoCD Applications**: 0" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # Job 6: Security Scanning (Basic)
+  security-scan:
+    name: 🔒 Security Scanning
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python for inventory check
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          pip install pyyaml requests
+
+      - name: Run inventory security check
+        run: |
+          echo "🔒 Running security inventory check..."
+          
+          if [ -f scripts/inventory-check.py ]; then
+            python scripts/inventory-check.py --format json --output inventory-security.json
+            
+            # Extract security metrics
+            security_score=$(jq -r '.security_assessment.security_score // "unknown"' inventory-security.json)
+            total_cves=$(jq -r '.security_assessment.total_cves // 0' inventory-security.json)
+            high_risk_apps=$(jq -r '.security_assessment.high_risk_applications // 0' inventory-security.json)
+            
+            echo "📊 Security Assessment Results:"
+            echo "- Security Score: $security_score/100"
+            echo "- Total CVEs: $total_cves"
+            echo "- High-Risk Applications: $high_risk_apps"
+            
+            # Fail if critical security issues found
+            if [ "$high_risk_apps" -gt 0 ] || [ "$total_cves" -gt 5 ]; then
+              echo "🚨 Critical security issues detected!"
+              echo "High-risk applications with CVEs found."
+              exit 1
+            else
+              echo "✅ Security check passed"
+            fi
+          else
+            echo "⚠️ inventory-check.py not found, skipping detailed security check"
+          fi
+
+      - name: Check for secrets in code
+        run: |
+          echo "🔍 Checking for potential secrets..."
+          
+          # Basic secret pattern detection
+          secret_patterns=(
+            "password\s*=\s*['\"][^'\"]{8,}['\"]"
+            "api[_-]?key\s*=\s*['\"][^'\"]{16,}['\"]"
+            "secret\s*=\s*['\"][^'\"]{16,}['\"]"
+            "token\s*=\s*['\"][^'\"]{20,}['\"]"
+            "-----BEGIN [A-Z]+ KEY-----"
+          )
+          
+          secrets_found=0
+          for pattern in "${secret_patterns[@]}"; do
+            if grep -r -E -i "$pattern" apps/ --include="*.yaml" --include="*.yml" --exclude-dir=charts; then
+              echo "⚠️ Potential secret pattern found: $pattern"
+              secrets_found=$((secrets_found + 1))
+            fi
+          done
+          
+          if [ $secrets_found -gt 0 ]; then
+            echo "🚨 $secrets_found potential secret patterns detected!"
+            echo "Please review and ensure no hardcoded secrets are committed."
+            # Note: Not failing the build as these might be false positives
+            # exit 1
+          else
+            echo "✅ No obvious secret patterns detected"
+          fi
+
+      - name: Upload security report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-report
+          path: |
+            inventory-security.json
+          retention-days: 30
+
+      - name: Generate security summary
+        if: always()
+        run: |
+          echo "## 🔒 Security Scanning Results" >> $GITHUB_STEP_SUMMARY
+          if [ -f inventory-security.json ]; then
+            security_score=$(jq -r '.security_assessment.security_score // "unknown"' inventory-security.json)
+            total_cves=$(jq -r '.security_assessment.total_cves // 0' inventory-security.json)
+            high_risk_apps=$(jq -r '.security_assessment.high_risk_applications // 0' inventory-security.json)
+            
+            echo "- **Security Score**: $security_score/100" >> $GITHUB_STEP_SUMMARY
+            echo "- **Total CVEs**: $total_cves" >> $GITHUB_STEP_SUMMARY
+            echo "- **High-Risk Applications**: $high_risk_apps" >> $GITHUB_STEP_SUMMARY
+            echo "- **Status**: $([ "$high_risk_apps" -gt 0 ] && echo '🚨 Critical issues found' || echo '✅ No critical issues')" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # Job 7: Validation Summary
+  validation-summary:
+    name: 📊 Validation Summary
+    runs-on: ubuntu-latest
+    needs: [kustomize-validation, helm-validation, kubeconform-validation, yaml-lint, argocd-validation, security-scan]
+    if: always()
+    
+    steps:
+      - name: Generate final summary
+        run: |
+          echo "# 🏠 Homelab Validation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Workflow**: ${{ github.workflow }}" >> $GITHUB_STEP_SUMMARY  
+          echo "**Triggered by**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Check job results
+          kustomize_result="${{ needs.kustomize-validation.result }}"
+          helm_result="${{ needs.helm-validation.result }}"
+          kubeconform_result="${{ needs.kubeconform-validation.result }}"
+          yaml_result="${{ needs.yaml-lint.result }}"
+          argocd_result="${{ needs.argocd-validation.result }}"
+          security_result="${{ needs.security-scan.result }}"
+          
+          echo "## Job Results" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Kustomize Validation | $([ "$kustomize_result" = "success" ] && echo '✅ Passed' || echo '❌ Failed') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Helm Validation | $([ "$helm_result" = "success" ] && echo '✅ Passed' || echo '❌ Failed') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Schema Validation | $([ "$kubeconform_result" = "success" ] && echo '✅ Passed' || echo '❌ Failed') |" >> $GITHUB_STEP_SUMMARY
+          echo "| YAML Linting | $([ "$yaml_result" = "success" ] && echo '✅ Passed' || echo '❌ Failed') |" >> $GITHUB_STEP_SUMMARY
+          echo "| ArgoCD Validation | $([ "$argocd_result" = "success" ] && echo '✅ Passed' || echo '❌ Failed') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Security Scan | $([ "$security_result" = "success" ] && echo '✅ Passed' || echo '🚨 Issues Found') |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Overall status
+          if [ "$kustomize_result" = "success" ] && [ "$helm_result" = "success" ] && [ "$kubeconform_result" = "success" ] && [ "$yaml_result" = "success" ] && [ "$argocd_result" = "success" ] && [ "$security_result" = "success" ]; then
+            echo "## ✅ Overall Status: All Validations Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ❌ Overall Status: Some Validations Failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Please review the failed jobs and fix the issues before merging." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Report validation status
+        run: |
+          # Exit with error if any validation failed
+          if [ "${{ needs.kustomize-validation.result }}" != "success" ] || \
+             [ "${{ needs.helm-validation.result }}" != "success" ] || \
+             [ "${{ needs.kubeconform-validation.result }}" != "success" ] || \
+             [ "${{ needs.yaml-lint.result }}" != "success" ] || \
+             [ "${{ needs.argocd-validation.result }}" != "success" ]; then
+            echo "❌ Validation failed - blocking merge"
+            exit 1
+          elif [ "${{ needs.security-scan.result }}" != "success" ]; then
+            echo "🚨 Security issues detected - review required"
+            # Note: Not failing for security issues as they might need manual review
+          else
+            echo "✅ All validations passed successfully!"
+          fi

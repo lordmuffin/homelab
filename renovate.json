@@ -11,14 +11,32 @@
     {
       "paths": [
         "apps/networking/unifi/**",
-        "apps/argocd/base/services/mlops/localai.yaml",
-        "apps/argocd/kustomization.yaml",
-        "apps/argocd/base/core/argocd.yaml",
-        "apps/argocd/Dockerfile",
-        "apps/argocd/base/services/gitea.yaml",
-        "apps/data/redis/kustomization.yaml"
+        "apps/argocd/base/services/mlops/localai.yaml"
       ],
       "enabled": false
+    },
+    {
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "reviewRequired": true
+    },
+    {
+      "matchPackageNames": ["cert-manager", "argocd", "kube-prometheus-stack"],
+      "matchUpdateTypes": ["patch"],
+      "automerge": true,
+      "schedule": ["before 6am on monday"]
+    },
+    {
+      "matchDatasources": ["docker"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true,
+      "schedule": ["after 10pm every weekday"]
+    },
+    {
+      "matchDatasources": ["helm"],
+      "matchUpdateTypes": ["patch"],
+      "automerge": true,
+      "schedule": ["before 6am on monday"]
     }
   ],
   "argocd": {
@@ -31,5 +49,23 @@
     ],
     "enabled": true
   },
-  "pinDigests":true
+  "pinDigests": true,
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "automerge": true
+  },
+  "schedule": [
+    "after 10pm every weekday",
+    "before 5am every weekday",
+    "every weekend"
+  ],
+  "timezone": "America/New_York",
+  "assignees": ["@lordmuffin"],
+  "reviewers": ["@lordmuffin"],
+  "labels": ["dependencies"],
+  "prHourlyLimit": 5,
+  "prConcurrentLimit": 10,
+  "branchConcurrentLimit": 20,
+  "minimumReleaseAge": "3 days",
+  "stabilityDays": 3
 }
