@@ -31,7 +31,6 @@ spec:
                   
                   # Retry configuration
                   MAX_RETRIES=3
-                  RETRY_DELAYS=(10 20 40)
                   
                   # Logging functions
                   log_info() {
@@ -42,21 +41,21 @@ spec:
                       echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] ERROR: $*" >&2
                   }
                   
-                  # Error trap handler
+                  # Error trap handler - simplified for sh compatibility
                   error_trap() {
-                      local exit_code=$?
-                      local line_number=$1
-                      log_error "Actual backup failed at line $line_number with exit code $exit_code"
-                      log_error "Command: ${BASH_COMMAND}"
-                      exit $exit_code
+                      exit_code=$?
+                      if [ $exit_code -ne 0 ]; then
+                          log_error "Actual backup failed with exit code $exit_code"
+                          exit $exit_code
+                      fi
                   }
                   
-                  trap 'error_trap $LINENO' ERR
+                  trap 'error_trap' EXIT
                   
                   # Retry function with exponential backoff
                   retry_with_backoff() {
-                      local cmd="$1"
-                      local attempt=1
+                      cmd="$1"
+                      attempt=1
                       
                       while [ $attempt -le $MAX_RETRIES ]; do
                           log_info "Attempt $attempt/$MAX_RETRIES: $cmd"
@@ -65,7 +64,7 @@ spec:
                               log_info "Command succeeded on attempt $attempt"
                               return 0
                           else
-                              local exit_code=$?
+                              exit_code=$?
                               log_error "Command failed on attempt $attempt with exit code $exit_code"
                               
                               if [ $attempt -eq $MAX_RETRIES ]; then
@@ -73,10 +72,11 @@ spec:
                                   return $exit_code
                               fi
                               
-                              local delay=${RETRY_DELAYS[$((attempt-1))]}
+                              # Calculate delay: 10 * attempt seconds
+                              delay=$((10 * attempt))
                               log_info "Waiting $delay seconds before next attempt..."
                               sleep "$delay"
-                              ((attempt++))
+                              attempt=$((attempt + 1))
                           fi
                       done
                   }
@@ -165,7 +165,6 @@ spec:
                   
                   # Retry configuration
                   MAX_RETRIES=5
-                  RETRY_DELAYS=(10 20 40 80 160)
                   
                   # Logging functions
                   log_info() {
@@ -176,21 +175,21 @@ spec:
                       echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] ERROR: $*" >&2
                   }
                   
-                  # Error trap handler
+                  # Error trap handler - simplified for sh compatibility
                   error_trap() {
-                      local exit_code=$?
-                      local line_number=$1
-                      log_error "B2 upload failed at line $line_number with exit code $exit_code"
-                      log_error "Command: ${BASH_COMMAND}"
-                      exit $exit_code
+                      exit_code=$?
+                      if [ $exit_code -ne 0 ]; then
+                          log_error "B2 upload failed with exit code $exit_code"
+                          exit $exit_code
+                      fi
                   }
                   
-                  trap 'error_trap $LINENO' ERR
+                  trap 'error_trap' EXIT
                   
                   # Retry function with exponential backoff
                   retry_with_backoff() {
-                      local cmd="$1"
-                      local attempt=1
+                      cmd="$1"
+                      attempt=1
                       
                       while [ $attempt -le $MAX_RETRIES ]; do
                           log_info "Attempt $attempt/$MAX_RETRIES: $cmd"
@@ -199,7 +198,7 @@ spec:
                               log_info "Command succeeded on attempt $attempt"
                               return 0
                           else
-                              local exit_code=$?
+                              exit_code=$?
                               log_error "Command failed on attempt $attempt with exit code $exit_code"
                               
                               if [ $attempt -eq $MAX_RETRIES ]; then
@@ -207,10 +206,11 @@ spec:
                                   return $exit_code
                               fi
                               
-                              local delay=${RETRY_DELAYS[$((attempt-1))]}
+                              # Calculate delay: 10 * attempt seconds
+                              delay=$((10 * attempt))
                               log_info "Waiting $delay seconds before next attempt..."
                               sleep "$delay"
-                              ((attempt++))
+                              attempt=$((attempt + 1))
                           fi
                       done
                   }
@@ -233,7 +233,7 @@ spec:
                       fi
                       log_info "Waiting for backup completion... (${elapsed}s elapsed)"
                       sleep 5
-                      ((elapsed+=5))
+                      elapsed=$((elapsed + 5))
                   done
                   
                   # Find the backup file
