@@ -24,4 +24,4 @@ spec:
         - name: blinko-internal
           port: 80
   tls:
-    secretName: labs-andrewpjackson-com-tls
+    secretName: lab-apj-dev-tls
