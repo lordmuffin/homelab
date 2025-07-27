@@ -61,7 +61,9 @@
       "WebFetch(domain:actualbudget.org)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:learn.microsoft.com)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(awk:*)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ]
   },
   "enableAllProjectMcpServers": true,
