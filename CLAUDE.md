@@ -176,3 +176,119 @@ pulumi up --stack <environment>
 5. **Validation**: Always run `task validate` before committing
 
 This homelab demonstrates enterprise-grade Kubernetes practices with comprehensive application lifecycle management, automated secret handling, and GitOps-driven deployments suitable for both learning and production use.
+
+## SuperClaude Agent Configuration
+
+### Intelligent Task-Agent Routing System
+
+**Auto-Detection Rules**: Keywords, file patterns, and domain indicators trigger optimal agent selection with framework-specific specialists and universal fallbacks.
+
+### Technology-Agent Mapping
+
+#### Infrastructure & Operations
+**Kubernetes & GitOps** → `kubernetes-devops-expert` | `backend-developer` | `api-architect`
+- **Auto-Triggers**: `apps/`, `clusters/`, `*.yaml`, `kustomization.yaml`, ArgoCD patterns, Helm charts
+- **Tasks**: Cluster management, GitOps workflows, infrastructure deployment, service mesh, monitoring
+- **MCP**: `--seq` (systematic analysis), `--c7` (K8s/Helm patterns)
+- **Commands**: `/build`, `/analyze --infrastructure`, `/implement --type service`, `/deploy`
+
+**Pulumi Infrastructure** → `kubernetes-devops-expert` | `backend-developer` | `api-architect`
+- **Auto-Triggers**: `pulumi/`, `__main__.py`, IaC patterns, Proxmox configurations, Terraform files
+- **Tasks**: VM provisioning, Kairos OS deployment, network automation, infrastructure as code
+- **MCP**: `--c7` (Pulumi/Terraform patterns), `--seq` (infrastructure design)
+- **Commands**: `/implement --framework pulumi`, `/analyze --focus infrastructure`, `/build --infra`
+
+#### Application Domains
+**AI/ML Services** → `laravel-backend-expert` | `api-architect` | `backend-developer`
+- **Auto-Triggers**: `apps/mlops/`, `litellm`, `milvus`, `localai`, ML model patterns
+- **Tasks**: LiteLLM proxy configuration, vector database setup, model serving
+- **MCP**: `--c7` (ML frameworks), `--seq` (system architecture)
+- **Commands**: `/implement --type api`, `/analyze --focus performance`
+
+**Media Automation** → `backend-developer` | `performance-optimizer`
+- **Auto-Triggers**: `apps/arr-stack/`, `jellyfin`, `sonarr`, `radarr`, media workflows
+- **Tasks**: Arr stack optimization, transcoding pipelines, storage management
+- **MCP**: `--seq` (performance analysis), `--play` (E2E validation)
+- **Commands**: `/improve --perf`, `/troubleshoot`, `/analyze --focus performance`
+
+**Development Tools** → `laravel-backend-expert` | `frontend-developer` | `tailwind-frontend-expert`
+- **Auto-Triggers**: `gitea`, `woodpecker`, `jupyterlab`, `n8n`, CI/CD patterns
+- **Tasks**: Git hosting, CI/CD pipelines, automation workflows, dev environments
+- **MCP**: `--magic` (dashboard UI), `--c7` (dev tools), `--seq` (workflow design)
+- **Commands**: `/implement --type component`, `/build --framework next`, `/design`
+
+#### Monitoring & Observability
+**Monitoring Stack** → `project-analyst` | `performance-optimizer` | `code-reviewer`
+- **Auto-Triggers**: `apps/monitoring/`, `prometheus`, `grafana`, observability patterns
+- **Tasks**: Metrics collection, dashboard creation, alerting configuration
+- **MCP**: `--seq` (systematic analysis), `--play` (monitoring validation)
+- **Commands**: `/analyze`, `/troubleshoot`, `/improve --focus monitoring`
+
+**Security & Compliance** → `code-reviewer` | `backend-developer`
+- **Auto-Triggers**: `apps/secrets/`, `1password`, `cert-manager`, security patterns
+- **Tasks**: Secret management, certificate automation, security hardening
+- **MCP**: `--seq` (security analysis), `--validate` mode
+- **Commands**: `/analyze --focus security`, `/improve --security`
+
+### Framework-Specific Agent Selection
+
+#### Task Type Routing
+**API Endpoints & Services** → `laravel-api-architect` | `api-architect` | `backend-developer`
+- **Patterns**: Service definitions, endpoint configuration, API gateways
+- **Auto-Detection**: `service.yaml`, `ingress.yaml`, API documentation
+- **MCP**: `--c7` (API patterns), `--seq` (design analysis)
+
+**Frontend Components** → `tailwind-frontend-expert` | `frontend-developer`
+- **Patterns**: Dashboard UIs, admin interfaces, monitoring frontends
+- **Auto-Detection**: UI component files, frontend frameworks, styling patterns
+- **MCP**: `--magic` (component generation), `--c7` (framework patterns)
+
+**Database Operations** → `laravel-eloquent-expert` | `backend-developer` | `performance-optimizer`
+- **Patterns**: Database schemas, migration files, ORM configurations
+- **Auto-Detection**: PostgreSQL configs, database manifests, persistence patterns
+- **MCP**: `--c7` (database patterns), `--seq` (optimization analysis)
+
+**Infrastructure Code** → `kubernetes-devops-expert` | `backend-developer` | `project-analyst`
+- **Patterns**: Infrastructure as Code, configuration management, automation, CI/CD pipelines
+- **Auto-Detection**: Pulumi files, Terraform configs, automation scripts, pipeline YAML
+- **MCP**: `--seq` (infrastructure analysis), `--c7` (IaC patterns)
+
+### Advanced Orchestration Patterns
+
+#### Multi-Agent Coordination
+**Comprehensive System Analysis** → `tech-lead-orchestrator` + Domain Specialists
+- **Triggers**: `/analyze --comprehensive`, complex multi-domain operations
+- **Strategy**: Wave orchestration with specialized agent delegation
+- **Workflow**: Analysis → Planning → Implementation → Validation
+
+**Large-Scale Infrastructure** → `project-analyst` + `--delegate --parallel-dirs`
+- **Triggers**: >50 manifests, multi-environment deployments
+- **Strategy**: Parallel directory analysis with coordinated implementation
+- **Performance**: 60-80% time reduction through intelligent parallelization
+
+**Security Audits** → `code-reviewer` + `--wave-strategy systematic`
+- **Triggers**: Security keywords, compliance requirements, audit requests
+- **Strategy**: Systematic security assessment with validation checkpoints
+- **Scope**: Infrastructure, applications, secrets, network policies
+
+### Universal Fallback Strategy
+
+**When Framework-Specific Agents Unavailable:**
+1. **Primary Fallback**: `general-purpose` agent with enhanced context
+2. **Secondary Fallback**: `backend-developer` + `frontend-developer` combination  
+3. **Tertiary Fallback**: `project-analyst` for comprehensive analysis
+4. **Emergency Fallback**: Core Claude Code with explicit tool coordination
+
+### Agent Performance Optimization
+
+**Context Retention**: ≥90% context preservation across agent handoffs
+**Response Time**: Sub-5s agent selection and activation
+**Quality Gates**: 8-step validation cycle with agent-specific checkpoints
+**Resource Management**: Dynamic token allocation based on complexity and scope
+
+### Integration with Existing Workflows
+
+**Task Runner Integration**: Seamless integration with existing `Taskfile.yml` commands
+**GitOps Compatibility**: Respect existing ArgoCD and Flux workflows
+**Development Workflow**: Preserve Docker Compose and validation patterns
+**CI/CD Integration**: Maintain GitHub Actions and pipeline automation
