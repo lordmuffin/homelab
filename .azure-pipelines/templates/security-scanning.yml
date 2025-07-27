@@ -93,19 +93,13 @@ steps:
           & "$securityToolsDir/checkov-venv/bin/pip" install "checkov==$(CHECKOV_VERSION)" --no-cache-dir
           
           # Create wrapper script
-          $checkovWrapper = @'
-          #!/bin/bash
-          exec "$securityToolsDir/checkov-venv/bin/checkov" "\$@"
-'@
+          $checkovWrapper = "#!/bin/bash`nexec `"`$securityToolsDir/checkov-venv/bin/checkov`" `"`$@`""
         } else {
           & "$securityToolsDir/checkov-venv/Scripts/pip.exe" install --upgrade pip
           & "$securityToolsDir/checkov-venv/Scripts/pip.exe" install "checkov==$(CHECKOV_VERSION)" --no-cache-dir
           
           # Create wrapper script for Windows
-          $checkovWrapper = @'
-          @echo off
-          "$securityToolsDir/checkov-venv/Scripts/checkov.exe" %*
-'@
+          $checkovWrapper = "@echo off`n`"`$securityToolsDir/checkov-venv/Scripts/checkov.exe`" %*"
         }
         
         $wrapperExt = if ($IsWindows) { ".bat" } else { "" }
@@ -124,10 +118,7 @@ steps:
           Write-Host "🔄 Trying fallback installation method..."
           python3 -m pip install --user --no-warn-script-location "checkov==$(CHECKOV_VERSION)"
           
-          $checkovWrapper = @'
-          #!/bin/bash
-          python3 -m checkov $@
-'@
+          $checkovWrapper = "#!/bin/bash`npython3 -m checkov `$@"
           $checkovWrapper | Out-File -FilePath "$binDir/checkov" -Encoding UTF8
           chmod +x "$binDir/checkov"
           Write-Host "✅ Checkov installed via fallback method"
