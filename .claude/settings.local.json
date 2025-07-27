@@ -63,7 +63,8 @@
       "WebFetch(domain:learn.microsoft.com)",
       "Bash(tree:*)",
       "Bash(awk:*)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(docker run:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
