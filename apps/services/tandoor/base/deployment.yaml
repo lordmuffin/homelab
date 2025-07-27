@@ -249,6 +249,8 @@ spec:
             secretKeyRef:
               name: tandoor-db-postgres-creds-1password
               key: password
+        - name: GUNICORN_MEDIA
+          value: 1
         # - name: SOCIALACCOUNT_PROVIDERS
         #   value: |
         #     {
