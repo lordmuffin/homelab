@@ -277,7 +277,7 @@ spec:
         - name: recipes-static
           mountPath: /opt/recipes/staticfiles
         - name: recipes-media
-          mountPath: opt/recipes/mediafiles
+          mountPath: /opt/recipes/mediafiles
       volumes:
         - name: recipes-static
           persistentVolumeClaim:
