@@ -15,7 +15,7 @@ spec:
   entryPoints:
     - websecure
   routes:
-    - match: Host(`blinko.lab.apj.dev)
+    - match: Host(`blinko.lab.apj.dev`)
       kind: Rule
       middlewares:
         - name: traefik-forward-auth
