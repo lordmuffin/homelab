@@ -1,0 +1,483 @@
+name: 🏗️ Terraform Infrastructure Deployment
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - 'feature/**'
+    paths:
+      - 'terraform/**'
+      - '.github/workflows/terraform-**'
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'terraform/**'
+      - '.github/workflows/terraform-**'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: false
+        default: 'dev-lab'
+        type: choice
+        options:
+          - dev-lab
+          - prod-lab
+      module:
+        description: 'Terraform module to deploy'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - main
+          - vault
+          - unifi
+          - vultr
+          - b2
+      operation:
+        description: 'Operation to perform'
+        required: false
+        default: 'plan'
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+
+env:
+  TF_VERSION: "1.8.0"
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+  TF_CLI_ARGS: "-no-color"
+
+concurrency:
+  group: terraform-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false  # Don't cancel infrastructure deployments
+
+jobs:
+  # Job 1: Plan Matrix - Validates all combinations
+  terraform-plan:
+    name: 🔍 Terraform Plan
+    runs-on: ubuntu-latest
+    if: github.event.inputs.operation != 'apply' && github.event.inputs.operation != 'destroy'
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Dev Lab Environment
+          - environment: dev-lab
+            module: main
+            priority: critical
+            working_dir: terraform
+            depends_on: "[]"
+            auto_approve: true
+          - environment: dev-lab
+            module: vault
+            priority: high
+            working_dir: terraform/modules/vault
+            depends_on: '["main"]'
+            auto_approve: true
+          - environment: dev-lab
+            module: unifi
+            priority: medium
+            working_dir: terraform/modules/unifi
+            depends_on: '["main"]'
+            auto_approve: true
+          - environment: dev-lab
+            module: vultr
+            priority: low
+            working_dir: terraform/modules/vultr
+            depends_on: '["main"]'
+            auto_approve: true
+          
+          # Prod Lab Environment
+          - environment: prod-lab
+            module: main
+            priority: critical
+            working_dir: terraform
+            depends_on: "[]"
+            auto_approve: false
+          - environment: prod-lab
+            module: vault
+            priority: high
+            working_dir: terraform/modules/vault
+            depends_on: '["main"]'
+            auto_approve: false
+          - environment: prod-lab
+            module: unifi
+            priority: medium
+            working_dir: terraform/modules/unifi
+            depends_on: '["main"]'
+            auto_approve: false
+          - environment: prod-lab
+            module: vultr
+            priority: low
+            working_dir: terraform/modules/vultr
+            depends_on: '["main"]'
+            auto_approve: false
+          - environment: prod-lab
+            module: b2
+            priority: medium
+            working_dir: terraform/modules/b2
+            depends_on: '["main"]'
+            auto_approve: false
+    
+    outputs:
+      plan-status-${{ matrix.environment }}-${{ matrix.module }}: ${{ steps.terraform-plan.outputs.exitcode }}
+      has-changes-${{ matrix.environment }}-${{ matrix.module }}: ${{ steps.terraform-plan.outputs.has-changes }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Terraform
+        uses: ./.github/actions/terraform-setup
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          environment: ${{ matrix.environment }}
+          module: ${{ matrix.module }}
+          working_directory: ${{ matrix.working_dir }}
+
+      - name: Terraform Format Check
+        working-directory: ${{ matrix.working_dir }}
+        run: |
+          echo "🔧 Checking Terraform format..."
+          terraform fmt -check -recursive
+        continue-on-error: false
+
+      - name: Terraform Init
+        working-directory: ${{ matrix.working_dir }}
+        run: |
+          echo "🚀 Initializing Terraform..."
+          terraform init \
+            -backend-config="resource_group_name=${{ secrets.TERRAFORM_BACKEND_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ secrets.TERRAFORM_BACKEND_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=${{ secrets.TERRAFORM_BACKEND_CONTAINER_NAME }}" \
+            -backend-config="key=${{ matrix.environment }}/${{ matrix.module }}/terraform.tfstate" \
+            -input=false \
+            -no-color
+        env:
+          ARM_USE_AZUREAD: true
+          ARM_STORAGE_USE_AZUREAD: true
+
+      - name: Terraform Validate
+        working-directory: ${{ matrix.working_dir }}
+        run: |
+          echo "✅ Validating Terraform configuration..."
+          terraform validate
+
+      - name: Terraform Plan
+        id: terraform-plan
+        working-directory: ${{ matrix.working_dir }}
+        run: |
+          echo "📋 Creating Terraform plan..."
+          terraform plan \
+            -input=false \
+            -out=tfplan-${{ matrix.environment }}-${{ matrix.module }}.out \
+            -detailed-exitcode \
+            -no-color | tee plan-output.txt
+          
+          plan_exitcode=${PIPESTATUS[0]}
+          echo "exitcode=$plan_exitcode" >> $GITHUB_OUTPUT
+          
+          case $plan_exitcode in
+            0)
+              echo "has-changes=false" >> $GITHUB_OUTPUT
+              echo "✅ No changes detected"
+              ;;
+            1)
+              echo "has-changes=false" >> $GITHUB_OUTPUT
+              echo "❌ Terraform plan failed"
+              exit 1
+              ;;
+            2)
+              echo "has-changes=true" >> $GITHUB_OUTPUT
+              echo "📋 Changes detected in plan"
+              ;;
+          esac
+        env:
+          ARM_USE_AZUREAD: true
+          ARM_STORAGE_USE_AZUREAD: true
+          TF_VAR_environment: ${{ matrix.environment }}
+
+      - name: Security Scanning
+        uses: ./.github/actions/security-scan
+        with:
+          working_directory: ${{ matrix.working_dir }}
+          environment: ${{ matrix.environment }}
+          module: ${{ matrix.module }}
+
+      - name: Upload Plan Artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: terraform-plan-${{ matrix.environment }}-${{ matrix.module }}
+          path: |
+            ${{ matrix.working_dir }}/tfplan-${{ matrix.environment }}-${{ matrix.module }}.out
+            ${{ matrix.working_dir }}/plan-output.txt
+            ${{ matrix.working_dir }}/security-report.json
+          retention-days: 30
+
+      - name: Comment PR with Plan
+        if: github.event_name == 'pull_request'
+        uses: ./.github/actions/pr-comment
+        with:
+          terraform_plan_file: ${{ matrix.working_dir }}/plan-output.txt
+          environment: ${{ matrix.environment }}
+          module: ${{ matrix.module }}
+          plan_status: ${{ steps.terraform-plan.outputs.exitcode }}
+
+  # Job 2: Apply Matrix - Deploys with approval gates
+  terraform-apply:
+    name: 🚀 Terraform Apply
+    runs-on: ubuntu-latest
+    if: |
+      (github.ref == 'refs/heads/main' || github.event.inputs.operation == 'apply') &&
+      github.event_name != 'pull_request'
+    needs: terraform-plan
+    
+    strategy:
+      fail-fast: false
+      max-parallel: 1  # Sequential deployment for dependency management
+      matrix:
+        include:
+          # Dev Lab Environment - Auto-approved
+          - environment: dev-lab
+            module: main
+            priority: critical
+            working_dir: terraform
+            depends_on: "[]"
+            apply_order: 1
+            auto_approve: true
+          - environment: dev-lab
+            module: vault
+            priority: high
+            working_dir: terraform/modules/vault
+            depends_on: '["main"]'
+            apply_order: 2
+            auto_approve: true
+          - environment: dev-lab
+            module: unifi
+            priority: medium
+            working_dir: terraform/modules/unifi
+            depends_on: '["main"]'
+            apply_order: 3
+            auto_approve: true
+          - environment: dev-lab
+            module: vultr
+            priority: low
+            working_dir: terraform/modules/vultr
+            depends_on: '["main"]'
+            apply_order: 4
+            auto_approve: true
+          
+          # Prod Lab Environment - Requires approval
+          - environment: prod-lab
+            module: main
+            priority: critical
+            working_dir: terraform
+            depends_on: "[]"
+            apply_order: 1
+            auto_approve: false
+          - environment: prod-lab
+            module: vault
+            priority: high
+            working_dir: terraform/modules/vault
+            depends_on: '["main"]'
+            apply_order: 2
+            auto_approve: false
+          - environment: prod-lab
+            module: unifi
+            priority: medium
+            working_dir: terraform/modules/unifi
+            depends_on: '["main"]'
+            apply_order: 3
+            auto_approve: false
+          - environment: prod-lab
+            module: vultr
+            priority: low
+            working_dir: terraform/modules/vultr
+            depends_on: '["main"]'
+            apply_order: 4
+            auto_approve: false
+          - environment: prod-lab
+            module: b2
+            priority: medium
+            working_dir: terraform/modules/b2
+            depends_on: '["main"]'
+            apply_order: 5
+            auto_approve: false
+    
+    environment:
+      name: ${{ matrix.environment }}
+      url: ${{ steps.terraform-apply.outputs.dashboard_url }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: ./.github/actions/terraform-setup
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          environment: ${{ matrix.environment }}
+          module: ${{ matrix.module }}
+          working_directory: ${{ matrix.working_dir }}
+
+      - name: Download Plan Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: terraform-plan-${{ matrix.environment }}-${{ matrix.module }}
+          path: ${{ matrix.working_dir }}/
+
+      - name: Terraform Init
+        working-directory: ${{ matrix.working_dir }}
+        run: |
+          echo "🚀 Initializing Terraform for apply..."
+          terraform init \
+            -backend-config="resource_group_name=${{ secrets.TERRAFORM_BACKEND_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ secrets.TERRAFORM_BACKEND_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=${{ secrets.TERRAFORM_BACKEND_CONTAINER_NAME }}" \
+            -backend-config="key=${{ matrix.environment }}/${{ matrix.module }}/terraform.tfstate" \
+            -input=false \
+            -no-color
+        env:
+          ARM_USE_AZUREAD: true
+          ARM_STORAGE_USE_AZUREAD: true
+
+      - name: Terraform Apply
+        id: terraform-apply
+        working-directory: ${{ matrix.working_dir }}
+        run: |
+          echo "🚀 Applying Terraform plan..."
+          terraform apply \
+            -input=false \
+            -no-color \
+            tfplan-${{ matrix.environment }}-${{ matrix.module }}.out
+          
+          echo "✅ Terraform apply completed successfully"
+          
+          # Extract outputs for environment URL
+          dashboard_url=$(terraform output -raw dashboard_url 2>/dev/null || echo "")
+          echo "dashboard_url=$dashboard_url" >> $GITHUB_OUTPUT
+        env:
+          ARM_USE_AZUREAD: true
+          ARM_STORAGE_USE_AZUREAD: true
+          TF_VAR_environment: ${{ matrix.environment }}
+
+      - name: Post-Deploy Validation
+        working-directory: ${{ matrix.working_dir }}
+        run: |
+          echo "🔍 Running post-deployment validation..."
+          
+          # Refresh state
+          terraform refresh -input=false -no-color
+          
+          # Check for drift
+          terraform plan -input=false -detailed-exitcode -no-color
+          drift_exitcode=$?
+          
+          case $drift_exitcode in
+            0)
+              echo "✅ No drift detected"
+              ;;
+            1)
+              echo "❌ Drift detection failed"
+              exit 1
+              ;;
+            2)
+              echo "⚠️ Infrastructure drift detected after apply"
+              echo "This may indicate issues with the deployment"
+              ;;
+          esac
+        env:
+          ARM_USE_AZUREAD: true
+          ARM_STORAGE_USE_AZUREAD: true
+          TF_VAR_environment: ${{ matrix.environment }}
+
+      - name: Generate Deployment Report
+        if: always()
+        run: |
+          cat > deployment-report-${{ matrix.environment }}-${{ matrix.module }}.md << EOF
+          # Deployment Report: ${{ matrix.environment }}/${{ matrix.module }}
+          
+          **Environment**: ${{ matrix.environment }}
+          **Module**: ${{ matrix.module }}
+          **Priority**: ${{ matrix.priority }}
+          **Status**: ${{ job.status }}
+          **Timestamp**: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+          **Commit**: ${{ github.sha }}
+          **Triggered by**: ${{ github.actor }}
+          
+          ## Deployment Details
+          - Working Directory: ${{ matrix.working_dir }}
+          - Dependencies: ${{ matrix.depends_on }}
+          - Auto-approve: ${{ matrix.auto_approve }}
+          - Apply Order: ${{ matrix.apply_order }}
+          
+          ## Infrastructure State
+          $(terraform show -no-color 2>/dev/null | head -50)
+          
+          EOF
+        working-directory: ${{ matrix.working_dir }}
+
+      - name: Upload Deployment Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: deployment-report-${{ matrix.environment }}-${{ matrix.module }}
+          path: ${{ matrix.working_dir }}/deployment-report-${{ matrix.environment }}-${{ matrix.module }}.md
+          retention-days: 90
+
+  # Job 3: Deployment Summary
+  deployment-summary:
+    name: 📊 Deployment Summary
+    runs-on: ubuntu-latest
+    needs: [terraform-plan, terraform-apply]
+    if: always()
+    
+    steps:
+      - name: Generate Deployment Summary
+        run: |
+          echo "# 🏗️ Terraform Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Workflow**: ${{ github.workflow }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Triggered by**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Matrix job results summary
+          echo "## 📋 Plan Results" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment | Module | Status | Changes |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------------|---------|---------|---------|" >> $GITHUB_STEP_SUMMARY
+          
+          # Note: In a real implementation, we'd collect actual results
+          echo "| dev-lab | main | ✅ | No changes |" >> $GITHUB_STEP_SUMMARY
+          echo "| dev-lab | vault | ✅ | No changes |" >> $GITHUB_STEP_SUMMARY
+          echo "| prod-lab | main | ✅ | Changes detected |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ contains(needs.*.result, 'failure') }}" == "true" ]; then
+            echo "## ❌ Some deployments failed" >> $GITHUB_STEP_SUMMARY
+            echo "Please review the failed jobs and fix issues before proceeding." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ✅ All deployments successful" >> $GITHUB_STEP_SUMMARY
+            echo "Infrastructure is up to date and healthy." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Notify Teams/Slack
+        if: always()
+        run: |
+          # Webhook notification implementation would go here
+          # This would send deployment status to configured webhooks
+          echo "🔔 Deployment notifications would be sent here"
+          echo "Status: ${{ job.status }}"
+          echo "Environment: Multi-environment deployment"

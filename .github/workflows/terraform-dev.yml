@@ -1,0 +1,189 @@
+# GitHub Actions Workflow: Development Environment
+# Focused on dev-lab environment with faster feedback loops
+
+name: 🧪 Terraform Development
+
+on:
+  push:
+    branches:
+      - develop
+      - 'feature/**'
+    paths:
+      - 'terraform/**'
+      - '.github/workflows/**'
+      - '.github/actions/**'
+  
+  pull_request:
+    branches:
+      - develop
+    paths:
+      - 'terraform/**'
+
+  workflow_dispatch:
+    inputs:
+      module:
+        description: 'Specific module to deploy'
+        required: false
+        type: choice
+        options:
+          - 'all'
+          - 'main'
+          - 'vault'
+          - 'unifi'
+          - 'vultr'
+
+env:
+  # Development-specific settings
+  ENVIRONMENT: 'dev-lab'
+  TF_VERSION: '1.8.0'
+  TF_IN_AUTOMATION: 'true'
+  ARM_USE_AZUREAD: 'true'
+  ARM_USE_OIDC: 'true'
+  
+  # Security Tool Versions
+  TFSEC_VERSION: '1.28.4'
+  CHECKOV_VERSION: '3.1.34'
+  TERRASCAN_VERSION: '1.18.11'
+  
+  # Development Quality Gates (more permissive)
+  MAX_SECURITY_ISSUES: '5'
+  SECURITY_FAIL_ON_HIGH: 'false'
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  dev-plan:
+    name: 🔍 Dev Plan (${{ matrix.module }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    
+    strategy:
+      fail-fast: false
+      max-parallel: 5  # Faster for dev
+      matrix:
+        module: ['main', 'vault', 'unifi', 'vultr']
+
+    steps:
+      - name: 🚀 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup
+        id: setup
+        run: |
+          WORKING_DIR=$( [ "${{ matrix.module }}" = "main" ] && echo "terraform" || echo "terraform/modules/${{ matrix.module }}" )
+          echo "working-dir=$WORKING_DIR" >> $GITHUB_OUTPUT
+          echo "state-key=dev-lab/${{ matrix.module }}/terraform.tfstate" >> $GITHUB_OUTPUT
+
+      - name: 🔐 Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: 🛠️ Terraform Setup
+        uses: ./.github/actions/terraform-setup
+        with:
+          terraform-version: ${{ env.TF_VERSION }}
+          working-directory: ${{ steps.setup.outputs.working-dir }}
+          environment: 'dev-lab'
+          module: ${{ matrix.module }}
+          state-key: ${{ steps.setup.outputs.state-key }}
+
+      - name: 🔄 Terraform Init & Plan
+        working-directory: ${{ steps.setup.outputs.working-dir }}
+        env:
+          TF_VAR_environment: 'dev-lab'
+        run: |
+          terraform init \
+            -backend-config="resource_group_name=${{ secrets.AZURE_BACKEND_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ secrets.AZURE_BACKEND_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=${{ secrets.AZURE_BACKEND_CONTAINER_NAME }}" \
+            -backend-config="key=${{ steps.setup.outputs.state-key }}" \
+            -input=false
+
+          terraform plan -input=false -out=dev-plan.out
+
+      - name: 🛡️ Security Scan (Relaxed)
+        uses: ./.github/actions/security-scan
+        with:
+          working-directory: ${{ steps.setup.outputs.working-dir }}
+          fail-on-high: 'false'  # More permissive for dev
+          environment: 'dev-lab'
+          module: ${{ matrix.module }}
+
+      - name: 📤 Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dev-plan-${{ matrix.module }}
+          path: ${{ steps.setup.outputs.working-dir }}
+          retention-days: 7  # Shorter retention for dev
+
+  dev-apply:
+    name: 🚀 Dev Apply (${{ matrix.module }})
+    runs-on: ubuntu-latest
+    needs: dev-plan
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/develop'
+    environment: dev-lab
+    
+    strategy:
+      max-parallel: 2
+      matrix:
+        module: ['main', 'vault', 'unifi', 'vultr']
+
+    steps:
+      - name: 🚀 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup
+        id: setup
+        run: |
+          WORKING_DIR=$( [ "${{ matrix.module }}" = "main" ] && echo "terraform" || echo "terraform/modules/${{ matrix.module }}" )
+          echo "working-dir=$WORKING_DIR" >> $GITHUB_OUTPUT
+          echo "state-key=dev-lab/${{ matrix.module }}/terraform.tfstate" >> $GITHUB_OUTPUT
+
+      - name: 🔐 Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: 🛠️ Terraform Setup
+        uses: ./.github/actions/terraform-setup
+        with:
+          terraform-version: ${{ env.TF_VERSION }}
+          working-directory: ${{ steps.setup.outputs.working-dir }}
+          environment: 'dev-lab'
+          module: ${{ matrix.module }}
+          state-key: ${{ steps.setup.outputs.state-key }}
+
+      - name: 📥 Download Plan
+        uses: actions/download-artifact@v4
+        with:
+          name: dev-plan-${{ matrix.module }}
+          path: ${{ steps.setup.outputs.working-dir }}
+
+      - name: 🚀 Terraform Apply
+        working-directory: ${{ steps.setup.outputs.working-dir }}
+        env:
+          TF_VAR_environment: 'dev-lab'
+        run: |
+          terraform init \
+            -backend-config="resource_group_name=${{ secrets.AZURE_BACKEND_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ secrets.AZURE_BACKEND_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=${{ secrets.AZURE_BACKEND_CONTAINER_NAME }}" \
+            -backend-config="key=${{ steps.setup.outputs.state-key }}" \
+            -input=false
+
+          terraform apply dev-plan.out
+
+      - name: 📊 Summary
+        run: |
+          echo "## ✅ Dev Deployment: ${{ matrix.module }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Environment: dev-lab" >> $GITHUB_STEP_SUMMARY
+          echo "- Module: ${{ matrix.module }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Status: Complete" >> $GITHUB_STEP_SUMMARY

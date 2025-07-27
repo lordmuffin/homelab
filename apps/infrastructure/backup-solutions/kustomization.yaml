@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - velero-enhanced.yaml
+  - backup-schedules.yaml
+  - restore-templates.yaml
+  - backup-policies.yaml
+
+commonLabels:
+  app.kubernetes.io/component: backup-solutions
+  app.kubernetes.io/part-of: homelab-infrastructure
+
+commonAnnotations:
+  homelab.io/component: backup-and-recovery

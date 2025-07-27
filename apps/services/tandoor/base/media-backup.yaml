@@ -1,0 +1,156 @@
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: tandoor-media-backup
+  labels:
+    app: tandoor
+spec:
+  schedule: "0 3 * * 0" # Weekly on Sunday at 3AM
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: media-archiver
+            image: alpine:latest
+            env:
+            - name: B2_APPLICATION_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: backblaze-cloud-homelab-creds-1password
+                  key: keyID
+            - name: B2_APPLICATION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: backblaze-cloud-homelab-creds-1password
+                  key: applicationKey
+            - name: B2_BUCKET_NAME
+              value: "cloud-homelab-backups"
+            command: ["/bin/sh", "-c"]
+            args:
+            - |
+              # Strict error handling
+              set -euo pipefail
+              
+              # Logging functions
+              log_info() {
+                  echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] INFO: $*" >&2
+              }
+              
+              log_error() {
+                  echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] ERROR: $*" >&2
+              }
+              
+              # Error trap handler
+              error_trap() {
+                  local exit_code=$?
+                  local line_number=$1
+                  log_error "Media backup failed at line $line_number with exit code $exit_code"
+                  exit $exit_code
+              }
+              
+              trap 'error_trap $LINENO' ERR
+              
+              log_info "🔄 Starting Tandoor media backup..."
+              
+              # Install required tools
+              apk add --no-cache tar gzip curl
+              
+              # Install B2 CLI
+              log_info "Installing B2 CLI..."
+              curl -L https://github.com/Backblaze/B2_Command_Line_Tool/releases/latest/download/b2-linux -o /usr/local/bin/b2
+              chmod +x /usr/local/bin/b2
+              
+              # Authenticate with B2
+              log_info "Authenticating with B2..."
+              /usr/local/bin/b2 authorize-account $B2_APPLICATION_KEY_ID $B2_APPLICATION_KEY
+              
+              # Check media directories for content
+              STATIC_COUNT=$(find /media/static -type f 2>/dev/null | wc -l || echo "0")
+              MEDIA_COUNT=$(find /media/mediafiles -type f 2>/dev/null | wc -l || echo "0")
+              
+              log_info "Found $STATIC_COUNT static files and $MEDIA_COUNT media files"
+              
+              if [ "$STATIC_COUNT" -eq "0" ] && [ "$MEDIA_COUNT" -eq "0" ]; then
+                  log_info "No media files found, skipping backup"
+                  exit 0
+              fi
+              
+              # Create archive
+              ARCHIVE_NAME="tandoor_media_$(date +%Y%m%d_%H%M%S).tar.gz"
+              log_info "Creating archive: $ARCHIVE_NAME"
+              
+              cd /media
+              tar -czf "/tmp/$ARCHIVE_NAME" \
+                  --exclude='*.tmp' \
+                  --exclude='*.log' \
+                  --exclude='.DS_Store' \
+                  --exclude='Thumbs.db' \
+                  static/ mediafiles/ 2>/dev/null || true
+              
+              # Validate archive
+              if [ ! -f "/tmp/$ARCHIVE_NAME" ]; then
+                  log_error "Archive creation failed"
+                  exit 1
+              fi
+              
+              ARCHIVE_SIZE=$(du -h "/tmp/$ARCHIVE_NAME" | cut -f1)
+              log_info "Archive created successfully: $ARCHIVE_SIZE"
+              
+              # Test archive integrity
+              if ! tar -tzf "/tmp/$ARCHIVE_NAME" >/dev/null 2>&1; then
+                  log_error "Archive integrity check failed"
+                  exit 1
+              fi
+              
+              # Upload to B2
+              UPLOAD_PATH="tandoor/media/$ARCHIVE_NAME"
+              log_info "Uploading to B2: $UPLOAD_PATH"
+              
+              if /usr/local/bin/b2 file upload "$B2_BUCKET_NAME" "/tmp/$ARCHIVE_NAME" "$UPLOAD_PATH"; then
+                  log_info "✅ Media backup completed successfully: $UPLOAD_PATH ($ARCHIVE_SIZE)"
+              else
+                  log_error "B2 upload failed"
+                  exit 1
+              fi
+              
+              # Cleanup old backups (keep last 4 weekly backups)
+              log_info "Cleaning up old media backups..."
+              OLD_BACKUPS=$(/usr/local/bin/b2 ls "b2://$B2_BUCKET_NAME/tandoor/media/" --recursive 2>/dev/null | \
+                           grep -E 'tandoor_media_[0-9]{8}_[0-9]{6}\.tar\.gz' | \
+                           sort -r | tail -n +5 | awk '{print $NF}' || echo "")
+              
+              if [ -n "$OLD_BACKUPS" ]; then
+                  echo "$OLD_BACKUPS" | while read -r old_backup; do
+                      if [ -n "$old_backup" ]; then
+                          log_info "Deleting old backup: $old_backup"
+                          /usr/local/bin/b2 file delete "b2://$B2_BUCKET_NAME/$old_backup" || true
+                      fi
+                  done
+              fi
+            volumeMounts:
+            - name: recipes-static
+              mountPath: /media/static
+              readOnly: true
+            - name: recipes-media
+              mountPath: /media/mediafiles
+              readOnly: true
+            resources:
+              requests:
+                cpu: 100m
+                memory: 256Mi
+              limits:
+                cpu: 200m
+                memory: 512Mi
+          restartPolicy: OnFailure
+          volumes:
+          - name: recipes-static
+            persistentVolumeClaim:
+              claimName: recipes-static
+          - name: recipes-media
+            persistentVolumeClaim:
+              claimName: recipes-media

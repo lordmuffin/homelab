@@ -1,0 +1,266 @@
+---
+# Backup Retention Policy
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backup-retention-policy
+  namespace: velero
+data:
+  policy.yaml: |
+    # HomeLab Backup Retention Policy
+    
+    # Daily Backups: 30 days retention
+    daily:
+      retention: 720h  # 30 days
+      frequency: "0 2 * * *"  # 2 AM daily
+      storage: primary
+      
+    # Weekly Backups: 90 days retention  
+    weekly:
+      retention: 2160h  # 90 days
+      frequency: "0 3 * * 0"  # 3 AM Sunday
+      storage: local
+      
+    # Monthly Backups: 1 year retention
+    monthly:
+      retention: 8760h  # 365 days
+      frequency: "0 4 1 * *"  # 4 AM 1st of month
+      storage: archive
+      
+    # Critical Backups: 7 days retention (frequent)
+    critical:
+      retention: 168h  # 7 days
+      frequency: "0 */6 * * *"  # Every 6 hours
+      storage: primary
+
+---
+# Backup Quality Gates
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backup-quality-gates
+  namespace: velero
+data:
+  quality-gates.yaml: |
+    # Quality Gates for Backup Validation
+    
+    pre_backup_checks:
+    - name: storage_space_check
+      description: "Verify sufficient storage space"
+      threshold: "80%"  # Fail if storage >80% full
+      
+    - name: cluster_health_check
+      description: "Verify cluster is healthy"
+      required_nodes: "min_3"
+      
+    - name: critical_services_check
+      description: "Verify critical services are running"
+      services:
+      - argocd-server
+      - prometheus-server
+      - grafana
+      
+    post_backup_validation:
+    - name: backup_integrity_check
+      description: "Verify backup completed successfully"
+      timeout: "30m"
+      
+    - name: backup_size_validation
+      description: "Verify backup size is reasonable"
+      min_size: "100MB"
+      max_size: "100GB"
+      
+    - name: restore_test
+      description: "Perform test restore validation"
+      frequency: "weekly"
+      namespace: "test-restore"
+
+---
+# Backup Alerting Rules
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: velero-backup-alerts
+  namespace: velero
+  labels:
+    app: velero
+    prometheus: kube-prometheus
+spec:
+  groups:
+  - name: velero.backup
+    rules:
+    - alert: VeleroBackupPartialFailure
+      expr: velero_backup_partial_failure_total > 0
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Velero backup partially failed"
+        description: "Backup {{ $labels.schedule }} has {{ $value }} partial failures"
+        
+    - alert: VeleroBackupFailure
+      expr: velero_backup_failure_total > 0
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Velero backup failed"
+        description: "Backup {{ $labels.schedule }} has failed completely"
+        
+    - alert: VeleroBackupMissing
+      expr: time() - velero_backup_last_successful_timestamp > 86400  # 24 hours
+      for: 10m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Velero backup missing"
+        description: "No successful backup in the last 24 hours for schedule {{ $labels.schedule }}"
+        
+    - alert: VeleroRestoreFailure
+      expr: velero_restore_failed_total > 0
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Velero restore failed"
+        description: "Restore operation has failed: {{ $labels.restore }}"
+
+---
+# Backup Testing Job
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: backup-testing
+  namespace: velero
+spec:
+  schedule: "0 6 * * 1"  # 6 AM every Monday
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: velero
+          restartPolicy: OnFailure
+          containers:
+          - name: backup-test
+            image: velero/velero:v1.12.0
+            command:
+            - /bin/bash
+            - -c
+            - |
+              echo "Starting backup testing procedure..."
+              
+              # Create test namespace
+              kubectl create namespace backup-test-$(date +%Y%m%d) || true
+              
+              # Deploy test resources
+              kubectl apply -n backup-test-$(date +%Y%m%d) -f - <<EOF
+              apiVersion: v1
+              kind: ConfigMap
+              metadata:
+                name: test-config
+              data:
+                test-key: "test-value-$(date +%s)"
+              ---
+              apiVersion: v1
+              kind: Secret
+              metadata:
+                name: test-secret
+              stringData:
+                secret-key: "secret-value-$(date +%s)"
+              EOF
+              
+              # Wait for resources
+              sleep 30
+              
+              # Create test backup
+              velero backup create backup-test-$(date +%Y%m%d-%H%M%S) \
+                --include-namespaces backup-test-$(date +%Y%m%d) \
+                --wait
+              
+              # Verify backup
+              BACKUP_NAME="backup-test-$(date +%Y%m%d-%H%M%S)"
+              BACKUP_STATUS=$(velero backup describe $BACKUP_NAME --details | grep "Phase:" | awk '{print $2}')
+              
+              if [ "$BACKUP_STATUS" = "Completed" ]; then
+                echo "✓ Backup test successful"
+                
+                # Test restore in different namespace
+                kubectl create namespace restore-test-$(date +%Y%m%d) || true
+                
+                velero restore create restore-test-$(date +%Y%m%d-%H%M%S) \
+                  --from-backup $BACKUP_NAME \
+                  --namespace-mappings backup-test-$(date +%Y%m%d):restore-test-$(date +%Y%m%d) \
+                  --wait
+                
+                # Verify restore
+                if kubectl get configmap test-config -n restore-test-$(date +%Y%m%d) &>/dev/null; then
+                  echo "✓ Restore test successful"
+                else
+                  echo "✗ Restore test failed"
+                  exit 1
+                fi
+                
+                # Cleanup
+                kubectl delete namespace backup-test-$(date +%Y%m%d)
+                kubectl delete namespace restore-test-$(date +%Y%m%d)
+                velero backup delete $BACKUP_NAME --confirm
+                
+                echo "Backup testing completed successfully"
+              else
+                echo "✗ Backup test failed"
+                exit 1
+              fi
+
+---
+# Backup Monitoring Dashboard Config
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backup-monitoring-dashboard
+  namespace: velero
+data:
+  dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "Velero Backup Monitoring",
+        "tags": ["velero", "backup", "disaster-recovery"],
+        "style": "dark",
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Backup Success Rate",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "rate(velero_backup_success_total[24h]) / rate(velero_backup_attempt_total[24h]) * 100",
+                "legendFormat": "Success Rate %"
+              }
+            ]
+          },
+          {
+            "id": 2,
+            "title": "Backup Duration",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "velero_backup_duration_seconds",
+                "legendFormat": "{{ schedule }}"
+              }
+            ]
+          },
+          {
+            "id": 3,
+            "title": "Restore Operations",
+            "type": "table",
+            "targets": [
+              {
+                "expr": "velero_restore_attempt_total",
+                "legendFormat": "{{ restore }}"
+              }
+            ]
+          }
+        ]
+      }
+    }

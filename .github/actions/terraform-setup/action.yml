@@ -1,0 +1,222 @@
+name: 'Terraform Setup'
+description: 'Sets up Terraform with caching, backend configuration, and environment-specific settings'
+
+inputs:
+  terraform_version:
+    description: 'Terraform version to install'
+    required: true
+    default: '1.8.0'
+  environment:
+    description: 'Target environment (dev-lab, prod-lab)'
+    required: true
+  module:
+    description: 'Terraform module name'
+    required: true
+  working_directory:
+    description: 'Working directory for Terraform'
+    required: true
+    default: 'terraform'
+
+outputs:
+  terraform_version:
+    description: 'Installed Terraform version'
+    value: ${{ steps.terraform-setup.outputs.terraform_version }}
+  cache_hit:
+    description: 'Whether cache was hit'
+    value: ${{ steps.cache-terraform.outputs.cache-hit }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Terraform
+      id: terraform-setup
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ inputs.terraform_version }}
+
+    - name: Cache Terraform Plugins
+      id: cache-terraform
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.terraform.d/plugin-cache
+          ${{ inputs.working_directory }}/.terraform
+        key: terraform-${{ runner.os }}-${{ inputs.terraform_version }}-${{ hashFiles('**/.terraform.lock.hcl') }}
+        restore-keys: |
+          terraform-${{ runner.os }}-${{ inputs.terraform_version }}-
+          terraform-${{ runner.os }}-
+
+    - name: Configure Terraform Plugin Cache
+      shell: bash
+      run: |
+        echo "🔧 Configuring Terraform plugin cache..."
+        
+        # Create plugin cache directory
+        mkdir -p ~/.terraform.d/plugin-cache
+        
+        # Configure Terraform CLI
+        cat > ~/.terraformrc << EOF
+        plugin_cache_dir = "$HOME/.terraform.d/plugin-cache"
+        disable_checkpoint = true
+        disable_checkpoint_signature = true
+        
+        # Performance optimizations
+        plugin_cache_may_break_dependency_lock_file = true
+        
+        # Logging configuration
+        log_level = "INFO"
+        
+        # Provider installation configuration
+        provider_installation {
+          filesystem_mirror {
+            path = "$HOME/.terraform.d/plugin-cache/registry.terraform.io"
+            include = ["*/*"]
+          }
+          direct {
+            exclude = ["*/*"]
+          }
+        }
+        EOF
+        
+        # Set environment variables
+        echo "TF_PLUGIN_CACHE_DIR=$HOME/.terraform.d/plugin-cache" >> $GITHUB_ENV
+        echo "TF_CLI_CONFIG_FILE=$HOME/.terraformrc" >> $GITHUB_ENV
+        echo "TF_LOG=INFO" >> $GITHUB_ENV
+        
+        # Cache status
+        if [ "${{ steps.cache-terraform.outputs.cache-hit }}" == "true" ]; then
+          echo "✅ Terraform cache restored"
+          cache_size=$(du -sh ~/.terraform.d/plugin-cache 2>/dev/null | cut -f1 || echo "0")
+          echo "Cache size: $cache_size"
+        else
+          echo "💫 First run or cache miss - plugins will be downloaded"
+        fi
+
+    - name: Configure Backend
+      shell: bash
+      working-directory: ${{ inputs.working_directory }}
+      run: |
+        echo "🔧 Configuring Terraform backend..."
+        
+        # Validate required environment variables
+        required_vars=(
+          "TERRAFORM_BACKEND_RESOURCE_GROUP"
+          "TERRAFORM_BACKEND_STORAGE_ACCOUNT" 
+          "TERRAFORM_BACKEND_CONTAINER_NAME"
+        )
+        
+        missing_vars=()
+        for var in "${required_vars[@]}"; do
+          if [ -z "${!var}" ]; then
+            missing_vars+=("$var")
+          else
+            echo "✅ $var: ${!var}"
+          fi
+        done
+        
+        if [ ${#missing_vars[@]} -gt 0 ]; then
+          echo "❌ Missing required backend variables: ${missing_vars[*]}"
+          echo "Please ensure these secrets are configured in your repository or environment."
+          exit 1
+        fi
+        
+        # Create backend configuration
+        cat > backend.tf << EOF
+        # Auto-generated Terraform backend configuration
+        # Environment: ${{ inputs.environment }}
+        # Module: ${{ inputs.module }}
+        # Generated: $(date -u +%Y-%m-%dTH:%M:%SZ)
+        
+        terraform {
+          required_version = ">= ${{ inputs.terraform_version }}"
+          
+          required_providers {
+            azurerm = {
+              source  = "hashicorp/azurerm"
+              version = "~> 3.0"
+            }
+            random = {
+              source  = "hashicorp/random" 
+              version = "~> 3.1"
+            }
+          }
+          
+          backend "azurerm" {
+            resource_group_name   = "${{ env.TERRAFORM_BACKEND_RESOURCE_GROUP }}"
+            storage_account_name  = "${{ env.TERRAFORM_BACKEND_STORAGE_ACCOUNT }}"
+            container_name        = "${{ env.TERRAFORM_BACKEND_CONTAINER_NAME }}"
+            key                   = "${{ inputs.environment }}/${{ inputs.module }}/terraform.tfstate"
+            use_azuread_auth      = true
+            use_oidc              = false
+            snapshot              = true
+          }
+        }
+        
+        # Provider configuration
+        provider "azurerm" {
+          features {
+            key_vault {
+              purge_soft_delete_on_destroy    = true
+              recover_soft_deleted_key_vaults = true
+            }
+            resource_group {
+              prevent_deletion_if_contains_resources = false
+            }
+          }
+          
+          # Use Azure AD authentication
+          use_oidc = false
+          use_cli  = true
+        }
+        EOF
+        
+        echo "✅ Backend configuration created for ${{ inputs.environment }}/${{ inputs.module }}"
+        echo "📄 Backend configuration:"
+        cat backend.tf | sed 's/^/  /'
+        
+        # Validate configuration syntax
+        if terraform fmt -check backend.tf; then
+          echo "✅ Backend configuration syntax is valid"
+        else
+          echo "⚠️ Backend configuration formatting issues detected, fixing..."
+          terraform fmt backend.tf
+          echo "✅ Backend configuration formatted"
+        fi
+      env:
+        TERRAFORM_BACKEND_RESOURCE_GROUP: ${{ env.TERRAFORM_BACKEND_RESOURCE_GROUP }}
+        TERRAFORM_BACKEND_STORAGE_ACCOUNT: ${{ env.TERRAFORM_BACKEND_STORAGE_ACCOUNT }}
+        TERRAFORM_BACKEND_CONTAINER_NAME: ${{ env.TERRAFORM_BACKEND_CONTAINER_NAME }}
+
+    - name: Verify Setup
+      shell: bash
+      run: |
+        echo "🔍 Verifying Terraform setup..."
+        
+        # Verify Terraform installation
+        terraform_version=$(terraform version -json | jq -r '.terraform_version')
+        echo "terraform_version=$terraform_version" >> $GITHUB_OUTPUT
+        echo "✅ Terraform version: $terraform_version"
+        
+        # Verify plugin cache
+        if [ -d ~/.terraform.d/plugin-cache ]; then
+          echo "✅ Plugin cache directory exists"
+        else
+          echo "⚠️ Plugin cache directory not found"
+        fi
+        
+        # Verify backend configuration
+        if [ -f "${{ inputs.working_directory }}/backend.tf" ]; then
+          echo "✅ Backend configuration exists"
+        else
+          echo "❌ Backend configuration missing"
+          exit 1
+        fi
+        
+        echo "📋 Setup Summary:"
+        echo "  Environment: ${{ inputs.environment }}"
+        echo "  Module: ${{ inputs.module }}"
+        echo "  Working Directory: ${{ inputs.working_directory }}"
+        echo "  Terraform Version: $terraform_version"
+        echo "  Cache Hit: ${{ steps.cache-terraform.outputs.cache-hit }}"
+        echo "  Plugin Cache: ~/.terraform.d/plugin-cache"
+        echo "  CLI Config: ~/.terraformrc"

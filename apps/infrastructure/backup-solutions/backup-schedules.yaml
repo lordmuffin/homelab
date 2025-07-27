@@ -1,0 +1,219 @@
+---
+# Daily Full Cluster Backup
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: daily-cluster-backup
+  namespace: velero
+spec:
+  schedule: "0 2 * * *"  # 2 AM daily
+  template:
+    metadata:
+      labels:
+        backup-type: "cluster-full"
+        schedule: "daily"
+    includedNamespaces:
+    - "*"
+    excludedNamespaces:
+    - kube-system
+    - kube-public
+    - kube-node-lease
+    - velero
+    defaultVolumesToRestic: true
+    storageLocation: homelab-primary
+    volumeSnapshotLocations:
+    - homelab-snapshots
+    ttl: 720h  # 30 days
+    hooks:
+      resources:
+      - name: database-backup-hook
+        includedNamespaces:
+        - services
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/component: database
+        pre:
+        - exec:
+            container: postgres
+            command:
+            - /bin/bash
+            - -c
+            - "pg_dump -U $POSTGRES_USER $POSTGRES_DB > /tmp/backup.sql"
+            onError: Continue
+        post:
+        - exec:
+            container: postgres
+            command:
+            - /bin/bash
+            - -c
+            - "rm -f /tmp/backup.sql"
+
+---
+# Weekly Archive Backup
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: weekly-archive-backup
+  namespace: velero
+spec:
+  schedule: "0 3 * * 0"  # 3 AM every Sunday
+  template:
+    metadata:
+      labels:
+        backup-type: "archive"
+        schedule: "weekly"
+    includedNamespaces:
+    - "*"
+    defaultVolumesToRestic: true
+    storageLocation: homelab-local
+    volumeSnapshotLocations:
+    - homelab-snapshots
+    ttl: 2160h  # 90 days
+    snapshotVolumes: true
+
+---
+# Critical Services Backup (Every 6 hours)
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: critical-services-backup
+  namespace: velero
+spec:
+  schedule: "0 */6 * * *"  # Every 6 hours
+  template:
+    metadata:
+      labels:
+        backup-type: "critical"
+        schedule: "frequent"
+    includedNamespaces:
+    - argocd
+    - monitoring
+    - services
+    labelSelector:
+      matchLabels:
+        backup-priority: "critical"
+    defaultVolumesToRestic: true
+    storageLocation: homelab-primary
+    ttl: 168h  # 7 days
+
+---
+# Database Backup Schedule
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: database-backup
+  namespace: velero
+spec:
+  schedule: "0 */4 * * *"  # Every 4 hours
+  template:
+    metadata:
+      labels:
+        backup-type: "database"
+        schedule: "frequent"
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/component: database
+    defaultVolumesToRestic: true
+    storageLocation: homelab-primary
+    volumeSnapshotLocations:
+    - homelab-snapshots
+    ttl: 336h  # 14 days
+    hooks:
+      resources:
+      - name: postgres-consistent-backup
+        includedNamespaces:
+        - "*"
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: postgresql
+        pre:
+        - exec:
+            container: postgresql
+            command:
+            - /bin/bash
+            - -c
+            - "psql -U $POSTGRES_USER -c 'SELECT pg_start_backup('velero-backup', true);'"
+            onError: Fail
+        post:
+        - exec:
+            container: postgresql
+            command:
+            - /bin/bash
+            - -c
+            - "psql -U $POSTGRES_USER -c 'SELECT pg_stop_backup();'"
+
+---
+# Configuration Backup (Secrets, ConfigMaps)
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: configuration-backup
+  namespace: velero
+spec:
+  schedule: "0 1 * * *"  # 1 AM daily
+  template:
+    metadata:
+      labels:
+        backup-type: "configuration"
+        schedule: "daily"
+    includedResources:
+    - secrets
+    - configmaps
+    - persistentvolumeclaims
+    - persistentvolumes
+    includedNamespaces:
+    - "*"
+    excludedNamespaces:
+    - kube-system
+    - kube-public
+    - kube-node-lease
+    storageLocation: homelab-primary
+    ttl: 2160h  # 90 days
+
+---
+# Infrastructure Backup
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: infrastructure-backup
+  namespace: velero
+spec:
+  schedule: "0 4 * * 1"  # 4 AM every Monday
+  template:
+    metadata:
+      labels:
+        backup-type: "infrastructure"
+        schedule: "weekly"
+    includedNamespaces:
+    - cert-manager
+    - ingress-nginx
+    - metallb-system
+    - democratic-csi
+    - kube-system
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/part-of: infrastructure
+    defaultVolumesToRestic: false
+    storageLocation: homelab-primary
+    ttl: 4320h  # 180 days
+
+---
+# Development Backup (Less frequent)
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: development-backup
+  namespace: velero
+spec:
+  schedule: "0 5 * * 2,4,6"  # 5 AM on Tue, Thu, Sat
+  template:
+    metadata:
+      labels:
+        backup-type: "development"
+        schedule: "tri-weekly"
+    labelSelector:
+      matchLabels:
+        environment: development
+    defaultVolumesToRestic: true
+    storageLocation: homelab-local
+    ttl: 168h  # 7 days

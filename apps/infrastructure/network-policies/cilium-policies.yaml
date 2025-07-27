@@ -1,0 +1,166 @@
+---
+# Cilium L3/L4 Network Policy for Database Security
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: database-security
+  namespace: services
+specs:
+- endpointSelector:
+    matchLabels:
+      app.kubernetes.io/component: database
+  ingress:
+  - fromEndpoints:
+    - matchLabels:
+        app.kubernetes.io/type: web
+    toPorts:
+    - ports:
+      - port: "5432"
+        protocol: TCP
+      - port: "3306"
+        protocol: TCP
+      - port: "6379"
+        protocol: TCP
+
+---
+# Cilium L7 HTTP Policy for Web Services
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: web-services-l7
+  namespace: services
+specs:
+- endpointSelector:
+    matchLabels:
+      app.kubernetes.io/type: web
+  ingress:
+  - fromEndpoints:
+    - matchLabels:
+        app.kubernetes.io/name: ingress-nginx
+    - matchLabels:
+        app.kubernetes.io/name: traefik
+    toPorts:
+    - ports:
+      - port: "80"
+        protocol: TCP
+      - port: "443"
+        protocol: TCP
+      rules:
+        http:
+        - method: "GET"
+        - method: "POST"
+        - method: "PUT"
+        - method: "DELETE"
+        - method: "PATCH"
+
+---
+# Cilium DNS Policy
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: dns-policy
+  namespace: services
+specs:
+- endpointSelector: {}
+  egress:
+  - toEndpoints:
+    - matchLabels:
+        k8s-app: kube-dns
+    toPorts:
+    - ports:
+      - port: "53"
+        protocol: UDP
+      rules:
+        dns:
+        - matchPattern: "*"
+
+---
+# Cilium Monitoring Policy
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: monitoring-access
+  namespace: services
+specs:
+- endpointSelector:
+    matchLabels:
+      monitoring: "true"
+  ingress:
+  - fromEndpoints:
+    - matchLabels:
+        app.kubernetes.io/name: prometheus
+    toPorts:
+    - ports:
+      - port: "8080"
+        protocol: TCP
+      - port: "9090"
+        protocol: TCP
+      - port: "3000"
+        protocol: TCP
+
+---
+# Cilium Cross-Namespace Policy for Matrix
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: matrix-cross-namespace
+  namespace: matrix
+specs:
+- endpointSelector:
+    matchLabels:
+      app.kubernetes.io/component: synapse
+  ingress:
+  - fromEndpoints:
+    - matchLabels:
+        app.kubernetes.io/component: bridge
+  - fromEndpoints:
+    - matchLabels:
+        app.kubernetes.io/component: client
+    toPorts:
+    - ports:
+      - port: "8008"
+        protocol: TCP
+      - port: "8448"
+        protocol: TCP
+
+---
+# Cilium FQDN Policy for External Services
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: external-fqdn-policy
+  namespace: services
+specs:
+- endpointSelector:
+    matchLabels:
+      external-access: "true"
+  egress:
+  - toFQDNs:
+    - matchName: "api.github.com"
+    - matchName: "registry-1.docker.io"
+    - matchName: "ghcr.io"
+    - matchPattern: "*.githubusercontent.com"
+    toPorts:
+    - ports:
+      - port: "443"
+        protocol: TCP
+
+---
+# Cilium Identity-based Policy
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: identity-based-policy
+  namespace: services
+specs:
+- endpointSelector:
+    matchLabels:
+      security-level: high
+  ingress:
+  - fromEndpoints:
+    - matchLabels:
+        security-clearance: high
+  egress:
+  - toEndpoints:
+    - matchLabels:
+        security-level: high

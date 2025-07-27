@@ -55,6 +55,8 @@ spec:
               key: password
         - name: FORCE_RESTORE
           value: "false"
+        - name: RESTORE_MEDIA
+          value: "true"
         command: ["/bin/sh", "-c"]
         args:
         - |
@@ -214,6 +216,80 @@ spec:
             echo "ERROR: Database restoration failed."
             exit 1
           fi
+          
+          # MEDIA RESTORATION LOGIC
+          if [ "${RESTORE_MEDIA:-true}" = "true" ]; then
+            echo "🔄 Checking for media backup restoration..."
+            
+            # Check if media directories already have content
+            STATIC_COUNT=$(find /opt/recipes/staticfiles -type f 2>/dev/null | wc -l || echo "0")
+            MEDIA_COUNT=$(find /opt/recipes/mediafiles -type f 2>/dev/null | wc -l || echo "0")
+            
+            echo "Current media files - Static: $STATIC_COUNT, Media: $MEDIA_COUNT"
+            
+            # Skip if media already exists (unless FORCE_RESTORE=true)
+            if [ "${FORCE_RESTORE:-false}" != "true" ] && [ "$MEDIA_COUNT" -gt "0" ]; then
+              echo "Media files already exist. Skipping media restoration."
+              echo "💡 To force media restoration, set FORCE_RESTORE=true"
+            else
+              echo "Searching for latest media backup..."
+              MEDIA_BACKUP_LIST=$(/usr/local/bin/b2 ls "b2://$B2_BUCKET_NAME/tandoor/media/" --recursive 2>/dev/null || echo "")
+              
+              if [ -n "$MEDIA_BACKUP_LIST" ]; then
+                LATEST_MEDIA_BACKUP=$(echo "$MEDIA_BACKUP_LIST" | \
+                                     grep -E 'tandoor_media_[0-9]{8}_[0-9]{6}\.tar\.gz' | \
+                                     sort -r | head -n 1 | awk '{print $NF}')
+                
+                if [ -n "$LATEST_MEDIA_BACKUP" ]; then
+                  echo "Found latest media backup: $LATEST_MEDIA_BACKUP"
+                  
+                  # Download media backup
+                  mkdir -p /tmp/media
+                  MEDIA_FILENAME=$(basename "$LATEST_MEDIA_BACKUP")
+                  
+                  echo "Downloading media backup..."
+                  if /usr/local/bin/b2 file download "b2://$B2_BUCKET_NAME/$LATEST_MEDIA_BACKUP" "/tmp/media/$MEDIA_FILENAME"; then
+                    echo "Media backup downloaded successfully"
+                    
+                    # Validate archive
+                    if tar -tzf "/tmp/media/$MEDIA_FILENAME" >/dev/null 2>&1; then
+                      echo "Archive validation successful"
+                      
+                      # Clear existing media if forcing restore
+                      if [ "${FORCE_RESTORE:-false}" = "true" ]; then
+                        echo "⚠️  FORCE_RESTORE enabled - clearing existing media files"
+                        rm -rf /opt/recipes/staticfiles/* /opt/recipes/mediafiles/* 2>/dev/null || true
+                      fi
+                      
+                      # Extract media files
+                      echo "Extracting media files..."
+                      cd /opt/recipes
+                      if tar -xzf "/tmp/media/$MEDIA_FILENAME" --strip-components=0; then
+                        # Verify extraction
+                        RESTORED_STATIC=$(find staticfiles -type f 2>/dev/null | wc -l || echo "0")
+                        RESTORED_MEDIA=$(find mediafiles -type f 2>/dev/null | wc -l || echo "0")
+                        echo "✅ Media restoration completed - Static: $RESTORED_STATIC, Media: $RESTORED_MEDIA files"
+                      else
+                        echo "❌ Media extraction failed"
+                      fi
+                    else
+                      echo "❌ Media archive validation failed"
+                    fi
+                  else
+                    echo "❌ Media backup download failed"
+                  fi
+                else
+                  echo "No valid media backup files found"
+                fi
+              else
+                echo "No media backups available in B2"
+              fi
+            fi
+          else
+            echo "Media restoration disabled (RESTORE_MEDIA=false)"
+          fi
+          
+          echo "Init container completed successfully"
       containers:
       - name: recipes
         image: vabene1111/recipes

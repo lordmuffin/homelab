@@ -1,0 +1,362 @@
+---
+# Velero Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: velero
+  labels:
+    name: velero
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+
+---
+# Velero Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: velero-config
+  namespace: velero
+data:
+  config.yaml: |
+    # Velero server configuration
+    backupSyncPeriod: 60m
+    fsBackupTimeout: 240m
+    defaultBackupTTL: 720h  # 30 days
+    defaultVolumesToFsBackup: true
+    logLevel: info
+    logFormat: text
+    
+    # Features
+    enableCSI: true
+    enableAPIGroupVersions: true
+    
+    # Resource filtering
+    excludeResources:
+    - nodes
+    - events
+    - events.events.k8s.io
+    - backups.velero.io
+    - restores.velero.io
+    - resticrepositories.velero.io
+
+---
+# Enhanced BackupStorageLocation
+apiVersion: velero.io/v1
+kind: BackupStorageLocation
+metadata:
+  name: homelab-primary
+  namespace: velero
+spec:
+  provider: aws
+  objectStorage:
+    bucket: homelab-k8s-backups
+    prefix: cluster-backups
+  config:
+    region: us-east-1
+    s3ForcePathStyle: "true"
+    s3Url: https://s3.amazonaws.com
+    publicUrl: https://s3.amazonaws.com
+    checksumAlgorithm: CRC32C
+  credential:
+    name: velero-credentials
+    key: cloud
+  default: true
+
+---
+# Secondary BackupStorageLocation (Local NAS)
+apiVersion: velero.io/v1
+kind: BackupStorageLocation
+metadata:
+  name: homelab-local
+  namespace: velero
+spec:
+  provider: aws
+  objectStorage:
+    bucket: homelab-local-backups
+    prefix: local-backups
+  config:
+    region: local
+    s3ForcePathStyle: "true"
+    s3Url: http://nas.homelab.local:9000
+    publicUrl: http://nas.homelab.local:9000
+    insecureSkipTLSVerify: "true"
+  credential:
+    name: velero-local-credentials
+    key: cloud
+  default: false
+
+---
+# VolumeSnapshotLocation
+apiVersion: velero.io/v1
+kind: VolumeSnapshotLocation
+metadata:
+  name: homelab-snapshots
+  namespace: velero
+spec:
+  provider: csi
+  config:
+    # CSI snapshot configuration
+    snapshotRetentionDays: "30"
+
+---
+# Velero Server Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: velero
+  namespace: velero
+  labels:
+    app: velero
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: velero
+  template:
+    metadata:
+      labels:
+        app: velero
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8085"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: velero
+      priorityClassName: infrastructure-high
+      initContainers:
+      - name: velero-plugin-for-csi
+        image: velero/velero-plugin-for-csi:v0.6.0
+        imagePullPolicy: IfNotPresent
+        volumeMounts:
+        - mountPath: /target
+          name: plugins
+      - name: velero-plugin-for-aws
+        image: velero/velero-plugin-for-aws:v1.8.0
+        imagePullPolicy: IfNotPresent
+        volumeMounts:
+        - mountPath: /target
+          name: plugins
+      containers:
+      - name: velero
+        image: velero/velero:v1.12.0
+        ports:
+        - name: metrics
+          containerPort: 8085
+        - name: monitoring
+          containerPort: 8086
+        command:
+        - /velero
+        args:
+        - server
+        - --uploader-type=restic
+        - --default-backup-storage-location=homelab-primary
+        - --default-volume-snapshot-locations=homelab-snapshots
+        - --backup-sync-period=60m
+        - --fs-backup-timeout=240m
+        - --default-backup-ttl=720h
+        - --restore-resource-priorities=namespaces,storageclasses,volumesnapshotclass.snapshot.storage.k8s.io,volumesnapshotcontents.snapshot.storage.k8s.io,volumesnapshots.snapshot.storage.k8s.io,persistentvolumes,persistentvolumeclaims,secrets,configmaps,serviceaccounts,limitranges,pods
+        - --features=EnableCSI,EnableAPIGroupVersions
+        - --log-level=info
+        - --log-format=text
+        - --metrics-address=0.0.0.0:8085
+        resources:
+          requests:
+            cpu: 500m
+            memory: 128Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+        volumeMounts:
+        - name: plugins
+          mountPath: /plugins
+        - name: velero-credentials
+          mountPath: /credentials
+          readOnly: true
+        - name: scratch
+          mountPath: /scratch
+        env:
+        - name: VELERO_SCRATCH_DIR
+          value: /scratch
+        - name: VELERO_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: LD_LIBRARY_PATH
+          value: /plugins
+        - name: AWS_SHARED_CREDENTIALS_FILE
+          value: /credentials/cloud
+        livenessProbe:
+          httpGet:
+            path: /metrics
+            port: 8085
+          initialDelaySeconds: 10
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /metrics
+            port: 8085
+          initialDelaySeconds: 10
+          timeoutSeconds: 5
+      volumes:
+      - name: plugins
+        emptyDir: {}
+      - name: scratch
+        emptyDir: {}
+      - name: velero-credentials
+        secret:
+          secretName: velero-credentials
+
+---
+# Node Agent DaemonSet (for filesystem backups)
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: node-agent
+  namespace: velero
+  labels:
+    app: node-agent
+spec:
+  selector:
+    matchLabels:
+      app: node-agent
+  template:
+    metadata:
+      labels:
+        app: node-agent
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8085"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: velero
+      priorityClassName: infrastructure-high
+      hostPID: true
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+      - name: node-agent
+        image: velero/velero:v1.12.0
+        imagePullPolicy: IfNotPresent
+        command:
+        - /velero
+        args:
+        - node-agent
+        - server
+        - --log-level=info
+        - --log-format=text
+        - --metrics-address=0.0.0.0:8085
+        ports:
+        - name: metrics
+          containerPort: 8085
+          hostPort: 8085
+        resources:
+          requests:
+            cpu: 500m
+            memory: 512Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: host-pods
+          mountPath: /host_pods
+          mountPropagation: HostToContainer
+        - name: scratch
+          mountPath: /scratch
+        env:
+        - name: VELERO_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: VELERO_SCRATCH_DIR
+          value: /scratch
+      volumes:
+      - name: host-pods
+        hostPath:
+          path: /var/lib/kubelet/pods
+      - name: scratch
+        emptyDir: {}
+      tolerations:
+      - operator: Exists
+
+---
+# Velero ServiceAccount
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: velero
+  namespace: velero
+
+---
+# Velero ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: velero
+subjects:
+- kind: ServiceAccount
+  name: velero
+  namespace: velero
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Velero Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: velero
+  namespace: velero
+  labels:
+    app: velero
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8085"
+    prometheus.io/path: "/metrics"
+spec:
+  selector:
+    app: velero
+  ports:
+  - name: metrics
+    port: 8085
+    targetPort: 8085
+  - name: monitoring
+    port: 8086
+    targetPort: 8086
+  type: ClusterIP
+
+---
+# Velero Credentials Secret Template
+apiVersion: v1
+kind: Secret
+metadata:
+  name: velero-credentials
+  namespace: velero
+type: Opaque
+stringData:
+  cloud: |
+    [default]
+    aws_access_key_id=YOUR_ACCESS_KEY_ID
+    aws_secret_access_key=YOUR_SECRET_ACCESS_KEY
+
+---
+# Velero Local Credentials Secret Template
+apiVersion: v1
+kind: Secret
+metadata:
+  name: velero-local-credentials
+  namespace: velero
+type: Opaque
+stringData:
+  cloud: |
+    [default]
+    aws_access_key_id=LOCAL_MINIO_ACCESS_KEY
+    aws_secret_access_key=LOCAL_MINIO_SECRET_KEY
