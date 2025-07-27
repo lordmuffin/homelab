@@ -214,7 +214,7 @@ spec:
           fi
       containers:
       - name: blinko
-        image: blinkospace/blinko:latest
+        image: blinkospace/blinko:1.2.2
         imagePullPolicy: Always
         command: ["/bin/sh"]
         args:
