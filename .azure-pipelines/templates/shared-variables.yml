@@ -69,7 +69,7 @@ variables:
 
 # Working Directory Logic (enhanced)
 - name: WORKING_DIR
-  value: $[eq(variables['Module'], 'main'), 'terraform', format('terraform/modules/{0}', variables['Module'])]
+  value: $[if(eq(variables['Module'], 'main'), 'terraform', format('terraform/modules/{0}', variables['Module']))]
 - name: StateKey
   value: '$(Environment)/$(Module)/terraform.tfstate'
 - name: STATE_LOCK_TIMEOUT
