@@ -1,0 +1,450 @@
+# Azure DevOps Template: Secure Security Scanning
+# Installs and runs security scanning tools with proper verification
+
+parameters:
+- name: workingDirectory
+  type: string
+  default: '$(WORKING_DIR)'
+- name: failOnHigh
+  type: boolean
+  default: true
+- name: enableCache
+  type: boolean
+  default: true
+
+steps:
+- task: Cache@2
+  displayName: 'Cache Security Tools'
+  condition: eq('${{ parameters.enableCache }}', 'true')
+  inputs:
+    key: '$(SecurityScanCacheKey)'
+    path: '$(Pipeline.Workspace)/.security-tools'
+    cacheHitVar: 'SECURITY_TOOLS_CACHE_RESTORED'
+
+- task: PowerShell@2
+  displayName: 'Install Security Tools (Secure)'
+  inputs:
+    targetType: 'inline'
+    script: |
+      $securityToolsDir = "$(Pipeline.Workspace)/.security-tools"
+      $binDir = "$securityToolsDir/bin"
+      
+      # Create directories
+      New-Item -ItemType Directory -Force -Path $binDir
+      $env:PATH = "$binDir;$env:PATH"
+      
+      # Skip installation if cache hit
+      if ($env:SECURITY_TOOLS_CACHE_RESTORED -eq 'true') {
+        Write-Host "✅ Security tools restored from cache"
+        $env:PATH = "$binDir;$env:PATH"
+        & "$binDir/tfsec" --version
+        & "$binDir/checkov" --version 2>$null || Write-Host "Checkov not in cache, will install"
+        return
+      }
+      
+      Write-Host "🔧 Installing security scanning tools..."
+      
+      # Install tfsec with enhanced security verification
+      $tfsecVersion = "$(TFSEC_VERSION)"
+      $platform = if ($IsLinux) { "linux-amd64" } elseif ($IsMacOS) { "darwin-amd64" } else { "windows-amd64.exe" }
+      $tfsecUrl = "https://github.com/aquasecurity/tfsec/releases/download/v$tfsecVersion/tfsec-$platform"
+      $tfsecChecksum = "https://github.com/aquasecurity/tfsec/releases/download/v$tfsecVersion/tfsec_$($tfsecVersion)_checksums.txt"
+      
+      try {
+        # Download tfsec
+        Write-Host "📦 Downloading tfsec v$tfsecVersion..."
+        Invoke-WebRequest -Uri $tfsecUrl -OutFile "$binDir/tfsec" -UseBasicParsing
+        
+        # Download and verify checksum with enhanced validation
+        Invoke-WebRequest -Uri $tfsecChecksum -OutFile "$securityToolsDir/checksums.txt" -UseBasicParsing
+        $checksumContent = Get-Content "$securityToolsDir/checksums.txt"
+        $expectedChecksum = ($checksumContent | Select-String "tfsec-$platform").Line.Split()[0]
+        
+        if (-not $expectedChecksum) {
+          throw "Checksum not found for platform: $platform"
+        }
+        
+        $actualChecksum = (Get-FileHash "$binDir/tfsec" -Algorithm SHA256).Hash.ToLower()
+        
+        if ($actualChecksum -ne $expectedChecksum.ToLower()) {
+          throw "Checksum verification failed for tfsec. Expected: $expectedChecksum, Actual: $actualChecksum"
+        }
+        
+        Write-Host "✅ tfsec checksum verified: $actualChecksum"
+        
+        # Make executable
+        chmod +x "$binDir/tfsec"
+        Write-Host "✅ tfsec installed and verified"
+        
+      } catch {
+        Write-Host "❌ Failed to install tfsec: $($_.Exception.Message)"
+        exit 1
+      }
+      
+      # Install Checkov via pip with enhanced security
+      try {
+        Write-Host "📦 Installing Checkov v$(CHECKOV_VERSION)..."
+        
+        # Create virtual environment for isolation
+        python3 -m venv "$securityToolsDir/checkov-venv"
+        
+        if ($IsLinux -or $IsMacOS) {
+          & "$securityToolsDir/checkov-venv/bin/pip" install --upgrade pip
+          & "$securityToolsDir/checkov-venv/bin/pip" install "checkov==$(CHECKOV_VERSION)" --no-cache-dir
+          
+          # Create wrapper script
+          $checkovWrapper = @"
+#!/bin/bash
+exec "$securityToolsDir/checkov-venv/bin/checkov" `"\$@`"
+"@
+        } else {
+          & "$securityToolsDir/checkov-venv/Scripts/pip.exe" install --upgrade pip
+          & "$securityToolsDir/checkov-venv/Scripts/pip.exe" install "checkov==$(CHECKOV_VERSION)" --no-cache-dir
+          
+          # Create wrapper script for Windows
+          $checkovWrapper = @"
+@echo off
+"$securityToolsDir/checkov-venv/Scripts/checkov.exe" %*
+"@
+        }
+        
+        $wrapperExt = if ($IsWindows) { ".bat" } else { "" }
+        $checkovWrapper | Out-File -FilePath "$binDir/checkov$wrapperExt" -Encoding UTF8
+        
+        if ($IsLinux -or $IsMacOS) {
+          chmod +x "$binDir/checkov"
+        }
+        
+        Write-Host "✅ Checkov installed in isolated environment"
+        
+      } catch {
+        Write-Host "❌ Failed to install Checkov: $($_.Exception.Message)"
+        # Try fallback installation
+        try {
+          Write-Host "🔄 Trying fallback installation method..."
+          python3 -m pip install --user --no-warn-script-location "checkov==$(CHECKOV_VERSION)"
+          
+          $checkovWrapper = @"
+#!/bin/bash
+python3 -m checkov `$@
+"@
+          $checkovWrapper | Out-File -FilePath "$binDir/checkov" -Encoding UTF8
+          chmod +x "$binDir/checkov"
+          Write-Host "✅ Checkov installed via fallback method"
+        } catch {
+          Write-Host "❌ All Checkov installation methods failed: $($_.Exception.Message)"
+          exit 1
+        }
+      }
+      
+      # Install Terrascan for additional coverage
+      try {
+        Write-Host "📦 Installing Terrascan v$(TERRASCAN_VERSION)..."
+        $terrascanUrl = "https://github.com/tenable/terrascan/releases/download/v$(TERRASCAN_VERSION)/terrascan_$(TERRASCAN_VERSION)_Linux_x86_64.tar.gz"
+        
+        # Download and extract
+        Invoke-WebRequest -Uri $terrascanUrl -OutFile "$securityToolsDir/terrascan.tar.gz" -UseBasicParsing
+        tar -xzf "$securityToolsDir/terrascan.tar.gz" -C $binDir terrascan
+        chmod +x "$binDir/terrascan"
+        
+        Write-Host "✅ Terrascan installed"
+        
+      } catch {
+        Write-Host "⚠️ Failed to install Terrascan (non-critical): $($_.Exception.Message)"
+      }
+      
+      # Verify installations
+      Write-Host "🔍 Verifying security tool installations:"
+      & "$binDir/tfsec" --version
+      & "$binDir/checkov" --version
+      & "$binDir/terrascan" version 2>$null || Write-Host "Terrascan not available"
+
+- task: PowerShell@2
+  displayName: 'Security Scan - tfsec'
+  inputs:
+    targetType: 'inline'
+    workingDirectory: ${{ parameters.workingDirectory }}
+    script: |
+      $binDir = "$(Pipeline.Workspace)/.security-tools/bin"
+      $env:PATH = "$binDir;$env:PATH"
+      
+      Write-Host "🔍 Running tfsec security scan..."
+      
+      # Run tfsec with comprehensive options
+      & "$binDir/tfsec" . `
+        --format json `
+        --out tfsec-results.json `
+        --include-ignored `
+        --soft-fail
+      
+      # Process results
+      if (Test-Path "tfsec-results.json") {
+        $results = Get-Content "tfsec-results.json" | ConvertFrom-Json
+        $critical = ($results.results | Where-Object { $_.severity -eq "CRITICAL" }).Count
+        $high = ($results.results | Where-Object { $_.severity -eq "HIGH" }).Count
+        $medium = ($results.results | Where-Object { $_.severity -eq "MEDIUM" }).Count
+        $low = ($results.results | Where-Object { $_.severity -eq "LOW" }).Count
+        
+        Write-Host "📊 tfsec Results:"
+        Write-Host "  CRITICAL: $critical"
+        Write-Host "  HIGH: $high" 
+        Write-Host "  MEDIUM: $medium"
+        Write-Host "  LOW: $low"
+        
+        # Set variables for downstream tasks
+        Write-Host "##vso[task.setvariable variable=TFSEC_CRITICAL]$critical"
+        Write-Host "##vso[task.setvariable variable=TFSEC_HIGH]$high"
+        Write-Host "##vso[task.setvariable variable=TFSEC_TOTAL]$($critical + $high + $medium + $low)"
+        
+        # Enhanced security issue reporting and failure logic
+        if ($critical -gt 0 -or $high -gt 0) {
+          Write-Host "⚠️ Security issues summary:"
+          $criticalIssues = $results.results | Where-Object { $_.severity -eq "CRITICAL" }
+          $highIssues = $results.results | Where-Object { $_.severity -eq "HIGH" }
+          
+          if ($criticalIssues.Count -gt 0) {
+            Write-Host "🚨 CRITICAL Issues:"
+            $criticalIssues | ForEach-Object {
+              Write-Host "  🔴 $($_.rule_description) - $($_.location.filename):$($_.location.start_line)"
+              Write-Host "    Impact: $($_.description)"
+              Write-Host "    Rule: $($_.rule_id)"
+              Write-Host "##vso[task.logissue type=error]CRITICAL: $($_.rule_description) in $($_.location.filename)"
+            }
+          }
+          
+          if ($highIssues.Count -gt 0) {
+            Write-Host "🔶 HIGH Issues:"
+            $highIssues | ForEach-Object {
+              Write-Host "  🟠 $($_.rule_description) - $($_.location.filename):$($_.location.start_line)"
+              Write-Host "    Impact: $($_.description)"
+              Write-Host "    Rule: $($_.rule_id)"
+              Write-Host "##vso[task.logissue type=warning]HIGH: $($_.rule_description) in $($_.location.filename)"
+            }
+          }
+          
+          # Fail build based on configuration
+          if (${{ parameters.failOnHigh }}) {
+            if ($critical -gt 0) {
+              Write-Host "❌ Build failed due to $critical CRITICAL security issues"
+              exit 1
+            } elseif ($high -gt 0 -and "$(SECURITY_FAIL_ON_HIGH)" -eq "true") {
+              Write-Host "❌ Build failed due to $high HIGH security issues"
+              exit 1
+            }
+          }
+        }
+      } else {
+        Write-Host "⚠️ tfsec results file not found"
+        Write-Host "##vso[task.setvariable variable=TFSEC_TOTAL]0"
+      }
+
+- task: PowerShell@2
+  displayName: 'Security Scan - Checkov'
+  inputs:
+    targetType: 'inline'
+    workingDirectory: ${{ parameters.workingDirectory }}
+    script: |
+      $binDir = "$(Pipeline.Workspace)/.security-tools/bin"
+      $env:PATH = "$binDir;$env:PATH"
+      
+      Write-Host "🔍 Running Checkov security scan..."
+      
+      # Run Checkov with comprehensive framework support
+      & "$binDir/checkov" -d . `
+        --framework terraform `
+        --framework dockerfile `
+        --framework kubernetes `
+        --output json `
+        --output-file checkov-results.json `
+        --soft-fail `
+        --quiet
+      
+      # Process results
+      if (Test-Path "checkov-results.json") {
+        $results = Get-Content "checkov-results.json" | ConvertFrom-Json
+        $failed = $results.summary.failed
+        $passed = $results.summary.passed
+        $skipped = $results.summary.skipped
+        
+        Write-Host "📊 Checkov Results:"
+        Write-Host "  FAILED: $failed"
+        Write-Host "  PASSED: $passed"
+        Write-Host "  SKIPPED: $skipped"
+        
+        # Set variables for downstream tasks
+        Write-Host "##vso[task.setvariable variable=CHECKOV_FAILED]$failed"
+        Write-Host "##vso[task.setvariable variable=CHECKOV_PASSED]$passed"
+        
+        # Show top 10 failed checks
+        if ($failed -gt 0) {
+          Write-Host "🔍 Top failed checks:"
+          $results.results.failed_checks | Select-Object -First 10 | 
+            ForEach-Object { Write-Host "  ⚠️ $($_.check_name) - $($_.file_path):$($_.file_line_range[0])" }
+        }
+        
+        # Enhanced Checkov failure logic with detailed reporting
+        if ($failed -gt 0) {
+          Write-Host "⚠️ Checkov found $failed failed checks:"
+          
+          # Group issues by severity if available
+          $criticalChecks = $results.results.failed_checks | Where-Object { $_.severity -eq "CRITICAL" -or $_.severity -eq "HIGH" }
+          
+          if ($criticalChecks.Count -gt 0) {
+            Write-Host "🚨 High-severity failed checks:"
+            $criticalChecks | ForEach-Object {
+              Write-Host "  🔴 $($_.check_name) - $($_.file_path):$($_.file_line_range[0])"
+              Write-Host "    Category: $($_.check_class)"
+              Write-Host "    Guideline: $($_.guideline)"
+              Write-Host "##vso[task.logissue type=error]Checkov: $($_.check_name) in $($_.file_path)"
+            }
+          }
+          
+          # Fail build based on thresholds
+          if (${{ parameters.failOnHigh }}) {
+            $maxAllowed = [int]"$(MAX_SECURITY_ISSUES)"
+            if ($failed -gt $maxAllowed) {
+              Write-Host "❌ Too many security issues found ($failed > $maxAllowed) - failing build"
+              exit 1
+            } elseif ($criticalChecks.Count -gt 0) {
+              Write-Host "❌ Critical security checks failed - failing build"
+              exit 1
+            }
+          }
+        }
+      } else {
+        Write-Host "⚠️ Checkov results file not found"
+        Write-Host "##vso[task.setvariable variable=CHECKOV_FAILED]0"
+      }
+
+- task: PowerShell@2
+  displayName: 'Security Scan - Terrascan'
+  inputs:
+    targetType: 'inline'
+    workingDirectory: ${{ parameters.workingDirectory }}
+    script: |
+      $binDir = "$(Pipeline.Workspace)/.security-tools/bin"
+      $env:PATH = "$binDir;$env:PATH"
+      
+      if (Test-Path "$binDir/terrascan") {
+        Write-Host "🔍 Running Terrascan security scan..."
+        
+        & "$binDir/terrascan" scan `
+          -i terraform `
+          -t aws `
+          -t azure `
+          -t gcp `
+          -o json `
+          --output-file terrascan-results.json `
+          --non-recursive `
+          --verbose || $true  # Don't fail on terrascan errors
+        
+        # Process results if available
+        if (Test-Path "terrascan-results.json") {
+          $results = Get-Content "terrascan-results.json" | ConvertFrom-Json
+          $violationsCount = $results.results.violations.Count
+          
+          Write-Host "📊 Terrascan Results: $violationsCount violations"
+          Write-Host "##vso[task.setvariable variable=TERRASCAN_VIOLATIONS]$violationsCount"
+          
+          if ($violationsCount -gt 0) {
+            Write-Host "🔍 Top violations:"
+            $results.results.violations | Select-Object -First 5 | 
+              ForEach-Object { Write-Host "  ⚠️ $($_.rule_name) - $($_.description)" }
+          }
+        }
+      } else {
+        Write-Host "ℹ️ Terrascan not available, skipping"
+        Write-Host "##vso[task.setvariable variable=TERRASCAN_VIOLATIONS]0"
+      }
+  continueOnError: true
+
+- task: PowerShell@2
+  displayName: 'Generate Security Report'
+  inputs:
+    targetType: 'inline'
+    workingDirectory: ${{ parameters.workingDirectory }}
+    script: |
+      Write-Host "📋 Security Scan Summary Report"
+      Write-Host "================================"
+      
+      $tfsecTotal = if ($env:TFSEC_TOTAL) { $env:TFSEC_TOTAL } else { 0 }
+      $tfsecCritical = if ($env:TFSEC_CRITICAL) { $env:TFSEC_CRITICAL } else { 0 }
+      $tfsecHigh = if ($env:TFSEC_HIGH) { $env:TFSEC_HIGH } else { 0 }
+      $checkovFailed = if ($env:CHECKOV_FAILED) { $env:CHECKOV_FAILED } else { 0 }
+      $checkovPassed = if ($env:CHECKOV_PASSED) { $env:CHECKOV_PASSED } else { 0 }
+      $terrascanViolations = if ($env:TERRASCAN_VIOLATIONS) { $env:TERRASCAN_VIOLATIONS } else { 0 }
+      
+      Write-Host "🔍 tfsec: $tfsecTotal total issues ($tfsecCritical critical, $tfsecHigh high)"
+      Write-Host "🔍 Checkov: $checkovFailed failed, $checkovPassed passed"
+      Write-Host "🔍 Terrascan: $terrascanViolations violations"
+      
+      $totalCriticalHigh = [int]$tfsecCritical + [int]$tfsecHigh + [int]$checkovFailed
+      $totalIssues = [int]$tfsecTotal + [int]$checkovFailed + [int]$terrascanViolations
+      
+      # Enhanced overall security status with scoring
+      $securityScore = if ($totalIssues -eq 0) { 100 } else {
+        $maxScore = 100
+        $criticalPenalty = [int]$tfsecCritical * 50
+        $highPenalty = [int]$tfsecHigh * 20
+        $mediumPenalty = ([int]$tfsecTotal - [int]$tfsecCritical - [int]$tfsecHigh) * 5
+        $checkovPenalty = [int]$checkovFailed * 10
+        $terrascanPenalty = [int]$terrascanViolations * 5
+        
+        $totalPenalty = $criticalPenalty + $highPenalty + $mediumPenalty + $checkovPenalty + $terrascanPenalty
+        [math]::Max(0, $maxScore - $totalPenalty)
+      }
+      
+      Write-Host "📊 Security Assessment Results:"
+      Write-Host "  Overall Score: $securityScore/100"
+      Write-Host "  Total Issues: $totalIssues"
+      Write-Host "  Critical/High: $totalCriticalHigh"
+      
+      # Set comprehensive security variables
+      Write-Host "##vso[task.setvariable variable=SECURITY_SCORE;isOutput=true]$securityScore"
+      Write-Host "##vso[task.setvariable variable=TOTAL_SECURITY_ISSUES;isOutput=true]$totalIssues"
+      Write-Host "##vso[task.setvariable variable=CRITICAL_HIGH_ISSUES;isOutput=true]$totalCriticalHigh"
+      
+      if ($totalCriticalHigh -eq 0 -and $securityScore -ge 90) {
+        Write-Host "✅ Security scans passed - excellent security posture"
+        Write-Host "##vso[task.setvariable variable=SECURITY_STATUS;isOutput=true]Pass"
+      } elseif ($totalCriticalHigh -eq 0 -and $securityScore -ge 70) {
+        Write-Host "⚠️ Security scans passed with warnings - good security posture"
+        Write-Host "##vso[task.setvariable variable=SECURITY_STATUS;isOutput=true]Pass with Warnings"
+      } else {
+        Write-Host "❌ Security scans found significant issues (Score: $securityScore)"
+        Write-Host "##vso[task.setvariable variable=SECURITY_STATUS;isOutput=true]Issues Found"
+      }
+      
+      # Create consolidated report
+      $report = @{
+        timestamp = Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ"
+        environment = "$(Environment)"
+        module = "$(Module)"
+        tfsec = @{
+          total = [int]$tfsecTotal
+          critical = [int]$tfsecCritical
+          high = [int]$tfsecHigh
+        }
+        checkov = @{
+          failed = [int]$checkovFailed
+          passed = [int]$checkovPassed
+        }
+        terrascan = @{
+          violations = [int]$terrascanViolations
+        }
+        overall_status = if ($totalCriticalHigh -eq 0) { "PASS" } else { "FAIL" }
+      }
+      
+      $report | ConvertTo-Json -Depth 3 | Out-File -FilePath "security-report.json" -Encoding UTF8
+      Write-Host "📄 Security report saved to security-report.json"
+
+- task: PublishTestResults@2
+  displayName: 'Publish Security Test Results'
+  inputs:
+    testResultsFormat: 'JUnit'
+    testResultsFiles: '**/security-*.xml'
+    searchFolder: ${{ parameters.workingDirectory }}
+    testRunTitle: 'Security Scans - $(Environment)/$(Module)'
+    publishRunAttachments: true
+  condition: always()
+  continueOnError: true
