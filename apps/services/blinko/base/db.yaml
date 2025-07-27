@@ -1,0 +1,35 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: blinko-database
+  namespace: blinko
+spec:
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.2-10
+  instances: 1
+  startDelay: 35
+  stopDelay: 35
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 200m
+    limits:
+      memory: 512Mi
+      cpu: 500m
+  postgresql:
+    parameters:
+      shared_buffers: 128MB
+      timezone: "America/Chicago"
+      pg_stat_statements.max: '10000'
+      pg_stat_statements.track: all
+      auto_explain.log_min_duration: '10s'
+  bootstrap:
+    initdb:
+      database: blinko
+      owner: blinko
+      secret:
+        name: blinko-db-postgres-creds-1password
+  storage:
+    storageClass: sata
+    size: 10Gi
+  monitoring:
+    enablePodMonitor: true

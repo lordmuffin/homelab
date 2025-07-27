@@ -24,6 +24,7 @@ resources:
 - grill-stats-dev.yaml
 - mcp-servers.yaml
 - influxdb.yaml
+- blinko.yaml
 
 namespace: argocd
 
