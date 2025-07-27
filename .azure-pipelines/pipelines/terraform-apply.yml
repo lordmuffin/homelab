@@ -219,12 +219,55 @@ stages:
         vmImage: 'ubuntu-latest'
       
       variables:
-      # Import shared variables template
-      - template: ../templates/shared-variables.yml
-        parameters:
-          environment: $(Environment)
-          terraformVersion: '1.8.0'
-          maxParallel: 1  # Sequential for dependency management
+      # Core Terraform variables (extracted from shared template)
+      - name: TF_VERSION
+        value: '1.8.0'
+      - name: TF_IN_AUTOMATION
+        value: 'true'
+      - name: TF_INPUT
+        value: 'false'
+      - name: TF_CLI_ARGS
+        value: '-no-color'
+      
+      # Azure Backend Configuration
+      - name: ARM_USE_AZUREAD
+        value: 'true'
+      - name: ARM_USE_CLI
+        value: 'true'
+      - name: ARM_STORAGE_USE_AZUREAD
+        value: 'true'
+      - name: AZURE_BACKEND_RESOURCE_GROUP
+        value: '$(TERRAFORM_BACKEND_RESOURCE_GROUP)'
+      - name: AZURE_BACKEND_STORAGE_ACCOUNT
+        value: '$(TERRAFORM_BACKEND_STORAGE_ACCOUNT)'
+      - name: AZURE_BACKEND_CONTAINER_NAME
+        value: '$(TERRAFORM_BACKEND_CONTAINER_NAME)'
+      
+      # Security and Performance
+      - name: STATE_LOCK_TIMEOUT
+        value: '300s'
+      - name: SECURITY_FAIL_ON_HIGH
+        value: true
+      - name: NOTIFICATION_ENABLED
+        value: true
+      - name: TF_PLUGIN_CACHE_DIR
+        value: '$(Agent.TempDirectory)/terraform-plugins'
+      
+      # Security Tool Versions
+      - name: TFSEC_VERSION
+        value: '1.28.4'
+      - name: CHECKOV_VERSION
+        value: '3.1.34'
+      - name: TERRASCAN_VERSION
+        value: '1.18.11'
+      - name: MAX_SECURITY_ISSUES
+        value: '0'
+      - name: SecurityScanCacheKey
+        value: 'security-tools-$(Agent.OS)-$(TFSEC_VERSION)-$(CHECKOV_VERSION)-$(TERRASCAN_VERSION)'
+      
+      # Environment-specific variable groups (resolved at runtime)
+      - group: terraform-$(Environment)
+      - group: azure-service-connections
       
       # Job-specific variables
       - name: JOB_TIMEOUT_MINUTES
@@ -233,19 +276,14 @@ stages:
         value: 10
       - name: APPLY_TIMEOUT
         value: '3600s'
+      - name: APPLY_TIMEOUT_MINUTES
+        value: 60
       - name: StateKey
         value: '$(Environment)/$(Module)/terraform.tfstate'
+      - name: MAX_DRIFT_THRESHOLD
+        value: '5'
       
       steps:
-      - template: ../templates/terraform-setup.yml
-        parameters:
-          azureServiceConnection: 'azure-terraform-backend'
-          terraformVersion: $(TF_VERSION)
-          workingDirectory: $(WORKING_DIR)
-          environment: $(Environment)
-          module: $(Module)
-          stateKey: $(StateKey)
-      
       - task: PowerShell@2
         displayName: 'Set Working Directory Variable'
         inputs:
@@ -258,6 +296,19 @@ stages:
             }
             Write-Host "##vso[task.setvariable variable=WORKING_DIR]$workingDir"
             Write-Host "Working directory set to: $workingDir"
+            
+            # Set additional computed variables for downstream tasks
+            Write-Host "##vso[task.setvariable variable=COMPUTED_STATE_KEY]$(Environment)/$(Module)/terraform.tfstate"
+            Write-Host "##vso[task.setvariable variable=ARTIFACT_NAME]terraform-plan-$(Environment)-$(Module)"
+      
+      - template: ../templates/terraform-setup.yml
+        parameters:
+          azureServiceConnection: 'azure-terraform-backend'
+          terraformVersion: $(TF_VERSION)
+          workingDirectory: $(WORKING_DIR)
+          environment: $(Environment)
+          module: $(Module)
+          stateKey: $(StateKey)
       
       - task: DownloadPipelineArtifact@2
         displayName: 'Download Plan Artifact'
