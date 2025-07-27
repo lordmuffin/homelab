@@ -266,7 +266,7 @@ stages:
       - template: ../templates/security-scanning.yml
         parameters:
           workingDirectory: $(WORKING_DIR)
-          failOnHigh: $(SECURITY_FAIL_ON_HIGH)
+          failOnHigh: true
           enableCache: true
       
       - task: PowerShell@2
