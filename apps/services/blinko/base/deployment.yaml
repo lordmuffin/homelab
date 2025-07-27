@@ -216,6 +216,13 @@ spec:
       - name: blinko
         image: blinkospace/blinko:latest
         imagePullPolicy: Always
+        command: ["/bin/sh"]
+        args:
+        - -c
+        - |
+          export DATABASE_URL="postgresql://blinko:${POSTGRES_PASSWORD}@blinko-database-rw.blinko.svc.cluster.local:5432/blinko"
+          echo "Starting Blinko with DATABASE_URL: postgresql://blinko:***@blinko-database-rw.blinko.svc.cluster.local:5432/blinko"
+          exec npm start
         env:
         - name: NODE_ENV
           value: "production"
@@ -226,13 +233,6 @@ spec:
             secretKeyRef:
               name: blinko-nextauth-secret-1password
               key: password
-        - name: DATABASE_URL
-          value: "postgresql://$(POSTGRES_USERNAME):$(POSTGRES_PASSWORD)@blinko-database-rw.blinko.svc.cluster.local:5432/blinko"
-        - name: POSTGRES_USERNAME
-          valueFrom:
-            secretKeyRef:
-              name: blinko-db-postgres-creds-1password
-              key: username
         - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
