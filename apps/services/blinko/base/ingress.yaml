@@ -3,7 +3,7 @@ kind: IngressRoute
 metadata:
   name: blinko
   annotations:
-    external-dns.alpha.kubernetes.io/hostname: blinko.labs.andrewpjackson.com
+    external-dns.alpha.kubernetes.io/hostname: blinko.lab.apj.dev
     external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
     external-dns.alpha.kubernetes.io/ttl: "120"
     cert-manager.io/cluster-issuer: letsencrypt-production
