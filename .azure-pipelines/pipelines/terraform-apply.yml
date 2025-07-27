@@ -9,17 +9,16 @@ parameters:
   - 'dev-lab'
   - 'prod-lab'
 
-variables:
-# Import shared variables template
-- template: ../templates/shared-variables.yml
-  parameters:
-    environment: ${{ parameters.environment }}
-
 stages:
   - stage: PreApplyValidation
     displayName: 'Pre-Apply Validation'
     dependsOn: TerraformPlan
     condition: and(succeeded(), or(eq(variables['Build.SourceBranch'], 'refs/heads/main'), eq(variables['Build.Reason'], 'Manual')))
+    variables:
+    # Import shared variables template
+    - template: ../templates/shared-variables.yml
+      parameters:
+        environment: ${{ parameters.environment }}
     jobs:
     - job: ValidatePlan
       displayName: 'Validate Plan Integrity'
@@ -165,6 +164,11 @@ stages:
           eq(variables['Build.Reason'], 'Manual')
         )
       )
+    variables:
+    # Import shared variables template
+    - template: ../templates/shared-variables.yml
+      parameters:
+        environment: ${{ parameters.environment }}
     jobs:
     - job: TerraformApplyMatrix
       displayName: 'Terraform Apply'

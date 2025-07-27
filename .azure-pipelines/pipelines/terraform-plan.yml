@@ -9,15 +9,14 @@ parameters:
   - 'dev-lab'
   - 'prod-lab'
 
-variables:
-# Import shared variables template
-- template: ../templates/shared-variables.yml
-  parameters:
-    environment: ${{ parameters.environment }}
-
 stages:
   - stage: TerraformPlan
     displayName: 'Terraform Plan Validation'
+    variables:
+    # Import shared variables template
+    - template: ../templates/shared-variables.yml
+      parameters:
+        environment: ${{ parameters.environment }}
     jobs:
     - job: TerraformPlanMatrix
       displayName: 'Terraform Plan'
