@@ -105,6 +105,8 @@ spec:
     server: https://kubernetes.default.svc
   - namespace: mcp-servers
     server: https://kubernetes.default.svc
+  - namespace: blinko
+    server: https://kubernetes.default.svc
   clusterResourceWhitelist:
   - group: '*'
     kind: '*'
