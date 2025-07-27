@@ -221,8 +221,8 @@ spec:
         - -c
         - |
           export DATABASE_URL="postgresql://blinko:${POSTGRES_PASSWORD}@blinko-database-rw.blinko.svc.cluster.local:5432/blinko"
-          echo "Starting Blinko with DATABASE_URL: postgresql://blinko:***@blinko-database-rw.blinko.svc.cluster.local:5432/blinko"
-          exec npm start
+          echo "Starting Blinko with DATABASE_URL connection..."
+          exec /app/start.sh
         env:
         - name: NODE_ENV
           value: "production"
