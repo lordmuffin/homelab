@@ -67,15 +67,15 @@ variables:
 - name: TERRASCAN_VERSION
   value: '1.18.11'
 
-# Working Directory Logic (enhanced)
-- name: WORKING_DIR
-  value: $[if(eq(variables['Module'], 'main'), 'terraform', format('terraform/modules/{0}', variables['Module']))]
+# Working Directory Logic (set dynamically by pipeline scripts)
+# Note: WORKING_DIR is computed at runtime by PowerShell script based on Module parameter
+# This avoids Azure DevOps runtime expression limitations with if() function
 - name: StateKey
   value: '$(Environment)/$(Module)/terraform.tfstate'
 - name: STATE_LOCK_TIMEOUT
   value: '300s'
-- name: BACKEND_CONFIG_FILE
-  value: '$(WORKING_DIR)/backend.tf'
+# Backend configuration file path (computed dynamically with WORKING_DIR)
+# BACKEND_CONFIG_FILE is set in pipeline scripts as: $(WORKING_DIR)/backend.tf
 
 # Environment-specific variables
 - ${{ if eq(parameters.environment, 'dev-lab') }}:

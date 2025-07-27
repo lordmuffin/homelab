@@ -92,6 +92,7 @@ stages:
             # Set additional computed variables for downstream tasks
             Write-Host "##vso[task.setvariable variable=COMPUTED_STATE_KEY]$(Environment)/$(Module)/terraform.tfstate"
             Write-Host "##vso[task.setvariable variable=ARTIFACT_NAME]terraform-plan-$(Environment)-$(Module)"
+            Write-Host "##vso[task.setvariable variable=BACKEND_CONFIG_FILE]$workingDir/backend.tf"
       
       - template: ../templates/terraform-setup.yml
         parameters:
