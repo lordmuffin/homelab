@@ -11,4 +11,6 @@ resources:
   - db-configmap.yaml
   - db-cert.yaml
   - db-data-sql-configmap.yaml
+
+patchesStrategicMerge:
   - db-container-patch.yaml
