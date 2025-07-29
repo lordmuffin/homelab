@@ -6,3 +6,4 @@ resources:
   - persistent-volume.yaml
   - ingress.yaml
   - rbac.yaml
+  - secrets.yaml
