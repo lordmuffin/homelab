@@ -5,5 +5,6 @@ resources:
   - namespace.yaml
   - persistent-volume.yaml
   - ingress.yaml
+  - ingressroute.yaml
   - rbac.yaml
   - secrets.yaml

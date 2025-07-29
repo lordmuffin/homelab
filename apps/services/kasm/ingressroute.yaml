@@ -1,0 +1,57 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: kasm
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: kasm.lab.apj.dev
+    external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
+    external-dns.alpha.kubernetes.io/ttl: "120"
+    cert-manager.io/cluster-issuer: letsencrypt-production
+    acme.cert-manager.io/http01-edit-in-place: "true"
+    kubernetes.io/ingress.class: traefik-external
+  labels:
+    app: kasm
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`kasm.lab.apj.dev`)
+      kind: Rule
+      middlewares:
+        - name: traefik-forward-auth
+          namespace: traefik
+      services:
+        - name: proxy
+          port: 443
+          scheme: https
+          passHostHeader: true
+  tls:
+    secretName: lab-apj-dev-tls
+
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: kasm-internal
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: kasm.lab.apj.dev
+    external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
+    external-dns.alpha.kubernetes.io/ttl: "120"
+    cert-manager.io/cluster-issuer: letsencrypt-production
+    acme.cert-manager.io/http01-edit-in-place: "true"
+    kubernetes.io/ingress.class: traefik-external
+  labels:
+    app: kasm
+spec:
+  entryPoints:
+    - web-int-tls
+  routes:
+    - match: Host(`kasm.lab.apj.dev`)
+      kind: Rule
+      services:
+        - name: proxy
+          port: 443
+          scheme: https
+          passHostHeader: true
+  tls:
+    secretName: lab-apj-dev-tls
