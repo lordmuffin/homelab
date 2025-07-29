@@ -8,3 +8,5 @@ resources:
   - ingressroute.yaml
   - rbac.yaml
   - secrets.yaml
+  - db-configmap.yaml
+  - db-cert.yaml

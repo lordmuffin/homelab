@@ -18,7 +18,8 @@
       "Bash(kubectl get:*)",
       "Bash(ls:*)",
       "Bash(rm:*)",
-      "WebFetch(domain:kasmweb.com)"
+      "WebFetch(domain:kasmweb.com)",
+      "Bash(kubectl describe:*)"
     ],
     "deny": []
   },
