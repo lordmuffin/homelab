@@ -40,7 +40,7 @@ spec:
             create: false
           db:
             name: "kasm-db-cert"
-            create: false
+            create: true
 
         kasmApp:
           name: "kasm"
