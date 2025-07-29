@@ -26,6 +26,15 @@ spec:
     kind: Secret
     name: kasm-db-cert
     namespace: kasm
+  - group: ""
+    kind: Namespace
+    name: kasm
+    jsonPointers:
+    - /metadata/finalizers
+  - group: ""
+    kind: Ingress
+    name: kasm-ingress
+    namespace: kasm
   destination:
     namespace: kasm
     name: in-cluster

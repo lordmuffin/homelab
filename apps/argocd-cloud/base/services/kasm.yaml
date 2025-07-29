@@ -52,7 +52,7 @@ spec:
   destination:
     namespace: kasm
     name: in-cluster
-  # Ignore differences in secrets managed by 1Password
+  # Ignore differences in secrets and resources managed by external tools
   ignoreDifferences:
   - group: ""
     kind: Secret
@@ -60,6 +60,19 @@ spec:
     namespace: kasm
     jsonPointers:
     - /data
+  - group: ""
+    kind: Secret
+    name: kasm-db-cert
+    namespace: kasm
+  - group: ""
+    kind: ConfigMap
+    name: kasm-db-configmap
+    namespace: kasm
+  - group: ""
+    kind: Namespace
+    name: kasm
+    jsonPointers:
+    - /metadata/finalizers
   syncPolicy:
     automated:
       prune: true
