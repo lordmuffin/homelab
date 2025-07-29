@@ -10,7 +10,6 @@ resources:
   # Comment out the old secrets approach
   # - secrets.yaml
   # Use the new all-in-one secret approach
-  - kasm-all-in-one-secret.yaml
   - db-configmap.yaml
   - db-cert.yaml
   - db-data-sql-configmap.yaml
