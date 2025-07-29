@@ -25,6 +25,7 @@ resources:
 - mcp-servers.yaml
 - influxdb.yaml
 - blinko.yaml
+- kasm.yaml
 
 namespace: argocd
 

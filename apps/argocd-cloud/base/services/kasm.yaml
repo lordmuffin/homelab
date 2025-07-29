@@ -1,0 +1,119 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kasm
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: apps
+  source:
+    repoURL: 'https://github.com/kasmtech/helm-charts'
+    chart: kasm-single-zone
+    targetRevision: 1.16.0
+    helm:
+      values: |
+        global:
+          hostname: kasm.lab.apj.dev
+          kubernetesClusterDomain: cluster.local
+          deploySize: small
+          tls:
+            enabled: true
+            existingSecretName: "lab-apj-dev-tls"
+          existingSecrets:
+            adminPassword: "kasm-admin-creds"
+            dbPassword: "kasm-db-postgres-creds"
+            redisPw: "kasm-db-postgres-creds"
+            encryptionSecret: "kasm-encryption-key"
+
+        db:
+          persistence:
+            enabled: true
+            size: 10Gi
+          resources:
+            requests:
+              memory: 1Gi
+              cpu: 500m
+            limits:
+              memory: 2Gi
+              cpu: 1000m
+
+        api:
+          replicaCount: 1
+          resources:
+            requests:
+              memory: 1Gi
+              cpu: 500m
+            limits:
+              memory: 2Gi
+              cpu: 1000m
+
+        manager:
+          replicaCount: 1
+          resources:
+            requests:
+              memory: 1Gi
+              cpu: 500m
+            limits:
+              memory: 2Gi
+              cpu: 1000m
+
+        proxy:
+          replicaCount: 1
+          resources:
+            requests:
+              memory: 1Gi
+              cpu: 500m
+            limits:
+              memory: 2Gi
+              cpu: 1000m
+
+        guac:
+          replicaCount: 1
+          resources:
+            requests:
+              memory: 1Gi
+              cpu: 500m
+            limits:
+              memory: 2Gi
+              cpu: 1000m
+
+        share:
+          replicaCount: 1
+          resources:
+            requests:
+              memory: 512Mi
+              cpu: 250m
+            limits:
+              memory: 1Gi
+              cpu: 500m
+
+        rdpgw:
+          replicaCount: 1
+          resources:
+            requests:
+              memory: 512Mi
+              cpu: 250m
+            limits:
+              memory: 1Gi
+              cpu: 500m
+  destination:
+    namespace: kasm
+    name: in-cluster
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: true
+    syncOptions:
+    - Validate=false
+    - CreateNamespace=true
+    - PrunePropagationPolicy=foreground
+    - PruneLast=true
+    - ApplyOutOfSyncOnly=false
+    - Prune=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 20s
+        factor: 2
+        maxDuration: 15m

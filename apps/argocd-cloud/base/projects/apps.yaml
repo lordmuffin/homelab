@@ -107,6 +107,8 @@ spec:
     server: https://kubernetes.default.svc
   - namespace: blinko
     server: https://kubernetes.default.svc
+  - namespace: kasm
+    server: https://kubernetes.default.svc
   clusterResourceWhitelist:
   - group: '*'
     kind: '*'
