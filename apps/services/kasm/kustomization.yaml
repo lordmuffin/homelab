@@ -12,5 +12,11 @@ resources:
   - db-cert.yaml
   - db-data-sql-configmap.yaml
 
-patchesStrategicMerge:
-  - db-container-patch.yaml
+patches:
+  - path: db-container-patch.yaml
+    target:
+      group: apps
+      version: v1
+      kind: StatefulSet
+      name: kasm-db-statefulset
+      namespace: kasm
