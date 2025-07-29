@@ -2,8 +2,29 @@
   "permissions": {
     "allow": [
       "mcp__ruv-swarm",
-      "mcp__claude-flow"
+      "mcp__claude-flow",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:helm.kasmweb.com)",
+      "Bash(mkdir:*)",
+      "Bash(op:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(curl:*)",
+      "Bash(git clone:*)",
+      "Bash(cat:*)",
+      "Bash(grep:*)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(find:*)",
+      "Bash(kubectl get:*)",
+      "Bash(ls:*)",
+      "Bash(rm:*)",
+      "WebFetch(domain:kasmweb.com)"
     ],
     "deny": []
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "claude-flow",
+    "ruv-swarm"
+  ]
 }
