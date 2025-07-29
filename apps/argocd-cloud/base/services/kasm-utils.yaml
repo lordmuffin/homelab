@@ -18,6 +18,7 @@ spec:
     namespace: kasm
     jsonPointers:
     - /data
+    - /stringData
   - group: ""
     kind: ConfigMap
     name: kasm-db-configmap
@@ -38,6 +39,10 @@ spec:
   - group: ""
     kind: Ingress
     name: kasm-ingress
+    namespace: kasm
+  - group: "onepassword.com"
+    kind: OnePasswordItem
+    name: "*"
     namespace: kasm
   destination:
     namespace: kasm

@@ -60,6 +60,7 @@ spec:
     namespace: kasm
     jsonPointers:
     - /data
+    - /stringData
   - group: ""
     kind: Secret
     name: kasm-db-cert
@@ -77,6 +78,10 @@ spec:
     name: kasm
     jsonPointers:
     - /metadata/finalizers
+  - group: "onepassword.com"
+    kind: OnePasswordItem
+    name: "*"
+    namespace: kasm
   syncPolicy:
     automated:
       prune: true
