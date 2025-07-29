@@ -34,3 +34,7 @@ data:
     -- Database initialization script
     CREATE EXTENSION IF NOT EXISTS pgaudit;
     ALTER DATABASE kasm SET pgaudit.log='read,write,ddl';
+    
+  data.sql: |
+    -- Empty data.sql file to satisfy container mount requirements
+    -- This file is required by the KASM database container
