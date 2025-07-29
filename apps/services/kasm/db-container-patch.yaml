@@ -1,0 +1,18 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: kasm-db-statefulset
+  namespace: kasm
+spec:
+  template:
+    spec:
+      containers:
+      - name: kasm-db-container
+        volumeMounts:
+        - name: kasm-db-data-sql
+          mountPath: /docker-entrypoint-initdb.d/data.sql
+          subPath: data.sql
+      volumes:
+      - name: kasm-db-data-sql
+        configMap:
+          name: kasm-db-data-sql

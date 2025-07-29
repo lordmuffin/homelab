@@ -69,6 +69,10 @@ spec:
     name: kasm-db-configmap
     namespace: kasm
   - group: ""
+    kind: ConfigMap
+    name: kasm-db-data-sql
+    namespace: kasm
+  - group: ""
     kind: Namespace
     name: kasm
     jsonPointers:

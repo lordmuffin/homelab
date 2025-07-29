@@ -20,7 +20,8 @@
       "Bash(rm:*)",
       "WebFetch(domain:kasmweb.com)",
       "Bash(kubectl describe:*)",
-      "Bash(git rev-parse:*)"
+      "Bash(git rev-parse:*)",
+      "Bash(kubectl logs:*)"
     ],
     "deny": []
   },

@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kasm-db-data-sql
+  namespace: kasm
+  annotations:
+    argocd.argoproj.io/sync-options: Replace=true
+data:
+  data.sql: |
+    -- Empty initialization SQL file
+    -- This file is required for the KASM database container to start properly
+    SELECT 1;

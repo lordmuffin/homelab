@@ -9,3 +9,5 @@ resources:
   - secrets.yaml
   - db-configmap.yaml
   - db-cert.yaml
+  - db-data-sql-configmap.yaml
+  - db-container-patch.yaml
