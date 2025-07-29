@@ -3,16 +3,20 @@ kind: StatefulSet
 metadata:
   name: kasm-db-statefulset
   namespace: kasm
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/compare-options: IgnoreExtraneous
 spec:
   template:
     spec:
+      volumes:
+      - name: kasm-db-data-sql
+        configMap:
+          name: kasm-db-data-sql
       containers:
       - name: kasm-db-container
         volumeMounts:
         - name: kasm-db-data-sql
           mountPath: /docker-entrypoint-initdb.d/data.sql
           subPath: data.sql
-      volumes:
-      - name: kasm-db-data-sql
-        configMap:
-          name: kasm-db-data-sql

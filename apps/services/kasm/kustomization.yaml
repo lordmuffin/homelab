@@ -7,9 +7,7 @@ resources:
   - ingressroute.yaml
   - rbac.yaml
   - onepassword-items.yaml
-  # Comment out the old secrets approach
-  # - secrets.yaml
-  # Use the new all-in-one secret approach
+  - secrets.yaml
   - db-configmap.yaml
   - db-cert.yaml
   - db-data-sql-configmap.yaml
