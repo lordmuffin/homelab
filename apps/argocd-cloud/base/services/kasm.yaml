@@ -20,6 +20,11 @@ spec:
           image:
             pullPolicy: IfNotPresent
             restartPolicy: Always
+          # Reference external 1Password secrets
+          kasmExternalSecrets:
+            secretName: "kasm-secrets"
+            enabled: true
+          # Empty passwords to prevent Helm from managing these
           kasmPasswords:
             redisPassword: ""
             dbPassword: ""
@@ -50,6 +55,14 @@ spec:
   destination:
     namespace: kasm
     name: in-cluster
+  # Ignore differences in secrets managed by 1Password
+  ignoreDifferences:
+  - group: ""
+    kind: Secret
+    name: kasm-secrets
+    namespace: kasm
+    jsonPointers:
+    - /data
   syncPolicy:
     automated:
       prune: true
