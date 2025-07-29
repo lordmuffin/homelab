@@ -17,11 +17,9 @@ spec:
           clusterDomain: "cluster.local"
           ingressClassName: "traefik"
           hostname: "kasm.lab.apj.dev"
-          altHostnames: []
           image:
             pullPolicy: IfNotPresent
             restartPolicy: Always
-            pullSecrets: ""
           kasmPasswords:
             redisPassword: ""
             dbPassword: ""
@@ -34,93 +32,21 @@ spec:
           ingress:
             name: "lab-apj-dev-tls"
             create: false
-            cert: ""
-            key: ""
           kasmProxy:
             name: "lab-apj-dev-tls"
             create: false
-            cert: ""
-            key: ""
           rdpGateway:
             name: "lab-apj-dev-tls"
             create: false
-            cert: ""
-            key: ""
           db:
             name: "kasm-db-cert"
             create: false
-            cert: ""
-            key: ""
 
         kasmApp:
           name: "kasm"
           zoneName: "default"
           applyHardening: true
           deploymentSize: "small"
-          servicesToDeploy:
-            kasmProxy:
-              replicas: 1
-              resources:
-                requests:
-                  memory: 1Gi
-                  cpu: 500m
-                limits:
-                  memory: 2Gi
-                  cpu: 1000m
-            kasmApi:
-              replicas: 1
-              resources:
-                requests:
-                  memory: 1Gi
-                  cpu: 500m
-                limits:
-                  memory: 2Gi
-                  cpu: 1000m
-            kasmManager:
-              replicas: 1
-              resources:
-                requests:
-                  memory: 1Gi
-                  cpu: 500m
-                limits:
-                  memory: 2Gi
-                  cpu: 1000m
-            db:
-              storageClassName: ""
-              resources:
-                requests:
-                  memory: 1Gi
-                  cpu: 500m
-                limits:
-                  memory: 2Gi
-                  cpu: 1000m
-            kasmGuac:
-              replicas: 1
-              resources:
-                requests:
-                  memory: 1Gi
-                  cpu: 500m
-                limits:
-                  memory: 2Gi
-                  cpu: 1000m
-            kasmShare:
-              replicas: 1
-              resources:
-                requests:
-                  memory: 512Mi
-                  cpu: 250m
-                limits:
-                  memory: 1Gi
-                  cpu: 500m
-            rdpGateway:
-              replicas: 1
-              resources:
-                requests:
-                  memory: 512Mi
-                  cpu: 250m
-                limits:
-                  memory: 1Gi
-                  cpu: 500m
   destination:
     namespace: kasm
     name: in-cluster
