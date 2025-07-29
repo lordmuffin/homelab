@@ -26,6 +26,7 @@ resources:
 - influxdb.yaml
 - blinko.yaml
 - kasm.yaml
+- kasm-utils.yaml
 
 namespace: argocd
 
