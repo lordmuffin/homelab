@@ -12,32 +12,93 @@ spec:
     targetRevision: release/1.17.0
     helm:
       values: |
+        # yaml-language-server: $schema=values.schema.json
+        # Global parameters
         global:
-          hostname: kasm.lab.apj.dev
-          clusterDomain: cluster.local
+          # Kubernetes namespace and cluster domain configuration
+          namespace: "kasm"
+          clusterDomain: "cluster.local"
+          ingressClassName: "traefik"
+          
+          # Hostname configuration
+          hostname: "kasm.lab.apj.dev"
+          altHostnames: []
+          
+          # Image configuration
           image:
             pullPolicy: IfNotPresent
+            restartPolicy: Always
+            pullSecrets: ""
+          
+          # Kasm passwords (these will be replaced by our secret)
           kasmPasswords:
-            adminPassword: "WILL_BE_REPLACED"
-            dbPassword: "WILL_BE_REPLACED"
-            redisPassword: "WILL_BE_REPLACED"
-            encryptionSecret: "WILL_BE_REPLACED"
+            redisPassword: ""
+            dbPassword: ""
+            managerToken: ""
+            serviceToken: ""
+            adminPassword: ""
+            userPassword: ""
 
+        # KASM Application Configuration
         kasmApp:
-          secrets:
-            secretName: kasm-secrets
-            existingSecrets:
-              adminPassword: "kasm-admin-creds"
-              dbPassword: "kasm-db-postgres-creds"
-              redisPassword: "kasm-db-postgres-creds"
-              encryptionSecret: "kasm-encryption-key"
-          ingress:
-            enabled: true
-            tls:
-              enabled: true
-              secretName: "lab-apj-dev-tls"
+          name: "kasm"
+          zoneName: "default"
+          applyHardening: true
+          deploymentSize: "small"
+          
+          # Service configuration
           servicesToDeploy:
+            # Kasm Proxy configuration
+            kasmProxy:
+              name: "kasm-proxy"
+              addHealthChecks: true
+              image: kasmweb/proxy
+              tag: 1.17.0
+              replicas: 1
+              resources:
+                requests:
+                  memory: 1Gi
+                  cpu: 500m
+                limits:
+                  memory: 2Gi
+                  cpu: 1000m
+            
+            # Kasm API configuration
+            kasmApi:
+              name: "kasm-api"
+              addHealthChecks: true
+              image: kasmweb/api
+              tag: 1.17.0
+              replicas: 1
+              resources:
+                requests:
+                  memory: 1Gi
+                  cpu: 500m
+                limits:
+                  memory: 2Gi
+                  cpu: 1000m
+            
+            # Kasm Manager configuration
+            kasmManager:
+              name: "kasm-manager"
+              addHealthChecks: true
+              image: kasmweb/manager
+              tag: 1.17.0
+              replicas: 1
+              resources:
+                requests:
+                  memory: 1Gi
+                  cpu: 500m
+                limits:
+                  memory: 2Gi
+                  cpu: 1000m
+            
+            # Database configuration
             db:
+              name: "kasm-db"
+              addHealthChecks: true
+              image: kasmweb/postgres
+              tag: 1.17.0
               storageClassName: ""
               resources:
                 requests:
@@ -46,8 +107,15 @@ spec:
                 limits:
                   memory: 2Gi
                   cpu: 1000m
-            api:
-              replicaCount: 1
+            
+            # Guacamole server configuration
+            kasmGuac:
+              name: "kasm-guac"
+              deploy: true
+              addHealthChecks: true
+              image: kasmweb/kasm-guac
+              tag: 1.17.0
+              replicas: 1
               resources:
                 requests:
                   memory: 1Gi
@@ -55,35 +123,15 @@ spec:
                 limits:
                   memory: 2Gi
                   cpu: 1000m
-            manager:
-              replicaCount: 1
-              resources:
-                requests:
-                  memory: 1Gi
-                  cpu: 500m
-                limits:
-                  memory: 2Gi
-                  cpu: 1000m
-            proxy:
-              replicaCount: 1
-              resources:
-                requests:
-                  memory: 1Gi
-                  cpu: 500m
-                limits:
-                  memory: 2Gi
-                  cpu: 1000m
-            guac:
-              replicaCount: 1
-              resources:
-                requests:
-                  memory: 1Gi
-                  cpu: 500m
-                limits:
-                  memory: 2Gi
-                  cpu: 1000m
-            share:
-              replicaCount: 1
+            
+            # Share service configuration
+            kasmShare:
+              name: "kasm-share"
+              deploy: true
+              addHealthChecks: true
+              image: kasmweb/share
+              tag: 1.17.0
+              replicas: 1
               resources:
                 requests:
                   memory: 512Mi
@@ -91,8 +139,15 @@ spec:
                 limits:
                   memory: 1Gi
                   cpu: 500m
-            rdpgw:
-              replicaCount: 1
+            
+            # RDP Gateway configuration
+            rdpGateway:
+              name: "rdp-gateway"
+              deploy: true
+              addHealthChecks: true
+              image: kasmweb/rdp-gateway
+              tag: 1.17.0
+              replicas: 1
               resources:
                 requests:
                   memory: 512Mi
@@ -100,6 +155,36 @@ spec:
                 limits:
                   memory: 1Gi
                   cpu: 500m
+
+        # Certificate configuration
+        kasmCerts:
+          # Ingress certificate
+          ingress:
+            name: "lab-apj-dev-tls"
+            create: false
+            cert: ""
+            key: ""
+            
+          # Proxy certificate
+          kasmProxy:
+            name: "lab-apj-dev-tls"
+            create: false
+            cert: ""
+            key: ""
+            
+          # RDP Gateway certificate
+          rdpGateway:
+            name: "lab-apj-dev-tls"
+            create: false
+            cert: ""
+            key: ""
+            
+          # Database certificate
+          db:
+            name: "kasm-db-cert"
+            create: false
+            cert: ""
+            key: ""
   destination:
     namespace: kasm
     name: in-cluster
