@@ -1,0 +1,212 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: actual-restore-job
+  namespace: services
+spec:
+  template:
+    spec:
+      containers:
+      - name: actual-restore
+        image: alpine:latest
+        env:
+        - name: B2_APPLICATION_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: backblaze-cloud-homelab-creds-1password
+              key: keyID
+        - name: B2_APPLICATION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: backblaze-cloud-homelab-creds-1password
+              key: applicationKey
+        - name: B2_BUCKET_NAME
+          value: "cloud-homelab-backups"
+        - name: FORCE_RESTORE
+          value: "false"  # Set to "true" to force restore even if data exists
+        - name: BACKUP_DATE
+          value: ""  # Optional: specify date in format YYYYMMDD to restore specific backup
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            # Strict error handling
+            set -eu
+            
+            # Install required tools including B2 CLI
+            apk add --no-cache tar gzip curl jq python3 py3-pip
+            
+            # Install B2 CLI
+            pip3 install --break-system-packages b2
+            
+            # Logging functions
+            log_info() {
+                echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] INFO: $*" >&2
+            }
+            
+            log_error() {
+                echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] ERROR: $*" >&2
+            }
+            
+            # Error trap handler - simplified for sh compatibility
+            error_trap() {
+                exit_code=$?
+                if [ $exit_code -ne 0 ]; then
+                    log_error "Actual restore failed with exit code $exit_code"
+                    exit $exit_code
+                fi
+            }
+            
+            trap 'error_trap' EXIT
+            
+            log_info "🔄 Starting Actual Budget manual restoration process..."
+            log_info "Force restore: $FORCE_RESTORE"
+            log_info "Backup date filter: $BACKUP_DATE"
+            
+            # Validate environment variables
+            if [ -z "${B2_APPLICATION_KEY_ID:-}" ] || [ -z "${B2_APPLICATION_KEY:-}" ] || [ -z "${B2_BUCKET_NAME:-}" ]; then
+                log_error "Missing required B2 environment variables"
+                exit 1
+            fi
+            
+            # Check current data state
+            DATA_FILE_COUNT=$(find /data -type f 2>/dev/null | wc -l || echo "0")
+            SERVER_FILES_EXIST=$(test -d /data/server-files && find /data/server-files -type f | wc -l || echo "0")
+            USER_FILES_EXIST=$(test -d /data/user-files && find /data/user-files -type f | wc -l || echo "0")
+            
+            log_info "Current data state:"
+            log_info "  Total files: $DATA_FILE_COUNT"
+            log_info "  Server files: $SERVER_FILES_EXIST"
+            log_info "  User files: $USER_FILES_EXIST"
+            
+            # Check if we should restore (force or empty directory)
+            SHOULD_RESTORE="false"
+            if [ "$FORCE_RESTORE" = "true" ]; then
+              log_info "Force restore enabled, will restore regardless of existing data"
+              SHOULD_RESTORE="true"
+            elif [ "$DATA_FILE_COUNT" -le 0 ]; then
+              log_info "Data directory is empty, will restore"
+              SHOULD_RESTORE="true"
+            else
+              log_info "Data directory contains $DATA_FILE_COUNT files and force restore is not enabled"
+              log_info "To force restore, set FORCE_RESTORE=true environment variable"
+            fi
+            
+            if [ "$SHOULD_RESTORE" = "true" ]; then
+              # List backups and find the one to restore
+              log_info "Fetching list of backups from B2..."
+              
+              if [ -n "$BACKUP_DATE" ]; then
+                log_info "Looking for backup from date: $BACKUP_DATE"
+                BACKUP_TO_RESTORE=$(b2 ls --json b2://$B2_BUCKET_NAME/actual/ | jq -r '.[] | select(.fileName | startswith("actual_backup_'$BACKUP_DATE'")) | "actual/" + .fileName' | sort -r | head -n1)
+              else
+                log_info "Looking for latest backup..."
+                BACKUP_TO_RESTORE=$(b2 ls --json b2://$B2_BUCKET_NAME/actual/ | jq -r '.[] | select(.fileName | startswith("actual_backup_")) | "actual/" + .fileName' | sort -r | head -n1)
+              fi
+              
+              if [ -n "$BACKUP_TO_RESTORE" ] && [ "$BACKUP_TO_RESTORE" != "null" ]; then
+                log_info "Found backup to restore: $BACKUP_TO_RESTORE"
+                BACKUP_FILE="/tmp/$(basename $BACKUP_TO_RESTORE)"
+                
+                # Create backup of current data if it exists and we're forcing restore
+                if [ "$FORCE_RESTORE" = "true" ] && [ "$DATA_FILE_COUNT" -gt 0 ]; then
+                  log_info "Creating backup of current data before restore..."
+                  CURRENT_BACKUP="/tmp/current_actual_backup_$(date +%Y%m%d_%H%M%S).tar.gz"
+                  cd /data
+                  tar -czf "$CURRENT_BACKUP" --exclude='lost+found' . 2>/dev/null || true
+                  if [ -f "$CURRENT_BACKUP" ] && [ -s "$CURRENT_BACKUP" ]; then
+                    log_info "Current data backed up to: $CURRENT_BACKUP"
+                    log_info "Current backup size: $(du -h "$CURRENT_BACKUP" | cut -f1)"
+                  else
+                    log_info "Warning: Could not create backup of current data"
+                  fi
+                fi
+                
+                # Clear existing data if force restore
+                if [ "$FORCE_RESTORE" = "true" ]; then
+                  log_info "Clearing existing data..."
+                  rm -rf /data/* 2>/dev/null || true
+                  rm -rf /data/.[!.]* 2>/dev/null || true  # Remove hidden files but keep . and ..
+                  
+                  # Recreate the expected directory structure
+                  mkdir -p /data/server-files /data/user-files
+                  log_info "Recreated directory structure"
+                fi
+                
+                # Download the backup
+                log_info "Downloading backup from B2..."
+                b2 download-file-by-name $B2_BUCKET_NAME "$BACKUP_TO_RESTORE" "$BACKUP_FILE"
+                
+                # Validate downloaded backup
+                if [ ! -f "$BACKUP_FILE" ] || [ ! -s "$BACKUP_FILE" ]; then
+                    log_error "Downloaded backup file is missing or empty: $BACKUP_FILE"
+                    exit 1
+                fi
+                
+                # Test backup integrity
+                if ! gzip -t "$BACKUP_FILE"; then
+                    log_error "Downloaded backup file is corrupted: $BACKUP_FILE"
+                    exit 1
+                fi
+                
+                log_info "Downloaded backup size: $(du -h "$BACKUP_FILE" | cut -f1)"
+                
+                # Extract backup to data directory
+                log_info "Extracting backup to /data..."
+                cd /data
+                tar -xzf "$BACKUP_FILE"
+                
+                # Validate restoration
+                RESTORED_FILES=$(find /data -type f | wc -l)
+                RESTORED_SERVER_FILES=$(test -d /data/server-files && find /data/server-files -type f | wc -l || echo "0")
+                RESTORED_USER_FILES=$(test -d /data/user-files && find /data/user-files -type f | wc -l || echo "0")
+                
+                log_info "Restoration results:"
+                log_info "  Total files restored: $RESTORED_FILES"
+                log_info "  Server files restored: $RESTORED_SERVER_FILES"
+                log_info "  User files restored: $RESTORED_USER_FILES"
+                
+                # Clean up downloaded file
+                rm -f "$BACKUP_FILE"
+                
+                # Set proper permissions for Actual Budget
+                chown -R 1001:1001 /data 2>/dev/null || true
+                find /data -type d -exec chmod 755 {} \; 2>/dev/null || true
+                find /data -type f -exec chmod 644 {} \; 2>/dev/null || true
+                
+                log_info "✅ Restoration completed successfully!"
+                log_info "Restored from: $BACKUP_TO_RESTORE"
+                log_info "Please restart the Actual Budget deployment to use the restored data"
+              else
+                log_error "No suitable backup found for restoration"
+                if [ -n "$BACKUP_DATE" ]; then
+                  log_error "No backup found for date: $BACKUP_DATE"
+                  log_info "Available backups:"
+                  b2 ls --json b2://$B2_BUCKET_NAME/actual/ | jq -r '.[] | select(.fileName | startswith("actual_backup_")) | "actual/" + .fileName' | sort -r | head -10
+                else
+                  log_error "No backups found in B2 bucket under actual/ path"
+                fi
+                exit 1
+              fi
+            else
+              log_info "Restoration skipped - data directory contains files and force restore is not enabled"
+              log_info "Current data summary:"
+              log_info "  ACTUAL_SERVER_FILES (/data/server-files): $SERVER_FILES_EXIST files"
+              log_info "  ACTUAL_USER_FILES (/data/user-files): $USER_FILES_EXIST files"
+              log_info "To force restore anyway, set FORCE_RESTORE=true"
+            fi
+        volumeMounts:
+        - name: actual-data
+          mountPath: /data
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+      restartPolicy: Never
+      volumes:
+      - name: actual-data
+        persistentVolumeClaim:
+          claimName: actual-storage
+  backoffLimit: 3

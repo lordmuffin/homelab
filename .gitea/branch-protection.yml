@@ -1,0 +1,85 @@
+# Branch Protection Rules for homelab
+# This file defines protection rules for important branches
+
+# Protection rules for all branches
+# Default rules that apply to all protected branches
+default:
+  # Require at least one approved review before merging
+  required_approvals: 1
+  # Enable status checks
+  enable_status_check: true
+  # Block push with non-GPG signed commits
+  block_on_official_review_requests: true
+  # Prevent force pushing to this branch
+  enable_push_whitelist: false
+  # Prevent deleting this branch
+  enable_deletion: false
+  # Prevent merging without status checks
+  block_on_rejected_reviews: true
+  # Required status checks to pass before merging
+  required_status_checks:
+    - "test"
+    - "build"
+
+# Main branch specific rules (production branch)
+branches:
+  main:
+    # Additional protections for main branch
+    # Require at least two approved reviews before merging
+    required_approvals: 2
+    # Block merging when there are requested changes
+    block_on_rejected_reviews: true
+    # Enable strict status checks (PR must be up-to-date with base branch)
+    enable_status_check: true
+    # Block force push
+    enable_push: false
+    # Block branch deletion
+    enable_deletion: false
+    # Required status checks to pass before merging
+    required_status_checks:
+      - "test"
+      - "build"
+      - "Run Syntax Checks"
+      - "Run Unit Tests"
+      - "Run Alert System Tests"
+      - "Scan Docker Image for Vulnerabilities"
+      - "Verify Container Startup"
+    # Users/teams allowed to push to this branch
+    push_whitelist_usernames: ["lordmuffin"]
+    push_whitelist_team_names: ["maintainers"]
+    # Users/teams allowed to merge to this branch
+    merge_whitelist_usernames: ["lordmuffin"]
+    merge_whitelist_team_names: ["maintainers"]
+
+  # Develop branch specific rules (integration branch)
+  develop:
+    # Protection for develop branch
+    required_approvals: 1
+    # Block merging when there are requested changes
+    block_on_rejected_reviews: true
+    # Enable strict status checks
+    enable_status_check: true
+    # Block force push
+    enable_push: false
+    # Block branch deletion
+    enable_deletion: false
+    # Required status checks to pass before merging
+    required_status_checks:
+      - "test"
+      - "build"
+    # Users/teams allowed to push to this branch
+    push_whitelist_usernames: ["lordmuffin"]
+    push_whitelist_team_names: ["developers", "maintainers"]
+    # Users/teams allowed to merge to this branch
+    merge_whitelist_usernames: ["lordmuffin"]
+    merge_whitelist_team_names: ["developers", "maintainers"]
+
+  # Feature branch protection pattern
+  'feature/*':
+    # Protection for feature branches
+    required_approvals: 1
+    # Allow developers to push to their feature branches
+    enable_push: true
+    # Required status checks to pass before merging
+    required_status_checks:
+      - "test"

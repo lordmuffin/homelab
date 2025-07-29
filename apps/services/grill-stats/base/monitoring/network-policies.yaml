@@ -1,0 +1,421 @@
+# Monitoring and Observability Network Policies for Grill-Stats Platform
+# This file contains network policies for comprehensive monitoring and observability
+
+---
+# Prometheus Metrics Access Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: prometheus-metrics-access-policy
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: prometheus-metrics
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: grill-stats
+  policyTypes:
+  - Ingress
+  ingress:
+  # Allow Prometheus to scrape metrics from all grill-stats services
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: prometheus
+    ports:
+    - protocol: TCP
+      port: 8080  # Standard metrics port
+    - protocol: TCP
+      port: 9090  # Alternative metrics port
+    - protocol: TCP
+      port: 9100  # Node exporter port
+    - protocol: TCP
+      port: 9187  # PostgreSQL exporter port
+    - protocol: TCP
+      port: 9121  # Redis exporter port
+  # Allow Prometheus Operator to scrape metrics
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: prometheus-operator
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 9090
+  # Allow Grafana to access metrics for dashboards
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: grafana
+    ports:
+    - protocol: TCP
+      port: 8080
+  # Allow custom monitoring tools
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: monitoring
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 9090
+
+---
+# OpenTelemetry Collector Access Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: otel-collector-access-policy
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: otel-collector
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: observability
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: otel-collector
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow all grill-stats services to send telemetry data
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: grill-stats
+    ports:
+    - protocol: TCP
+      port: 4317  # OTLP gRPC
+    - protocol: TCP
+      port: 4318  # OTLP HTTP
+    - protocol: TCP
+      port: 8888  # Metrics endpoint
+    - protocol: TCP
+      port: 8889  # Health check endpoint
+  # Allow Jaeger to receive traces
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: jaeger
+    ports:
+    - protocol: TCP
+      port: 14250  # Jaeger gRPC
+  # Allow Prometheus to scrape collector metrics
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: prometheus
+    ports:
+    - protocol: TCP
+      port: 8888
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow sending data to Jaeger
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: jaeger
+    ports:
+    - protocol: TCP
+      port: 14250
+  # Allow sending data to Prometheus
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: prometheus
+    ports:
+    - protocol: TCP
+      port: 9090
+  # Allow sending data to external observability services
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 4317
+    - protocol: TCP
+      port: 4318
+
+---
+# Jaeger Tracing Access Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: jaeger-tracing-access-policy
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: jaeger-tracing
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: tracing
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: grill-stats
+  policyTypes:
+  - Egress
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow sending traces to Jaeger
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: jaeger
+    ports:
+    - protocol: TCP
+      port: 14268  # Jaeger HTTP
+    - protocol: TCP
+      port: 14250  # Jaeger gRPC
+    - protocol: TCP
+      port: 6831   # Jaeger UDP (compact)
+    - protocol: TCP
+      port: 6832   # Jaeger UDP (binary)
+  # Allow sending traces to OpenTelemetry Collector
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: otel-collector
+    ports:
+    - protocol: TCP
+      port: 4317
+    - protocol: TCP
+      port: 4318
+
+---
+# Logging Access Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: logging-access-policy
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: logging
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: logging
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: grill-stats
+  policyTypes:
+  - Egress
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow sending logs to Fluent Bit/Fluentd
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: fluent-bit
+    ports:
+    - protocol: TCP
+      port: 24224  # Fluentd forward protocol
+    - protocol: TCP
+      port: 2020   # Fluent Bit HTTP
+  # Allow sending logs to Loki
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: loki
+    ports:
+    - protocol: TCP
+      port: 3100
+  # Allow sending logs to OpenTelemetry Collector
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: otel-collector
+    ports:
+    - protocol: TCP
+      port: 4317
+    - protocol: TCP
+      port: 4318
+  # Allow sending logs to external log aggregation services
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 6514  # Syslog over TLS
+
+---
+# Health Check Access Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: health-check-access-policy
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: health-check
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: health-monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: grill-stats
+  policyTypes:
+  - Ingress
+  ingress:
+  # Allow Kubernetes to perform health checks
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    ports:
+    - protocol: TCP
+      port: 8080  # Health check endpoint
+  # Allow external health monitoring services
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: blackbox-exporter
+    ports:
+    - protocol: TCP
+      port: 8080
+  # Allow Uptime Kuma or similar monitoring tools
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: uptime-kuma
+    ports:
+    - protocol: TCP
+      port: 8080
+  # Allow health checks from ingress controllers
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: traefik
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: traefik
+    ports:
+    - protocol: TCP
+      port: 8080
+
+---
+# Alerting Access Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: alerting-access-policy
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: alerting
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: alerting
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: grill-stats
+  policyTypes:
+  - Egress
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow sending alerts to Alertmanager
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: alertmanager
+    ports:
+    - protocol: TCP
+      port: 9093
+  # Allow sending notifications to external services
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+    ports:
+    - protocol: TCP
+      port: 443  # Slack, PagerDuty, etc.
+    - protocol: TCP
+      port: 587  # SMTP
+    - protocol: TCP
+      port: 25   # SMTP
+  # Allow webhooks to notification services
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: notifications
+    ports:
+    - protocol: TCP
+      port: 8080

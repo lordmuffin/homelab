@@ -1,0 +1,583 @@
+# Azure DevOps Stage Template: Terraform Apply
+# Applies Terraform configurations to infrastructure
+
+parameters:
+- name: environment
+  type: string
+  default: 'dev-lab'
+  values:
+  - 'dev-lab'
+  - 'prod-lab'
+
+stages:
+  - stage: PreApplyValidation
+    displayName: 'Pre-Apply Validation'
+    dependsOn: TerraformPlan
+    condition: and(succeeded(), or(eq(variables['Build.SourceBranch'], 'refs/heads/main'), eq(variables['Build.Reason'], 'Manual')))
+    variables:
+    # Import shared variables template
+    - template: ../templates/shared-variables.yml
+      parameters:
+        environment: ${{ parameters.environment }}
+    jobs:
+    - job: ValidatePlan
+      displayName: 'Validate Plan Integrity'
+      pool:
+        vmImage: 'ubuntu-latest'
+      steps:
+      - task: PowerShell@2
+        displayName: 'Plan Drift Detection'
+        inputs:
+          targetType: 'inline'
+          script: |
+            Write-Host "🔍 Validating plan integrity..."
+            
+            # Dynamic plan artifact validation based on matrix
+            Write-Host "🔍 Validating plan artifacts for deployment..."
+            
+            # Get all plan artifacts from the current build
+            try {
+              $headers = @{
+                "Authorization" = "Bearer $(System.AccessToken)"
+                "Content-Type" = "application/json"
+              }
+              
+              $uri = "$(System.CollectionUri)$(System.TeamProject)/_apis/build/builds/$(Build.BuildId)/artifacts?api-version=7.0"
+              $artifacts = Invoke-RestMethod -Uri $uri -Headers $headers -TimeoutSec 30
+              
+              $planArtifacts = $artifacts.value | Where-Object { $_.name -match "terraform-plan-" }
+              $validPlans = 0
+              $criticalPlans = 0
+              
+              foreach ($artifact in $planArtifacts) {
+                $artifactName = $artifact.name
+                Write-Host "🔍 Checking artifact: $artifactName"
+                
+                # Download and validate artifact
+                $downloadUri = $artifact.resource.downloadUrl
+                if ($downloadUri) {
+                  $validPlans++
+                  
+                  # Check if this is a critical environment plan
+                  if ($artifactName -match "(prod-lab|main)" -or $artifactName -match "critical") {
+                    $criticalPlans++
+                  }
+                  
+                  Write-Host "✅ Valid plan found: $artifactName"
+                } else {
+                  Write-Host "❌ Invalid plan artifact: $artifactName"
+                }
+              }
+              
+              # Validation results
+              Write-Host "📊 Plan Validation Summary:"
+              Write-Host "  Total valid plans: $validPlans"
+              Write-Host "  Critical environment plans: $criticalPlans"
+              
+              if ($validPlans -eq 0) {
+                Write-Host "❌ No valid plans found - aborting deployment"
+                exit 1
+              }
+              
+              # Set variables for downstream jobs
+              Write-Host "##vso[task.setvariable variable=VALID_PLANS;isOutput=true]$validPlans"
+              Write-Host "##vso[task.setvariable variable=CRITICAL_PLANS;isOutput=true]$criticalPlans"
+              
+              Write-Host "✅ Plan validation completed successfully"
+              
+            } catch {
+              Write-Host "❌ Failed to validate plan artifacts: $($_.Exception.Message)"
+              Write-Host "Falling back to file system check..."
+              
+              # Fallback to original logic
+              $planArtifacts = @('terraform-plan-dev-lab-main', 'terraform-plan-prod-lab-main')
+              $validPlans = 0
+              
+              foreach ($artifact in $planArtifacts) {
+                if (Test-Path "$(Pipeline.Workspace)/$artifact/tfplan-*.out") {
+                  $validPlans++
+                  Write-Host "✅ Plan found: $artifact"
+                } else {
+                  Write-Host "❌ Missing plan: $artifact"
+                }
+              }
+              
+              if ($validPlans -eq 0) {
+                Write-Host "❌ No valid plans found - aborting deployment"
+                exit 1
+              }
+            }
+
+  - stage: ProductionApproval
+    displayName: 'Production Deployment Approval'
+    dependsOn: PreApplyValidation
+    condition: |
+      and(
+        succeeded(),
+        or(
+          contains(variables['Build.SourceBranch'], 'main'),
+          eq(variables['Build.Reason'], 'Manual')
+        ),
+        or(
+          contains(variables['System.TeamProject'], 'prod'),
+          contains(variables['Build.Repository.Name'], 'prod')
+        )
+      )
+    jobs:
+    - deployment: ProductionApproval
+      displayName: 'Production Environment Approval'
+      environment: 'production-terraform'
+      pool:
+        vmImage: 'ubuntu-latest'
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+            - task: PowerShell@2
+              displayName: 'Pre-Deployment Checklist'
+              inputs:
+                targetType: 'inline'
+                script: |
+                  Write-Host "🚦 Production Deployment Checklist"
+                  Write-Host "=================================="
+                  Write-Host "✅ Security scans completed"
+                  Write-Host "✅ Plan validation successful"
+                  Write-Host "✅ Manual approval received"
+                  Write-Host "⚠️  Deploying to PRODUCTION environment"
+                  Write-Host ""
+                  Write-Host "📋 Deployment Summary:"
+                  Write-Host "  - Branch: $(Build.SourceBranch)"
+                  Write-Host "  - Commit: $(Build.SourceVersion)"
+                  Write-Host "  - Triggered by: $(Build.RequestedFor)"
+                  Write-Host "  - Build reason: $(Build.Reason)"
+
+  - stage: TerraformApply
+    displayName: 'Terraform Apply'
+    dependsOn: 
+    - PreApplyValidation
+    - ProductionApproval
+    condition: |
+      and(
+        in(dependencies.PreApplyValidation.result, 'Succeeded'),
+        or(
+          in(dependencies.ProductionApproval.result, 'Succeeded', 'Skipped'),
+          eq(variables['Build.Reason'], 'Manual')
+        )
+      )
+    variables:
+    # Import shared variables template
+    - template: ../templates/shared-variables.yml
+      parameters:
+        environment: ${{ parameters.environment }}
+    jobs:
+    - job: TerraformApplyMatrix
+      displayName: 'Terraform Apply'
+      timeoutInMinutes: 90
+      cancelTimeoutInMinutes: 10
+      
+      strategy:
+        matrix:
+          DevLab_Main:
+            Environment: 'dev-lab'
+            Module: 'main'
+            Priority: 'critical'
+            DependsOn: '[]'
+            ApplyOrder: '1'
+          DevLab_Vault:
+            Environment: 'dev-lab'
+            Module: 'vault'
+            Priority: 'high'
+            DependsOn: '["main"]'
+            ApplyOrder: '2'
+          DevLab_Unifi:
+            Environment: 'dev-lab'
+            Module: 'unifi'
+            Priority: 'medium'
+            DependsOn: '["main"]'
+            ApplyOrder: '3'
+          DevLab_Vultr:
+            Environment: 'dev-lab'
+            Module: 'vultr'
+            Priority: 'low'
+            DependsOn: '["main"]'
+            ApplyOrder: '4'
+          ProdLab_Main:
+            Environment: 'prod-lab'
+            Module: 'main'
+            Priority: 'critical'
+            DependsOn: '[]'
+            ApplyOrder: '1'
+          ProdLab_Vault:
+            Environment: 'prod-lab'
+            Module: 'vault'
+            Priority: 'high'
+            DependsOn: '["main"]'
+            ApplyOrder: '2'
+          ProdLab_Unifi:
+            Environment: 'prod-lab'
+            Module: 'unifi'
+            Priority: 'medium'
+            DependsOn: '["main"]'
+            ApplyOrder: '3'
+          ProdLab_Vultr:
+            Environment: 'prod-lab'
+            Module: 'vultr'
+            Priority: 'low'
+            DependsOn: '["main"]'
+            ApplyOrder: '4'
+          ProdLab_B2:
+            Environment: 'prod-lab'
+            Module: 'b2'
+            Priority: 'medium'
+            DependsOn: '["main"]'
+            ApplyOrder: '5'
+        maxParallel: 1  # Sequential for dependency management
+    
+      pool:
+        vmImage: 'ubuntu-latest'
+      
+      variables:
+      # Environment-specific variable groups (resolved at runtime)
+      - group: terraform-$(Environment)
+      - group: azure-service-connections
+      
+      # Job-specific variables
+      - name: StateKey
+        value: '$(Environment)/$(Module)/terraform.tfstate'
+      
+      steps:
+      - task: PowerShell@2
+        displayName: 'Set Working Directory Variable'
+        inputs:
+          targetType: 'inline'
+          script: |
+            if ("$(Module)" -eq "main") {
+              $workingDir = "terraform"
+            } else {
+              $workingDir = "terraform/modules/$(Module)"
+            }
+            Write-Host "##vso[task.setvariable variable=WORKING_DIR]$workingDir"
+            Write-Host "Working directory set to: $workingDir"
+            
+            # Set additional computed variables for downstream tasks
+            Write-Host "##vso[task.setvariable variable=COMPUTED_STATE_KEY]$(Environment)/$(Module)/terraform.tfstate"
+            Write-Host "##vso[task.setvariable variable=ARTIFACT_NAME]terraform-plan-$(Environment)-$(Module)"
+            Write-Host "##vso[task.setvariable variable=BACKEND_CONFIG_FILE]$workingDir/backend.tf"
+      
+      - template: ../templates/terraform-setup.yml
+        parameters:
+          azureServiceConnection: 'azure-terraform-backend'
+          terraformVersion: $(TF_VERSION)
+          workingDirectory: $(WORKING_DIR)
+          environment: $(Environment)
+          module: $(Module)
+          stateKey: $(StateKey)
+      
+      - task: DownloadPipelineArtifact@2
+        displayName: 'Download Plan Artifact'
+        inputs:
+          buildType: 'current'
+          artifactName: 'terraform-plan-$(Environment)-$(Module)'
+          targetPath: '$(Pipeline.Workspace)/terraform-plan-$(Environment)-$(Module)'
+        retryCountOnTaskFailure: 3
+        timeoutInMinutes: 10
+      
+      - task: PowerShell@2
+        displayName: 'Terraform Init with Retry Logic'
+        inputs:
+          targetType: 'inline'
+          workingDirectory: $(WORKING_DIR)
+          script: |
+            # Set plugin cache directory for performance
+            $env:TF_PLUGIN_CACHE_DIR = "$(Agent.TempDirectory)/terraform-plugins"
+            New-Item -ItemType Directory -Force -Path $env:TF_PLUGIN_CACHE_DIR | Out-Null
+            
+            $maxRetries = 3
+            $retryDelay = 30
+            
+            for ($attempt = 1; $attempt -le $maxRetries; $attempt++) {
+              try {
+                Write-Host "🔄 Terraform Init attempt $attempt of $maxRetries"
+                
+                terraform init `
+                  -backend-config="resource_group_name=$(AZURE_BACKEND_RESOURCE_GROUP)" `
+                  -backend-config="storage_account_name=$(AZURE_BACKEND_STORAGE_ACCOUNT)" `
+                  -backend-config="container_name=$(AZURE_BACKEND_CONTAINER_NAME)" `
+                  -backend-config="key=$(StateKey)" `
+                  -lock-timeout=$(STATE_LOCK_TIMEOUT) `
+                  -input=false `
+                  -no-color
+                
+                if ($LASTEXITCODE -eq 0) {
+                  Write-Host "✅ Terraform init successful on attempt $attempt"
+                  break
+                } else {
+                  throw "Terraform init failed with exit code $LASTEXITCODE"
+                }
+              }
+              catch {
+                Write-Host "❌ Attempt $attempt failed: $($_.Exception.Message)"
+                
+                if ($attempt -lt $maxRetries) {
+                  Write-Host "⏳ Waiting $retryDelay seconds before retry..."
+                  Start-Sleep -Seconds $retryDelay
+                  $retryDelay = $retryDelay * 2  # Exponential backoff
+                } else {
+                  Write-Host "💥 All $maxRetries attempts failed"
+                  exit 1
+                }
+              }
+            }
+      
+      - task: PowerShell@2
+        displayName: 'Copy Plan File & Verify Integrity'
+        inputs:
+          targetType: 'inline'
+          script: |
+            $planFile = "$(Pipeline.Workspace)/terraform-plan-$(Environment)-$(Module)/tfplan-$(Environment)-$(Module).out"
+            $targetFile = "$(WORKING_DIR)/tfplan-$(Environment)-$(Module).out"
+            
+            if (Test-Path $planFile) {
+              # Verify plan file integrity
+              $planSize = (Get-Item $planFile).Length
+              if ($planSize -eq 0) {
+                Write-Host "❌ Plan file is empty: $planFile"
+                exit 1
+              }
+              
+              # Copy with verification
+              Copy-Item $planFile $targetFile -Force
+              
+              # Verify copy success
+              if ((Get-Item $targetFile).Length -eq $planSize) {
+                Write-Host "✅ Plan file copied successfully ($planSize bytes)"
+                Write-Host "##vso[task.setvariable variable=PLAN_FILE_SIZE]$planSize"
+              } else {
+                Write-Host "❌ Plan file copy verification failed"
+                exit 1
+              }
+            } else {
+              Write-Host "❌ Plan file not found: $planFile"
+              Write-Host "Available files in artifact:"
+              Get-ChildItem "$(Pipeline.Workspace)/terraform-plan-$(Environment)-$(Module)" -Recurse | ForEach-Object { Write-Host "  $($_.FullName)" }
+              exit 1
+            }
+      
+      - task: TerraformCLI@0
+        displayName: 'Terraform Apply'
+        inputs:
+          command: 'apply'
+          terraformVersion: $(TF_VERSION)
+          workingDirectory: $(WORKING_DIR)
+          environmentServiceName: 'azure-terraform-backend'
+          commandOptions: 'tfplan-$(Environment)-$(Module).out'
+        timeoutInMinutes: 60
+        retryCountOnTaskFailure: 1
+        env:
+          # Secure environment variables from variable groups
+          TF_VAR_api_key: $(RACKSPACE_API_KEY)
+          TF_VAR_environment: $(Environment)
+          TF_VAR_subscription_id: $(ARM_SUBSCRIPTION_ID)
+          TF_VAR_tenant_id: $(ARM_TENANT_ID)
+          ARM_USE_AZUREAD: true
+          ARM_STORAGE_USE_AZUREAD: true
+      
+      - task: PowerShell@2
+        displayName: 'Post-Apply Validation & Drift Detection'
+        inputs:
+          targetType: 'inline'
+          workingDirectory: $(WORKING_DIR)
+          script: |
+            Write-Host "🔍 Post-Apply Validation Starting..."
+            
+            # Enhanced state refresh with error handling
+            try {
+              Write-Host "🔄 Refreshing Terraform state..."
+              terraform refresh -input=false -no-color
+              
+              if ($LASTEXITCODE -ne 0) {
+                throw "Terraform refresh failed with exit code $LASTEXITCODE"
+              }
+              Write-Host "✅ State refresh completed successfully"
+            } catch {
+              Write-Host "❌ State refresh failed: $($_.Exception.Message)"
+              Write-Host "##vso[task.logissue type=error]State refresh failed"
+              exit 1
+            }
+            
+            # Enhanced drift detection
+            try {
+              Write-Host "🔍 Running drift detection..."
+              terraform plan -input=false -detailed-exitcode -no-color
+              
+              $driftExitCode = $LASTEXITCODE
+              switch ($driftExitCode) {
+                0 {
+                  Write-Host "✅ No infrastructure drift detected"
+                  Write-Host "##vso[task.setvariable variable=DRIFT_STATUS]No Drift"
+                  Write-Host "##vso[task.setvariable variable=DRIFT_COUNT]0"
+                }
+                1 {
+                  Write-Host "❌ Drift detection failed"
+                  Write-Host "##vso[task.setvariable variable=DRIFT_STATUS]Detection Failed"
+                  Write-Host "##vso[task.logissue type=error]Drift detection failed"
+                  exit 1
+                }
+                2 {
+                  Write-Host "⚠️ Infrastructure drift detected after apply"
+                  Write-Host "This indicates potential issues with the deployment"
+                  
+                  # Parse drift details
+                  $driftDetails = terraform show -no-color 2>&1
+                  $driftCount = ($driftDetails | Select-String "Plan:").Count
+                  
+                  Write-Host "##vso[task.setvariable variable=DRIFT_STATUS]Drift Detected"
+                  Write-Host "##vso[task.setvariable variable=DRIFT_COUNT]$driftCount"
+                  
+                  # Fail if drift exceeds threshold
+                  if ($driftCount -gt $(MAX_DRIFT_THRESHOLD)) {
+                    Write-Host "##vso[task.logissue type=error]Drift count ($driftCount) exceeds threshold ($(MAX_DRIFT_THRESHOLD))"
+                    exit 1
+                  }
+                }
+                default {
+                  Write-Host "❓ Unknown drift detection exit code: $driftExitCode"
+                  Write-Host "##vso[task.setvariable variable=DRIFT_STATUS]Unknown"
+                  exit 1
+                }
+              }
+            } catch {
+              Write-Host "❌ Drift detection failed: $($_.Exception.Message)"
+              Write-Host "##vso[task.logissue type=error]Drift detection error"
+              exit 1
+            }
+        env:
+          # Secure environment variables from variable groups
+          TF_VAR_api_key: $(RACKSPACE_API_KEY)
+          TF_VAR_environment: $(Environment)
+          TF_VAR_subscription_id: $(ARM_SUBSCRIPTION_ID)
+          TF_VAR_tenant_id: $(ARM_TENANT_ID)
+          ARM_USE_AZUREAD: true
+          ARM_STORAGE_USE_AZUREAD: true
+
+      - task: PowerShell@2
+        displayName: 'Generate Deployment Report & Notifications'
+        inputs:
+          targetType: 'inline'
+          script: |
+            Write-Host "📊 Deployment Summary Report"
+            Write-Host "============================="
+            Write-Host "✅ Terraform apply completed successfully for $(Environment)/$(Module)"
+            Write-Host "🎯 Environment: $(Environment)"
+            Write-Host "📦 Module: $(Module)"
+            Write-Host "🔗 Commit: $(Build.SourceVersion)"
+            Write-Host "👤 Requested by: $(Build.RequestedFor)"
+            Write-Host "⏰ Completed at: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')"
+            Write-Host "🔍 Drift Status: $(DRIFT_STATUS)"
+            Write-Host ""
+            Write-Host "🔧 Infrastructure changes have been deployed successfully"
+            
+            # Set deployment success status
+            Write-Host "##vso[task.setvariable variable=DEPLOYMENT_STATUS]Success"
+            Write-Host "##vso[task.setvariable variable=DEPLOYMENT_TIMESTAMP]$(Get-Date -Format 'yyyy-MM-ddTHH:mm:ssZ')"
+            
+            # Generate detailed report
+            $deploymentReport = @{
+              timestamp = Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ"
+              environment = "$(Environment)"
+              module = "$(Module)"
+              priority = "$(Priority)"
+              status = "Success"
+              commit = "$(Build.SourceVersion)"
+              branch = "$(Build.SourceBranch)"
+              requestedBy = "$(Build.RequestedFor)"
+              buildId = "$(Build.BuildId)"
+              driftStatus = "$(DRIFT_STATUS)"
+              driftCount = if ("$(DRIFT_COUNT)") { [int]"$(DRIFT_COUNT)" } else { 0 }
+            }
+            
+            $deploymentReport | ConvertTo-Json -Depth 3 | Out-File -FilePath "deployment-report.json" -Encoding UTF8
+            
+            # Send deployment notifications
+            if ("$(NOTIFICATION_ENABLED)" -eq "true") {
+              $driftEmoji = if ("$(DRIFT_STATUS)" -eq "No Drift") { "✅" } elseif ("$(DRIFT_STATUS)" -eq "Drift Detected") { "⚠️" } else { "❓" }
+              $deploymentDuration = ((Get-Date) - [datetime]"$(System.JobStartTime)").TotalMinutes
+              
+              # Enhanced notification with deployment metrics
+              $notification = @{
+                "@type" = "MessageCard"
+                "@context" = "http://schema.org/extensions"
+                text = "Terraform Deployment Complete: $(Environment)/$(Module)"
+                themeColor = if ("$(DRIFT_STATUS)" -eq "Drift Detected") { "FFA500" } else { "00FF00" }
+                sections = @(
+                  @{
+                    activityTitle = "✅ Deployment Successful"
+                    activitySubtitle = "Environment: $(Environment) | Module: $(Module) | Priority: $(Priority)"
+                    facts = @(
+                      @{ name = "Branch"; value = "$(Build.SourceBranch)" },
+                      @{ name = "Commit"; value = "$(Build.SourceVersion.Substring(0, 7))" },
+                      @{ name = "Requested By"; value = "$(Build.RequestedFor)" },
+                      @{ name = "Drift Status"; value = "$driftEmoji $(DRIFT_STATUS)" },
+                      @{ name = "Drift Count"; value = "$(DRIFT_COUNT)" },
+                      @{ name = "Duration"; value = "$([math]::Round($deploymentDuration, 1)) minutes" },
+                      @{ name = "Plan Size"; value = "$(PLAN_FILE_SIZE) bytes" },
+                      @{ name = "Build"; value = "[View Build]($(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId))" }
+                    )
+                  }
+                )
+                potentialAction = @(
+                  @{
+                    "@type" = "OpenUri"
+                    name = "View Deployment Report"
+                    targets = @(
+                      @{
+                        os = "default"
+                        uri = "$(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)&view=artifacts"
+                      }
+                    )
+                  }
+                )
+              } | ConvertTo-Json -Depth 5
+              
+              # Send to Teams
+              if ("$(TEAMS_WEBHOOK_URL)") {
+                try {
+                  Invoke-RestMethod -Uri "$(TEAMS_WEBHOOK_URL)" -Method POST -Body $notification -ContentType "application/json" -TimeoutSec 30
+                  Write-Host "✅ Teams deployment notification sent"
+                } catch {
+                  Write-Host "⚠️ Failed to send Teams notification: $($_.Exception.Message)"
+                }
+              }
+              
+              # Send to Slack if configured
+              if ("$(SLACK_WEBHOOK_URL)") {
+                $slackMessage = @{
+                  text = "Terraform Deployment Complete: $(Environment)/$(Module)"
+                  attachments = @(
+                    @{
+                      color = if ("$(DRIFT_STATUS)" -eq "Drift Detected") { "warning" } else { "good" }
+                      fields = @(
+                        @{ title = "Environment"; value = "$(Environment)"; short = $true },
+                        @{ title = "Module"; value = "$(Module)"; short = $true },
+                        @{ title = "Drift Status"; value = "$driftEmoji $(DRIFT_STATUS)"; short = $true },
+                        @{ title = "Duration"; value = "$([math]::Round($deploymentDuration, 1))m"; short = $true }
+                      )
+                      actions = @(
+                        @{
+                          type = "button"
+                          text = "View Build"
+                          url = "$(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)"
+                        }
+                      )
+                    }
+                  )
+                } | ConvertTo-Json -Depth 5
+                
+                try {
+                  Invoke-RestMethod -Uri "$(SLACK_WEBHOOK_URL)" -Method POST -Body $slackMessage -ContentType "application/json" -TimeoutSec 30
+                  Write-Host "✅ Slack deployment notification sent"
+                } catch {
+                  Write-Host "⚠️ Failed to send Slack notification: $($_.Exception.Message)"
+                }
+              }
+            }

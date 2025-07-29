@@ -1,0 +1,33 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: claude-code-monitoring
+  namespace: argocd
+  labels:
+    app.kubernetes.io/category: monitoring
+    argocd.argoproj.io/instance: monitoring
+spec:
+  project: monitoring
+  source:
+    repoURL: 'https://github.com/lordmuffin/homelab.git'
+    path: apps/monitoring/claude-code
+    targetRevision: main
+  destination:
+    namespace: monitoring
+    name: in-cluster
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: true
+    retry:
+      limit: 5
+      backoff:
+        duration: 20s
+        factor: 2
+        maxDuration: 15m
+    syncOptions:
+      - Validate=false
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true

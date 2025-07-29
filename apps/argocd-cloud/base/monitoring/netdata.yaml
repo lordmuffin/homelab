@@ -1,0 +1,100 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: netdata
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: monitoring
+  source:
+    repoURL: https://netdata.github.io/helmchart/
+    chart: netdata
+    targetRevision: v3.7.140
+    helm:
+      releaseName: netdata
+      values: |
+        APIKEY:
+          valueFrom:
+            secretKeyRef:
+              name: netdata-apikey-creds-1password
+              key: password
+        image:
+          tag: stable
+        ingress:
+          annotations:
+            kubernetes.io/ingress.class: traefik-external
+            cert-manager.io/cluster-issuer: letsencrypt-production
+            external-dns.alpha.kubernetes.io/hostname: netdata.lab.apj.dev
+            external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
+            external-dns.alpha.kubernetes.io/ttl: "120"
+          hosts:
+            - netdata.lab.apj.dev
+          tls:
+            - secretName: lab-apj-dev-tls
+              hosts:
+                - netdata.lab.apj.dev
+          spec:
+            ingressClassName: "traefik-external"
+            restarter:
+              enabled: "true"
+        k8sState:
+          enabled: "true"
+          persistence:
+            enabled: "true"
+            storageclass: "sata"
+            volumesize: "5Gi"
+        parent:
+          alarms: 
+            persistence: "true"
+            storageclass: "sata"
+            volumesize: "5Gi"
+          database: 
+            persistence: "true"
+            storageclass: "sata"
+            volumesize: "5Gi"
+          claiming:
+            enabled: "true"
+            token:
+              valueFrom:
+                secretKeyRef:
+                  name: netdata-token-creds-1password
+                  key: parent_token
+            rooms:
+              valueFrom:
+                secretKeyRef:
+                  name: netdata-token-creds-1password
+                  key: parent_rooms
+        child:
+          claiming:
+            enabled: "true"
+            token:
+              valueFrom:
+                secretKeyRef:
+                  name: netdata-token-creds-1password
+                  key: child_token
+            rooms:
+              valueFrom:
+                secretKeyRef:
+                  name: netdata-token-creds-1password
+                  key: child_rooms
+  destination:
+    namespace: monitoring
+    name: in-cluster
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: true
+    syncOptions:
+    - Validate=false
+    - CreateNamespace=false
+    - PrunePropagationPolicy=foreground
+    - PruneLast=false
+    - ApplyOutOfSyncOnly=false
+    - Prune=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 20s
+        factor: 2
+        maxDuration: 15m

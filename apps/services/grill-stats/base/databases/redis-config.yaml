@@ -1,0 +1,191 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-config
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+data:
+  redis.conf: |
+    # Network and security
+    bind 0.0.0.0
+    port 6379
+    protected-mode yes
+    requirepass ${REDIS_PASSWORD}
+
+    # Persistence configuration
+    # Save snapshots for data durability
+    save 900 1     # Save after 900 seconds if at least 1 key changed
+    save 300 10    # Save after 300 seconds if at least 10 keys changed
+    save 60 10000  # Save after 60 seconds if at least 10000 keys changed
+
+    # Memory management - critical for caching
+    maxmemory 768mb
+    maxmemory-policy allkeys-lru  # Evict least recently used keys when memory limit is reached
+
+    # Logging
+    loglevel notice
+    logfile ""
+
+    # Connection handling
+    timeout 300            # Client idle timeout (5 minutes)
+    tcp-keepalive 300     # TCP keepalive
+    tcp-backlog 511       # TCP connection backlog
+
+    # Database configuration
+    databases 16          # Support multiple databases for different use cases
+
+    # Keyspace notifications for session expiry management
+    notify-keyspace-events "Ex"  # Enable keyspace notifications for expired events
+
+    # RDB persistence settings
+    rdbcompression yes    # Compress RDB files
+    rdbchecksum yes      # Checksum RDB files
+    dbfilename dump.rdb   # RDB filename
+    dir /data            # Data directory
+
+    # AOF persistence for durability
+    appendonly yes                        # Enable AOF
+    appendfilename "appendonly.aof"       # AOF filename
+    appendfsync everysec                  # Sync every second (good balance)
+    no-appendfsync-on-rewrite no         # Don't stop syncing during rewrites
+    auto-aof-rewrite-percentage 100      # Rewrite when AOF is 100% larger
+    auto-aof-rewrite-min-size 64mb       # Minimum size for rewrite
+
+    # Performance tuning
+    stop-writes-on-bgsave-error yes      # Stop writes if save fails
+    rdbcompression yes                   # Compress RDB snapshots
+    lazyfree-lazy-eviction yes          # Use lazy freeing for evictions
+    lazyfree-lazy-expire yes            # Use lazy freeing for expired keys
+    lazyfree-lazy-server-del yes        # Use lazy freeing for server deletions
+
+    # Client buffer limits
+    client-output-buffer-limit normal 0 0 0
+    client-output-buffer-limit replica 256mb 64mb 60
+    client-output-buffer-limit pubsub 32mb 8mb 60
+
+    # Slow log configuration
+    slowlog-log-slower-than 10000       # Log queries slower than 10ms
+    slowlog-max-len 128                 # Keep last 128 slow queries
+
+    # Hash table settings for better performance
+    hash-max-ziplist-entries 512
+    hash-max-ziplist-value 64
+
+    # Set and sorted set optimizations
+    set-max-intset-entries 512
+    zset-max-ziplist-entries 128
+    zset-max-ziplist-value 64
+
+    # List optimizations
+    list-max-ziplist-size -2
+    list-compress-depth 0
+
+    # HyperLogLog settings
+    hll-sparse-max-bytes 3000
+
+    # Streams settings
+    stream-node-max-bytes 4096
+    stream-node-max-entries 100
+
+    # Active rehashing
+    activerehashing yes
+
+    # Jemalloc background thread
+    jemalloc-bg-thread yes
+
+    # Lua script settings
+    lua-time-limit 5000
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-cache-config
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+data:
+  cache-config.json: |
+    {
+      "session_management": {
+        "ttl": 3600,
+        "key_prefix": "session:",
+        "database": 0,
+        "description": "JWT tokens and user sessions"
+      },
+      "live_temperature_data": {
+        "ttl": 30,
+        "key_prefix": "temp:",
+        "database": 1,
+        "description": "Real-time temperature readings for dashboard"
+      },
+      "device_status": {
+        "ttl": 60,
+        "key_prefix": "device:",
+        "database": 2,
+        "description": "Device connection and status information"
+      },
+      "api_responses": {
+        "ttl": 300,
+        "key_prefix": "api:",
+        "database": 3,
+        "description": "Cached API responses for performance"
+      },
+      "thermoworks_api": {
+        "ttl": 600,
+        "key_prefix": "tw:",
+        "database": 4,
+        "description": "ThermoWorks API responses and rate limiting"
+      },
+      "rate_limiting": {
+        "ttl": 3600,
+        "key_prefix": "rate:",
+        "database": 5,
+        "description": "Rate limiting counters and failed attempts"
+      },
+      "sse_connections": {
+        "ttl": 1800,
+        "key_prefix": "sse:",
+        "database": 6,
+        "description": "Server-Sent Events connection tracking"
+      },
+      "aggregated_data": {
+        "ttl": 900,
+        "key_prefix": "agg:",
+        "database": 7,
+        "description": "Pre-computed aggregated temperature data"
+      }
+    }
+  connection-config.json: |
+    {
+      "connection_pool": {
+        "max_connections": 20,
+        "retry_on_timeout": true,
+        "health_check_interval": 30,
+        "socket_timeout": 5,
+        "socket_connect_timeout": 5,
+        "socket_keepalive": true,
+        "socket_keepalive_options": {
+          "TCP_KEEPIDLE": 1,
+          "TCP_KEEPINTVL": 3,
+          "TCP_KEEPCNT": 5
+        }
+      },
+      "redis_urls": {
+        "primary": "redis://:${REDIS_PASSWORD}@redis:6379",
+        "connection_string": "redis://:${REDIS_PASSWORD}@redis:6379/0"
+      },
+      "sentinel_config": {
+        "enabled": false,
+        "sentinel_service_name": "grill-stats-master",
+        "sentinel_hosts": [
+          "redis-sentinel-0.redis-sentinel.grill-stats.svc.cluster.local:26379",
+          "redis-sentinel-1.redis-sentinel.grill-stats.svc.cluster.local:26379",
+          "redis-sentinel-2.redis-sentinel.grill-stats.svc.cluster.local:26379"
+        ]
+      }
+    }

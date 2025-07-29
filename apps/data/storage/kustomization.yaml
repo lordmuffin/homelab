@@ -46,6 +46,7 @@ resources:
 - base/vikunja.yaml
 - base/paperless.yaml
 - base/litellm.yaml
+- base/headscale.yaml
 
 #  Postgres Storage
 # - base/postgres/ha.yaml

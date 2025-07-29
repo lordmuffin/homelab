@@ -1,0 +1,18 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: claude-code-exporter
+  labels:
+    app.kubernetes.io/name: claude-code-exporter
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: claude-code-exporter
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+    scheme: http
+  namespaceSelector:
+    matchNames:
+    - monitoring

@@ -1,0 +1,689 @@
+---
+# PostgreSQL Database Initialization Scripts
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgresql-init-scripts
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+data:
+  # Complete database schema for all user stories
+  01-schema.sql: |
+    -- PostgreSQL Database Schema for Grill Stats Application
+    -- Comprehensive schema supporting all user stories
+
+    -- Enable required extensions
+    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+    CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+    CREATE EXTENSION IF NOT EXISTS "pg_stat_statements";
+
+    -- User Management Schema (User Story 1: Authentication)
+    CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password_hash VARCHAR(255) NOT NULL,
+        name VARCHAR(255),
+        is_active BOOLEAN DEFAULT true,
+        is_locked BOOLEAN DEFAULT false,
+        failed_login_attempts INTEGER DEFAULT 0,
+        lockout_until TIMESTAMP,
+        last_login TIMESTAMP,
+        password_changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+        -- Constraints
+        CONSTRAINT valid_email CHECK (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'),
+        CONSTRAINT valid_failed_attempts CHECK (failed_login_attempts >= 0)
+    );
+
+    -- Session Management
+    CREATE TABLE IF NOT EXISTS sessions (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        session_token VARCHAR(255) UNIQUE NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        last_accessed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        ip_address INET,
+        user_agent TEXT,
+        is_active BOOLEAN DEFAULT true,
+
+        -- Constraints
+        CONSTRAINT valid_expiry CHECK (expires_at > created_at)
+    );
+
+    -- Login Attempts Logging
+    CREATE TABLE IF NOT EXISTS login_attempts (
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(255),
+        ip_address INET,
+        user_agent TEXT,
+        success BOOLEAN DEFAULT false,
+        failure_reason VARCHAR(100),
+        attempted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+        -- Index for security monitoring
+        INDEX idx_login_attempts_email (email),
+        INDEX idx_login_attempts_ip (ip_address),
+        INDEX idx_login_attempts_time (attempted_at)
+    );
+
+    -- Secure Credential Storage (User Story 5)
+    CREATE TABLE IF NOT EXISTS user_credentials (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        credential_type VARCHAR(50) NOT NULL,
+        encrypted_username TEXT,
+        encrypted_password TEXT,
+        encryption_key_id UUID DEFAULT uuid_generate_v4(),
+        encryption_algorithm VARCHAR(50) DEFAULT 'AES-256-GCM',
+        encrypted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        last_used TIMESTAMP,
+        is_active BOOLEAN DEFAULT true,
+
+        -- Constraints
+        CONSTRAINT valid_credential_type CHECK (credential_type IN ('thermoworks', 'homeassistant', 'api_key', 'oauth_token')),
+        CONSTRAINT valid_encryption_algo CHECK (encryption_algorithm IN ('AES-256-GCM', 'AES-256-CBC', 'ChaCha20-Poly1305'))
+    );
+
+    -- Credential Audit Log
+    CREATE TABLE IF NOT EXISTS credential_audit (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        credential_id INTEGER REFERENCES user_credentials(id) ON DELETE SET NULL,
+        operation VARCHAR(50) NOT NULL,
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        ip_address INET,
+        user_agent TEXT,
+        success BOOLEAN DEFAULT true,
+        error_message TEXT,
+
+        -- Constraints
+        CONSTRAINT valid_operation CHECK (operation IN ('create', 'read', 'update', 'delete', 'encrypt', 'decrypt', 'rotate'))
+    );
+
+    -- Device Management Schema (User Story 2: Device List)
+    CREATE TABLE IF NOT EXISTS devices (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        device_id VARCHAR(255) UNIQUE NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        device_type VARCHAR(100) NOT NULL DEFAULT 'thermoworks',
+        model VARCHAR(100),
+        firmware_version VARCHAR(50),
+        configuration JSONB DEFAULT '{}',
+        is_active BOOLEAN DEFAULT true,
+        last_seen TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+        -- Constraints
+        CONSTRAINT valid_device_type CHECK (device_type IN ('thermoworks', 'rfx', 'bluetooth', 'wifi', 'custom')),
+        CONSTRAINT valid_device_id_format CHECK (char_length(device_id) > 0)
+    );
+
+    -- Device Health Monitoring
+    CREATE TABLE IF NOT EXISTS device_health (
+        id SERIAL PRIMARY KEY,
+        device_id INTEGER REFERENCES devices(id) ON DELETE CASCADE,
+        battery_level INTEGER CHECK (battery_level >= 0 AND battery_level <= 100),
+        signal_strength INTEGER CHECK (signal_strength >= -100 AND signal_strength <= 100),
+        connection_status VARCHAR(50) DEFAULT 'unknown',
+        temperature_count INTEGER DEFAULT 0,
+        last_reading TIMESTAMP,
+        health_score INTEGER DEFAULT 100 CHECK (health_score >= 0 AND health_score <= 100),
+        alerts_active INTEGER DEFAULT 0,
+        metadata JSONB DEFAULT '{}',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+        -- Constraints
+        CONSTRAINT valid_connection_status CHECK (connection_status IN ('connected', 'disconnected', 'error', 'unknown', 'maintenance'))
+    );
+
+    -- Device Configuration Storage
+    CREATE TABLE IF NOT EXISTS device_configuration (
+        id SERIAL PRIMARY KEY,
+        device_id INTEGER REFERENCES devices(id) ON DELETE CASCADE,
+        config_key VARCHAR(100) NOT NULL,
+        config_value TEXT,
+        config_type VARCHAR(50) DEFAULT 'string',
+        is_encrypted BOOLEAN DEFAULT false,
+        is_readonly BOOLEAN DEFAULT false,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+        -- Unique constraint
+        UNIQUE(device_id, config_key),
+
+        -- Constraints
+        CONSTRAINT valid_config_type CHECK (config_type IN ('string', 'integer', 'float', 'boolean', 'json', 'encrypted'))
+    );
+
+    -- Live Data Schema (User Story 3: Live Temperature Data)
+    CREATE TABLE IF NOT EXISTS device_channels (
+        id SERIAL PRIMARY KEY,
+        device_id INTEGER REFERENCES devices(id) ON DELETE CASCADE,
+        channel_id INTEGER NOT NULL,
+        channel_name VARCHAR(100),
+        probe_type VARCHAR(50) DEFAULT 'meat',
+        unit VARCHAR(1) DEFAULT 'F',
+        min_temp DECIMAL(5,2),
+        max_temp DECIMAL(5,2),
+        alarm_low DECIMAL(5,2),
+        alarm_high DECIMAL(5,2),
+        is_active BOOLEAN DEFAULT true,
+        configuration JSONB DEFAULT '{}',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+        -- Unique constraint
+        UNIQUE(device_id, channel_id),
+
+        -- Constraints
+        CONSTRAINT valid_probe_type CHECK (probe_type IN ('meat', 'ambient', 'surface', 'liquid', 'custom')),
+        CONSTRAINT valid_unit CHECK (unit IN ('F', 'C', 'K')),
+        CONSTRAINT valid_temp_range CHECK (min_temp IS NULL OR max_temp IS NULL OR min_temp <= max_temp)
+    );
+
+    -- Live Temperature Readings
+    CREATE TABLE IF NOT EXISTS live_temperature_readings (
+        id SERIAL PRIMARY KEY,
+        device_id INTEGER REFERENCES devices(id) ON DELETE CASCADE,
+        channel_id INTEGER NOT NULL,
+        temperature DECIMAL(5,2) NOT NULL,
+        unit VARCHAR(1) DEFAULT 'F',
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        quality_score INTEGER DEFAULT 100 CHECK (quality_score >= 0 AND quality_score <= 100),
+        raw_value DECIMAL(10,4),
+        calibration_offset DECIMAL(5,2) DEFAULT 0,
+        is_valid BOOLEAN DEFAULT true,
+        metadata JSONB DEFAULT '{}',
+
+        -- Constraints
+        CONSTRAINT valid_unit CHECK (unit IN ('F', 'C', 'K')),
+        CONSTRAINT valid_temperature_range CHECK (temperature >= -273.15 AND temperature <= 1000)
+    );
+
+    -- Device Status Log
+    CREATE TABLE IF NOT EXISTS device_status_log (
+        id SERIAL PRIMARY KEY,
+        device_id INTEGER REFERENCES devices(id) ON DELETE CASCADE,
+        status_type VARCHAR(50) NOT NULL,
+        status_value VARCHAR(100),
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        severity VARCHAR(20) DEFAULT 'info',
+        message TEXT,
+        resolved_at TIMESTAMP,
+
+        -- Constraints
+        CONSTRAINT valid_status_type CHECK (status_type IN ('connection', 'battery', 'temperature', 'error', 'warning', 'info')),
+        CONSTRAINT valid_severity CHECK (severity IN ('critical', 'warning', 'info', 'debug'))
+    );
+
+    -- Historical Data Schema (User Story 4: Historical Data)
+    CREATE TABLE IF NOT EXISTS historical_temperature_readings (
+        id SERIAL PRIMARY KEY,
+        device_id INTEGER REFERENCES devices(id) ON DELETE CASCADE,
+        channel_id INTEGER NOT NULL,
+        temperature DECIMAL(5,2) NOT NULL,
+        unit VARCHAR(1) DEFAULT 'F',
+        timestamp TIMESTAMP NOT NULL,
+        recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        session_id UUID,
+        cook_id UUID,
+        quality_score INTEGER DEFAULT 100,
+        aggregation_type VARCHAR(20) DEFAULT 'raw',
+        source_table VARCHAR(50) DEFAULT 'live_readings',
+
+        -- Constraints
+        CONSTRAINT valid_unit CHECK (unit IN ('F', 'C', 'K')),
+        CONSTRAINT valid_temperature_range CHECK (temperature >= -273.15 AND temperature <= 1000),
+        CONSTRAINT valid_aggregation_type CHECK (aggregation_type IN ('raw', 'avg', 'min', 'max', 'median'))
+    );
+
+    -- Historical Data Summary for Analytics
+    CREATE TABLE IF NOT EXISTS historical_data_summary (
+        id SERIAL PRIMARY KEY,
+        device_id INTEGER REFERENCES devices(id) ON DELETE CASCADE,
+        channel_id INTEGER NOT NULL,
+        summary_date DATE NOT NULL,
+        summary_type VARCHAR(20) NOT NULL,
+        min_temperature DECIMAL(5,2),
+        max_temperature DECIMAL(5,2),
+        avg_temperature DECIMAL(5,2),
+        reading_count INTEGER DEFAULT 0,
+        quality_average DECIMAL(5,2),
+        cook_sessions INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+        -- Unique constraint
+        UNIQUE(device_id, channel_id, summary_date, summary_type),
+
+        -- Constraints
+        CONSTRAINT valid_summary_type CHECK (summary_type IN ('hourly', 'daily', 'weekly', 'monthly'))
+    );
+
+    -- Data Retention Policies
+    CREATE TABLE IF NOT EXISTS data_retention_policies (
+        id SERIAL PRIMARY KEY,
+        table_name VARCHAR(100) NOT NULL,
+        retention_days INTEGER NOT NULL,
+        archive_enabled BOOLEAN DEFAULT false,
+        archive_table VARCHAR(100),
+        compression_enabled BOOLEAN DEFAULT false,
+        policy_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+        -- Constraints
+        CONSTRAINT valid_retention_days CHECK (retention_days > 0),
+        CONSTRAINT valid_table_name CHECK (table_name ~ '^[a-zA-Z_][a-zA-Z0-9_]*$')
+    );
+
+    -- Encryption Key Management
+    CREATE TABLE IF NOT EXISTS encryption_keys (
+        id SERIAL PRIMARY KEY,
+        key_id UUID UNIQUE NOT NULL DEFAULT uuid_generate_v4(),
+        key_version INTEGER NOT NULL DEFAULT 1,
+        algorithm VARCHAR(50) NOT NULL DEFAULT 'AES-256-GCM',
+        key_purpose VARCHAR(50) NOT NULL,
+        encrypted_key TEXT NOT NULL,
+        key_derivation_salt TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMP,
+        is_active BOOLEAN DEFAULT true,
+        rotation_count INTEGER DEFAULT 0,
+
+        -- Constraints
+        CONSTRAINT valid_key_purpose CHECK (key_purpose IN ('credential_encryption', 'session_encryption', 'data_encryption', 'backup_encryption')),
+        CONSTRAINT valid_algorithm CHECK (algorithm IN ('AES-256-GCM', 'AES-256-CBC', 'ChaCha20-Poly1305'))
+    );
+
+    -- Create indexes for performance optimization
+
+    -- User management indexes
+    CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+    CREATE INDEX IF NOT EXISTS idx_users_active ON users(is_active);
+    CREATE INDEX IF NOT EXISTS idx_users_last_login ON users(last_login);
+
+    -- Session management indexes
+    CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
+    CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(session_token);
+    CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
+    CREATE INDEX IF NOT EXISTS idx_sessions_active ON sessions(is_active);
+
+    -- Device management indexes
+    CREATE INDEX IF NOT EXISTS idx_devices_user_id ON devices(user_id);
+    CREATE INDEX IF NOT EXISTS idx_devices_device_id ON devices(device_id);
+    CREATE INDEX IF NOT EXISTS idx_devices_active ON devices(is_active);
+    CREATE INDEX IF NOT EXISTS idx_devices_type ON devices(device_type);
+    CREATE INDEX IF NOT EXISTS idx_devices_last_seen ON devices(last_seen);
+
+    -- Device health indexes
+    CREATE INDEX IF NOT EXISTS idx_device_health_device_id ON device_health(device_id);
+    CREATE INDEX IF NOT EXISTS idx_device_health_created_at ON device_health(created_at);
+    CREATE INDEX IF NOT EXISTS idx_device_health_connection_status ON device_health(connection_status);
+
+    -- Live data indexes
+    CREATE INDEX IF NOT EXISTS idx_live_readings_device_id ON live_temperature_readings(device_id);
+    CREATE INDEX IF NOT EXISTS idx_live_readings_timestamp ON live_temperature_readings(timestamp DESC);
+    CREATE INDEX IF NOT EXISTS idx_live_readings_device_timestamp ON live_temperature_readings(device_id, timestamp DESC);
+    CREATE INDEX IF NOT EXISTS idx_live_readings_channel ON live_temperature_readings(device_id, channel_id, timestamp DESC);
+
+    -- Historical data indexes
+    CREATE INDEX IF NOT EXISTS idx_historical_device_id ON historical_temperature_readings(device_id);
+    CREATE INDEX IF NOT EXISTS idx_historical_timestamp ON historical_temperature_readings(timestamp DESC);
+    CREATE INDEX IF NOT EXISTS idx_historical_device_timestamp ON historical_temperature_readings(device_id, timestamp DESC);
+    CREATE INDEX IF NOT EXISTS idx_historical_channel_timestamp ON historical_temperature_readings(device_id, channel_id, timestamp DESC);
+    CREATE INDEX IF NOT EXISTS idx_historical_session_id ON historical_temperature_readings(session_id);
+    CREATE INDEX IF NOT EXISTS idx_historical_cook_id ON historical_temperature_readings(cook_id);
+
+    -- Summary data indexes
+    CREATE INDEX IF NOT EXISTS idx_summary_device_date ON historical_data_summary(device_id, summary_date DESC);
+    CREATE INDEX IF NOT EXISTS idx_summary_type_date ON historical_data_summary(summary_type, summary_date DESC);
+
+    -- Security audit indexes
+    CREATE INDEX IF NOT EXISTS idx_credential_audit_user_id ON credential_audit(user_id);
+    CREATE INDEX IF NOT EXISTS idx_credential_audit_timestamp ON credential_audit(timestamp DESC);
+    CREATE INDEX IF NOT EXISTS idx_credential_audit_operation ON credential_audit(operation);
+
+    -- Login attempts indexes
+    CREATE INDEX IF NOT EXISTS idx_login_attempts_email ON login_attempts(email);
+    CREATE INDEX IF NOT EXISTS idx_login_attempts_ip ON login_attempts(ip_address);
+    CREATE INDEX IF NOT EXISTS idx_login_attempts_time ON login_attempts(attempted_at DESC);
+
+    -- Status log indexes
+    CREATE INDEX IF NOT EXISTS idx_status_log_device_id ON device_status_log(device_id);
+    CREATE INDEX IF NOT EXISTS idx_status_log_timestamp ON device_status_log(timestamp DESC);
+    CREATE INDEX IF NOT EXISTS idx_status_log_severity ON device_status_log(severity);
+
+    -- Encryption key indexes
+    CREATE INDEX IF NOT EXISTS idx_encryption_keys_key_id ON encryption_keys(key_id);
+    CREATE INDEX IF NOT EXISTS idx_encryption_keys_purpose ON encryption_keys(key_purpose);
+    CREATE INDEX IF NOT EXISTS idx_encryption_keys_active ON encryption_keys(is_active);
+
+    -- User credential indexes
+    CREATE INDEX IF NOT EXISTS idx_user_credentials_user_id ON user_credentials(user_id);
+    CREATE INDEX IF NOT EXISTS idx_user_credentials_type ON user_credentials(credential_type);
+    CREATE INDEX IF NOT EXISTS idx_user_credentials_active ON user_credentials(is_active);
+
+    -- Successful schema creation marker
+    INSERT INTO device_status_log (device_id, status_type, status_value, message, severity)
+    VALUES (1, 'info', 'schema_created', 'Database schema created successfully', 'info')
+    ON CONFLICT DO NOTHING;
+
+    -- Create completion marker
+    SELECT 'Database schema initialization completed successfully' as status;
+
+  # Database users and permissions setup
+  02-users.sql: |
+    -- Database Users and Permissions Setup
+
+    -- Create application database
+    CREATE DATABASE grill_stats;
+
+    -- Connect to grill_stats database
+    \c grill_stats;
+
+    -- Create application users with specific permissions
+
+    -- Main application user
+    CREATE USER grill_stats_user WITH PASSWORD '${GRILL_STATS_PASSWORD}';
+    GRANT CONNECT ON DATABASE grill_stats TO grill_stats_user;
+    GRANT USAGE ON SCHEMA public TO grill_stats_user;
+    GRANT CREATE ON SCHEMA public TO grill_stats_user;
+
+    -- Service-specific users
+    CREATE USER auth_service WITH PASSWORD '${AUTH_SERVICE_PASSWORD}';
+    CREATE USER device_service WITH PASSWORD '${DEVICE_SERVICE_PASSWORD}';
+    CREATE USER encryption_service WITH PASSWORD '${ENCRYPTION_SERVICE_PASSWORD}';
+    CREATE USER temperature_service WITH PASSWORD '${TEMPERATURE_SERVICE_PASSWORD}';
+    CREATE USER historical_service WITH PASSWORD '${HISTORICAL_SERVICE_PASSWORD}';
+
+    -- Read-only user for reporting
+    CREATE USER readonly_user WITH PASSWORD '${READONLY_PASSWORD}';
+
+    -- Backup user
+    CREATE USER backup_user WITH PASSWORD '${BACKUP_PASSWORD}';
+
+    -- Monitoring user
+    CREATE USER monitoring_user WITH PASSWORD '${MONITORING_PASSWORD}';
+
+    -- Replication user for HA
+    CREATE USER replication_user WITH REPLICATION PASSWORD '${REPLICATION_PASSWORD}';
+
+    -- Grant permissions to application users
+    GRANT CONNECT ON DATABASE grill_stats TO auth_service, device_service, encryption_service, temperature_service, historical_service;
+    GRANT USAGE ON SCHEMA public TO auth_service, device_service, encryption_service, temperature_service, historical_service;
+
+    -- Grant table-specific permissions
+
+    -- Auth service permissions
+    GRANT SELECT, INSERT, UPDATE, DELETE ON users, sessions, login_attempts, credential_audit TO auth_service;
+    GRANT SELECT, INSERT, UPDATE, DELETE ON user_credentials TO auth_service;
+    GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO auth_service;
+
+    -- Device service permissions
+    GRANT SELECT, INSERT, UPDATE, DELETE ON devices, device_health, device_configuration, device_channels TO device_service;
+    GRANT SELECT, INSERT, UPDATE, DELETE ON device_status_log TO device_service;
+    GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO device_service;
+
+    -- Encryption service permissions
+    GRANT SELECT, INSERT, UPDATE, DELETE ON encryption_keys, user_credentials, credential_audit TO encryption_service;
+    GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO encryption_service;
+
+    -- Temperature service permissions
+    GRANT SELECT, INSERT, UPDATE, DELETE ON live_temperature_readings, device_channels TO temperature_service;
+    GRANT SELECT ON devices, device_health TO temperature_service;
+    GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO temperature_service;
+
+    -- Historical service permissions
+    GRANT SELECT, INSERT, UPDATE, DELETE ON historical_temperature_readings, historical_data_summary TO historical_service;
+    GRANT SELECT, INSERT, UPDATE, DELETE ON data_retention_policies TO historical_service;
+    GRANT SELECT ON devices, device_channels, live_temperature_readings TO historical_service;
+    GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO historical_service;
+
+    -- Read-only user permissions
+    GRANT CONNECT ON DATABASE grill_stats TO readonly_user;
+    GRANT USAGE ON SCHEMA public TO readonly_user;
+    GRANT SELECT ON ALL TABLES IN SCHEMA public TO readonly_user;
+
+    -- Backup user permissions
+    GRANT CONNECT ON DATABASE grill_stats TO backup_user;
+    GRANT USAGE ON SCHEMA public TO backup_user;
+    GRANT SELECT ON ALL TABLES IN SCHEMA public TO backup_user;
+
+    -- Monitoring user permissions
+    GRANT CONNECT ON DATABASE grill_stats TO monitoring_user;
+    GRANT USAGE ON SCHEMA public TO monitoring_user;
+    GRANT SELECT ON ALL TABLES IN SCHEMA public TO monitoring_user;
+    GRANT SELECT ON pg_stat_database, pg_stat_user_tables, pg_stat_user_indexes TO monitoring_user;
+    GRANT SELECT ON pg_statio_user_tables, pg_statio_user_indexes TO monitoring_user;
+
+    -- Grant permissions on future tables
+    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO grill_stats_user;
+    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO grill_stats_user;
+
+    -- Create completion marker
+    SELECT 'Database users and permissions setup completed successfully' as status;
+
+  # Database functions and triggers
+  03-functions.sql: |
+    -- Database Functions and Triggers
+
+    -- Function to update updated_at timestamp
+    CREATE OR REPLACE FUNCTION update_updated_at_column()
+    RETURNS TRIGGER AS $$
+    BEGIN
+        NEW.updated_at = CURRENT_TIMESTAMP;
+        RETURN NEW;
+    END;
+    $$ language 'plpgsql';
+
+    -- Function to log credential access
+    CREATE OR REPLACE FUNCTION log_credential_access()
+    RETURNS TRIGGER AS $$
+    BEGIN
+        INSERT INTO credential_audit (user_id, credential_id, operation, timestamp)
+        VALUES (NEW.user_id, NEW.id, TG_OP, CURRENT_TIMESTAMP);
+        RETURN NEW;
+    END;
+    $$ language 'plpgsql';
+
+    -- Function to archive old data
+    CREATE OR REPLACE FUNCTION archive_old_data()
+    RETURNS void AS $$
+    DECLARE
+        policy_record RECORD;
+        archive_date DATE;
+    BEGIN
+        FOR policy_record IN SELECT * FROM data_retention_policies WHERE policy_active = true
+        LOOP
+            archive_date := CURRENT_DATE - INTERVAL '1 day' * policy_record.retention_days;
+
+            CASE policy_record.table_name
+                WHEN 'live_temperature_readings' THEN
+                    IF policy_record.archive_enabled THEN
+                        INSERT INTO historical_temperature_readings (device_id, channel_id, temperature, unit, timestamp, recorded_at, source_table)
+                        SELECT device_id, channel_id, temperature, unit, timestamp, recorded_at, 'live_readings'
+                        FROM live_temperature_readings
+                        WHERE timestamp < archive_date;
+                    END IF;
+                    DELETE FROM live_temperature_readings WHERE timestamp < archive_date;
+
+                WHEN 'login_attempts' THEN
+                    DELETE FROM login_attempts WHERE attempted_at < archive_date;
+
+                WHEN 'device_status_log' THEN
+                    DELETE FROM device_status_log WHERE timestamp < archive_date;
+
+                WHEN 'sessions' THEN
+                    DELETE FROM sessions WHERE expires_at < CURRENT_TIMESTAMP;
+
+                ELSE
+                    RAISE NOTICE 'Unknown table for archiving: %', policy_record.table_name;
+            END CASE;
+        END LOOP;
+    END;
+    $$ language 'plpgsql';
+
+    -- Function to calculate device health score
+    CREATE OR REPLACE FUNCTION calculate_device_health_score(device_id_param INTEGER)
+    RETURNS INTEGER AS $$
+    DECLARE
+        health_score INTEGER := 100;
+        battery_level INTEGER;
+        signal_strength INTEGER;
+        last_reading_age INTERVAL;
+    BEGIN
+        SELECT dh.battery_level, dh.signal_strength, CURRENT_TIMESTAMP - dh.last_reading
+        INTO battery_level, signal_strength, last_reading_age
+        FROM device_health dh
+        WHERE dh.device_id = device_id_param
+        ORDER BY dh.created_at DESC
+        LIMIT 1;
+
+        -- Adjust score based on battery level
+        IF battery_level IS NOT NULL THEN
+            IF battery_level < 20 THEN
+                health_score := health_score - 30;
+            ELSIF battery_level < 50 THEN
+                health_score := health_score - 15;
+            END IF;
+        END IF;
+
+        -- Adjust score based on signal strength
+        IF signal_strength IS NOT NULL THEN
+            IF signal_strength < -80 THEN
+                health_score := health_score - 20;
+            ELSIF signal_strength < -60 THEN
+                health_score := health_score - 10;
+            END IF;
+        END IF;
+
+        -- Adjust score based on last reading age
+        IF last_reading_age IS NOT NULL THEN
+            IF last_reading_age > INTERVAL '1 hour' THEN
+                health_score := health_score - 40;
+            ELSIF last_reading_age > INTERVAL '15 minutes' THEN
+                health_score := health_score - 20;
+            END IF;
+        END IF;
+
+        RETURN GREATEST(health_score, 0);
+    END;
+    $$ language 'plpgsql';
+
+    -- Create triggers
+
+    -- Update timestamps on record changes
+    CREATE TRIGGER update_users_updated_at
+        BEFORE UPDATE ON users
+        FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+    CREATE TRIGGER update_devices_updated_at
+        BEFORE UPDATE ON devices
+        FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+    CREATE TRIGGER update_device_config_updated_at
+        BEFORE UPDATE ON device_configuration
+        FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+    CREATE TRIGGER update_user_credentials_updated_at
+        BEFORE UPDATE ON user_credentials
+        FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+    -- Log credential access
+    CREATE TRIGGER log_credential_insert
+        AFTER INSERT ON user_credentials
+        FOR EACH ROW EXECUTE FUNCTION log_credential_access();
+
+    CREATE TRIGGER log_credential_update
+        AFTER UPDATE ON user_credentials
+        FOR EACH ROW EXECUTE FUNCTION log_credential_access();
+
+    -- Create completion marker
+    SELECT 'Database functions and triggers setup completed successfully' as status;
+
+  # Sample data for testing
+  04-sample-data.sql: |
+    -- Sample Data for Testing
+
+    -- Insert sample data retention policies
+    INSERT INTO data_retention_policies (table_name, retention_days, archive_enabled, archive_table, policy_active) VALUES
+    ('live_temperature_readings', 7, true, 'historical_temperature_readings', true),
+    ('login_attempts', 90, false, null, true),
+    ('device_status_log', 30, false, null, true),
+    ('sessions', 1, false, null, true),
+    ('credential_audit', 365, false, null, true)
+    ON CONFLICT DO NOTHING;
+
+    -- Insert sample encryption keys
+    INSERT INTO encryption_keys (key_purpose, encrypted_key, algorithm, is_active) VALUES
+    ('credential_encryption', 'encrypted_key_data_here', 'AES-256-GCM', true),
+    ('session_encryption', 'encrypted_session_key_here', 'AES-256-GCM', true)
+    ON CONFLICT DO NOTHING;
+
+    -- Insert sample user (test user)
+    INSERT INTO users (email, password_hash, name, is_active) VALUES
+    ('test@example.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewGZHpzFQGsxVeha', 'Test User', true)
+    ON CONFLICT (email) DO NOTHING;
+
+    -- Insert sample devices
+    INSERT INTO devices (user_id, device_id, name, device_type, model, configuration, is_active) VALUES
+    (1, 'test_device_001', 'Test Grill Monitor', 'thermoworks', 'Signals BBQ', '{"probe_count": 2, "max_temp": 500}', true),
+    (1, 'test_device_002', 'Test Smoker Monitor', 'thermoworks', 'Smoke X2', '{"probe_count": 4, "max_temp": 300}', true),
+    (1, 'rfx_device_001', 'RFX Test Probe', 'rfx', 'RFX Gateway', '{"frequency": "433MHz", "protocol": "oregon"}', true)
+    ON CONFLICT (device_id) DO NOTHING;
+
+    -- Insert sample device channels
+    INSERT INTO device_channels (device_id, channel_id, channel_name, probe_type, unit, alarm_low, alarm_high, is_active) VALUES
+    (1, 1, 'Meat Probe 1', 'meat', 'F', 32, 165, true),
+    (1, 2, 'Ambient Probe', 'ambient', 'F', 200, 250, true),
+    (2, 1, 'Brisket Probe', 'meat', 'F', 32, 195, true),
+    (2, 2, 'Smoker Temp', 'ambient', 'F', 225, 275, true),
+    (2, 3, 'Water Pan', 'ambient', 'F', 32, 212, true),
+    (2, 4, 'Exhaust Temp', 'ambient', 'F', 150, 300, true)
+    ON CONFLICT (device_id, channel_id) DO NOTHING;
+
+    -- Insert sample device health data
+    INSERT INTO device_health (device_id, battery_level, signal_strength, connection_status, temperature_count, last_reading, health_score) VALUES
+    (1, 85, 95, 'connected', 120, CURRENT_TIMESTAMP - INTERVAL '5 minutes', 95),
+    (2, 92, 88, 'connected', 240, CURRENT_TIMESTAMP - INTERVAL '2 minutes', 98),
+    (3, 78, 76, 'connected', 60, CURRENT_TIMESTAMP - INTERVAL '10 minutes', 85)
+    ON CONFLICT DO NOTHING;
+
+    -- Insert sample live temperature readings
+    INSERT INTO live_temperature_readings (device_id, channel_id, temperature, unit, timestamp, quality_score) VALUES
+    (1, 1, 145.5, 'F', CURRENT_TIMESTAMP - INTERVAL '1 minute', 95),
+    (1, 2, 225.0, 'F', CURRENT_TIMESTAMP - INTERVAL '1 minute', 98),
+    (2, 1, 165.2, 'F', CURRENT_TIMESTAMP - INTERVAL '30 seconds', 97),
+    (2, 2, 235.8, 'F', CURRENT_TIMESTAMP - INTERVAL '30 seconds', 99),
+    (2, 3, 180.1, 'F', CURRENT_TIMESTAMP - INTERVAL '30 seconds', 96),
+    (2, 4, 245.3, 'F', CURRENT_TIMESTAMP - INTERVAL '30 seconds', 94)
+    ON CONFLICT DO NOTHING;
+
+    -- Insert sample historical data
+    INSERT INTO historical_temperature_readings (device_id, channel_id, temperature, unit, timestamp, session_id, cook_id) VALUES
+    (1, 1, 140.0, 'F', CURRENT_TIMESTAMP - INTERVAL '1 hour', uuid_generate_v4(), uuid_generate_v4()),
+    (1, 2, 220.0, 'F', CURRENT_TIMESTAMP - INTERVAL '1 hour', uuid_generate_v4(), uuid_generate_v4()),
+    (2, 1, 160.0, 'F', CURRENT_TIMESTAMP - INTERVAL '2 hours', uuid_generate_v4(), uuid_generate_v4()),
+    (2, 2, 230.0, 'F', CURRENT_TIMESTAMP - INTERVAL '2 hours', uuid_generate_v4(), uuid_generate_v4())
+    ON CONFLICT DO NOTHING;
+
+    -- Insert sample device configuration
+    INSERT INTO device_configuration (device_id, config_key, config_value, config_type) VALUES
+    (1, 'temperature_unit', 'fahrenheit', 'string'),
+    (1, 'sync_interval', '300', 'integer'),
+    (1, 'auto_sync', 'true', 'boolean'),
+    (2, 'temperature_unit', 'fahrenheit', 'string'),
+    (2, 'sync_interval', '180', 'integer'),
+    (2, 'alarm_enabled', 'true', 'boolean'),
+    (3, 'frequency', '433.92', 'float'),
+    (3, 'protocol_settings', '{"modulation": "OOK", "bandwidth": "narrow"}', 'json')
+    ON CONFLICT (device_id, config_key) DO NOTHING;
+
+    -- Create completion marker
+    SELECT 'Sample data insertion completed successfully' as status;

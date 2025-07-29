@@ -1,0 +1,243 @@
+# GitHub Actions Workflow: Infrastructure Cleanup & Maintenance
+# Handles drift detection, state cleanup, and cost optimization
+
+name: 🧹 Terraform Cleanup
+
+on:
+  schedule:
+    # Run drift detection daily at 2 AM UTC
+    - cron: '0 2 * * *'
+    # Run full cleanup weekly on Sundays at 3 AM UTC  
+    - cron: '0 3 * * 0'
+
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: 'Cleanup operation to perform'
+        required: true
+        type: choice
+        options:
+          - 'drift-detection'
+          - 'state-cleanup'
+          - 'cost-analysis'
+          - 'security-audit'
+          - 'full-maintenance'
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'dev-lab'
+        type: choice
+        options:
+          - 'dev-lab'
+          - 'prod-lab'
+          - 'both'
+
+env:
+  TF_VERSION: '1.8.0'
+  ARM_USE_AZUREAD: 'true'
+  ARM_USE_OIDC: 'true'
+
+permissions:
+  id-token: write
+  contents: read
+  issues: write
+
+jobs:
+  drift-detection:
+    name: 🔍 Drift Detection
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'schedule' || 
+      (github.event_name == 'workflow_dispatch' && 
+       contains(fromJson('["drift-detection", "full-maintenance"]'), github.event.inputs.operation))
+    
+    strategy:
+      matrix:
+        environment: ['dev-lab', 'prod-lab']
+        module: ['main', 'vault', 'unifi', 'vultr']
+        include:
+          - environment: 'prod-lab'
+            module: 'b2'
+
+    steps:
+      - name: 🚀 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup
+        id: setup
+        run: |
+          WORKING_DIR=$( [ "${{ matrix.module }}" = "main" ] && echo "terraform" || echo "terraform/modules/${{ matrix.module }}" )
+          echo "working-dir=$WORKING_DIR" >> $GITHUB_OUTPUT
+          echo "state-key=${{ matrix.environment }}/${{ matrix.module }}/terraform.tfstate" >> $GITHUB_OUTPUT
+
+      - name: 🔐 Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: 🛠️ Terraform Setup
+        uses: ./.github/actions/terraform-setup
+        with:
+          terraform-version: ${{ env.TF_VERSION }}
+          working-directory: ${{ steps.setup.outputs.working-dir }}
+          environment: ${{ matrix.environment }}
+          module: ${{ matrix.module }}
+          state-key: ${{ steps.setup.outputs.state-key }}
+
+      - name: 🔍 Drift Detection
+        id: drift
+        working-directory: ${{ steps.setup.outputs.working-dir }}
+        run: |
+          terraform init \
+            -backend-config="resource_group_name=${{ secrets.AZURE_BACKEND_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ secrets.AZURE_BACKEND_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=${{ secrets.AZURE_BACKEND_CONTAINER_NAME }}" \
+            -backend-config="key=${{ steps.setup.outputs.state-key }}" \
+            -input=false
+
+          # Refresh state
+          terraform refresh -input=false
+
+          # Check for drift
+          set +e
+          terraform plan -input=false -detailed-exitcode -out=drift-check.out
+          DRIFT_EXIT_CODE=$?
+          
+          case $DRIFT_EXIT_CODE in
+            0)
+              echo "✅ No drift detected"
+              echo "drift-status=No Drift" >> $GITHUB_OUTPUT
+              echo "drift-count=0" >> $GITHUB_OUTPUT
+              ;;
+            1)
+              echo "❌ Drift detection failed"
+              echo "drift-status=Failed" >> $GITHUB_OUTPUT
+              exit 1
+              ;;
+            2)
+              echo "⚠️ Infrastructure drift detected"
+              terraform show -no-color drift-check.out > drift-details.txt
+              DRIFT_COUNT=$(grep -c "Plan:" drift-details.txt || echo "0")
+              echo "drift-status=Drift Detected" >> $GITHUB_OUTPUT
+              echo "drift-count=$DRIFT_COUNT" >> $GITHUB_OUTPUT
+              
+              # Upload drift details
+              cat drift-details.txt >> $GITHUB_STEP_SUMMARY
+              ;;
+          esac
+
+      - name: 🚨 Create Drift Issue
+        if: steps.drift.outputs.drift-status == 'Drift Detected'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const driftCount = '${{ steps.drift.outputs.drift-count }}';
+            const environment = '${{ matrix.environment }}';
+            const module = '${{ matrix.module }}';
+            
+            const title = `🚨 Infrastructure Drift Detected: ${environment}/${module}`;
+            const body = `
+            ## Infrastructure Drift Alert
+            
+            **Environment:** ${environment}
+            **Module:** ${module}
+            **Drift Count:** ${driftCount} changes
+            **Detection Time:** ${new Date().toISOString()}
+            
+            ### Immediate Actions Required:
+            1. Review the detected changes
+            2. Determine if changes are intentional
+            3. Update Terraform configuration or apply corrections
+            4. Re-run drift detection to verify resolution
+            
+            ### Drift Details:
+            See the workflow run for detailed drift information.
+            
+            **Workflow Run:** [View Details](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            
+            ---
+            *This issue was automatically created by the drift detection workflow*
+            `;
+            
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: body,
+              labels: ['infrastructure', 'drift', 'urgent', environment]
+            });
+
+  security-audit:
+    name: 🛡️ Security Audit
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' && 
+      contains(fromJson('["security-audit", "full-maintenance"]'), github.event.inputs.operation)
+    
+    strategy:
+      matrix:
+        environment: ['dev-lab', 'prod-lab']
+
+    steps:
+      - name: 🚀 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🛡️ Comprehensive Security Scan
+        uses: ./.github/actions/security-scan
+        with:
+          working-directory: terraform
+          fail-on-high: 'true'
+          environment: ${{ matrix.environment }}
+          module: 'all'
+
+      - name: 📊 Security Report
+        run: |
+          echo "## 🛡️ Security Audit: ${{ matrix.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Scan completed at: $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "- See security-report.json for detailed results" >> $GITHUB_STEP_SUMMARY
+
+  cost-analysis:
+    name: 💰 Cost Analysis
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' && 
+      contains(fromJson('["cost-analysis", "full-maintenance"]'), github.event.inputs.operation)
+
+    steps:
+      - name: 🚀 Checkout
+        uses: actions/checkout@v4
+
+      - name: 💰 Analyze Infrastructure Costs
+        run: |
+          echo "## 💰 Cost Analysis Report" >> $GITHUB_STEP_SUMMARY
+          echo "- Analysis Date: $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "- Note: This is a placeholder for cost analysis" >> $GITHUB_STEP_SUMMARY
+          echo "- Consider integrating with Azure Cost Management APIs" >> $GITHUB_STEP_SUMMARY
+          echo "- Recommendations:" >> $GITHUB_STEP_SUMMARY
+          echo "  - Review unused resources" >> $GITHUB_STEP_SUMMARY
+          echo "  - Optimize instance sizes" >> $GITHUB_STEP_SUMMARY
+          echo "  - Consider reserved instances" >> $GITHUB_STEP_SUMMARY
+
+  maintenance-summary:
+    name: 📋 Maintenance Summary
+    runs-on: ubuntu-latest
+    needs: [drift-detection, security-audit, cost-analysis]
+    if: always()
+    
+    steps:
+      - name: 📋 Generate Summary
+        run: |
+          echo "## 🧹 Infrastructure Maintenance Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Job Results:" >> $GITHUB_STEP_SUMMARY
+          echo "- Drift Detection: ${{ needs.drift-detection.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Security Audit: ${{ needs.security-audit.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Cost Analysis: ${{ needs.cost-analysis.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps:" >> $GITHUB_STEP_SUMMARY
+          echo "- Review any created issues" >> $GITHUB_STEP_SUMMARY
+          echo "- Address detected drift" >> $GITHUB_STEP_SUMMARY
+          echo "- Implement security recommendations" >> $GITHUB_STEP_SUMMARY
+          echo "- Optimize costs where possible" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,121 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: claude-code-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: claude-code-exporter
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: claude-code-exporter
+        app.kubernetes.io/part-of: monitoring
+        app.kubernetes.io/component: metrics-exporter
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9464"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: claude-code-exporter
+        image: prom/prometheus:latest
+        command: ["/bin/sh"]
+        args:
+          - -c
+          - |
+            # Simple HTTP server to expose Claude Code metrics
+            # This would be replaced with actual Claude Code telemetry
+            cat > /tmp/prometheus.yml << EOF
+            global:
+              scrape_interval: 15s
+            scrape_configs:
+            - job_name: 'claude-code-metrics'
+              static_configs:
+              - targets: ['localhost:9464']
+            EOF
+            
+            # Start a simple metrics server
+            cat > /tmp/metrics_server.py << 'EOF'
+            #!/usr/bin/env python3
+            import http.server
+            import socketserver
+            import time
+            import random
+            
+            class MetricsHandler(http.server.BaseHTTPRequestHandler):
+                def do_GET(self):
+                    if self.path == '/metrics':
+                        self.send_response(200)
+                        self.send_header('Content-type', 'text/plain')
+                        self.end_headers()
+                        
+                        # Generate sample Claude Code metrics
+                        metrics = f'''# HELP claude_code_session_count_total Total number of Claude Code sessions
+            # TYPE claude_code_session_count_total counter
+            claude_code_session_count_total{{user="dev-team"}} {random.randint(100, 200)}
+            
+            # HELP claude_code_token_usage_total Total tokens used
+            # TYPE claude_code_token_usage_total counter
+            claude_code_token_usage_total{{type="input",model="claude-3-5-sonnet"}} {random.randint(10000, 50000)}
+            claude_code_token_usage_total{{type="output",model="claude-3-5-sonnet"}} {random.randint(5000, 25000)}
+            claude_code_token_usage_total{{type="cache",model="claude-3-5-sonnet"}} {random.randint(1000, 5000)}
+            
+            # HELP claude_code_cost_usage_total Total cost in USD
+            # TYPE claude_code_cost_usage_total counter
+            claude_code_cost_usage_total{{model="claude-3-5-sonnet"}} {random.uniform(10, 100):.2f}
+            
+            # HELP claude_code_lines_of_code_count_total Lines of code modified
+            # TYPE claude_code_lines_of_code_count_total counter
+            claude_code_lines_of_code_count_total{{type="added"}} {random.randint(1000, 5000)}
+            claude_code_lines_of_code_count_total{{type="removed"}} {random.randint(500, 2000)}
+            
+            # HELP claude_code_commit_count_total Git commits created
+            # TYPE claude_code_commit_count_total counter
+            claude_code_commit_count_total {random.randint(50, 150)}
+            
+            # HELP claude_code_pull_request_count_total Pull requests created
+            # TYPE claude_code_pull_request_count_total counter
+            claude_code_pull_request_count_total {random.randint(10, 50)}
+            
+            # HELP claude_code_tool_decision_total Tool usage decisions
+            # TYPE claude_code_tool_decision_total counter
+            claude_code_tool_decision_total{{tool="Edit",decision="accept",language="python"}} {random.randint(100, 300)}
+            claude_code_tool_decision_total{{tool="MultiEdit",decision="accept",language="yaml"}} {random.randint(50, 150)}
+            claude_code_tool_decision_total{{tool="Write",decision="accept",language="javascript"}} {random.randint(20, 80)}
+            '''
+                        self.wfile.write(metrics.encode())
+                    else:
+                        self.send_response(404)
+                        self.end_headers()
+            
+            with socketserver.TCPServer(("", 9464), MetricsHandler) as httpd:
+                print("Serving Claude Code metrics on port 9464")
+                httpd.serve_forever()
+            EOF
+            
+            python3 /tmp/metrics_server.py
+        ports:
+        - containerPort: 9464
+          name: metrics
+          protocol: TCP
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+        livenessProbe:
+          httpGet:
+            path: /metrics
+            port: 9464
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /metrics
+            port: 9464
+          initialDelaySeconds: 5
+          periodSeconds: 10

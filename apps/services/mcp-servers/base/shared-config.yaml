@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mcp-servers-shared-config
+  namespace: mcp-servers
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+data:
+  # Shared MCP Server Configuration
+  
+  # Logging Configuration
+  LOG_LEVEL: "INFO"
+  LOG_FORMAT: "json"
+  
+  # Health Check Configuration
+  HEALTH_CHECK_INTERVAL: "30s"
+  HEALTH_CHECK_TIMEOUT: "10s"
+  
+  # Network Configuration
+  BIND_ADDRESS: "0.0.0.0"
+  
+  # Security Configuration
+  ENABLE_CORS: "true"
+  CORS_ORIGINS: "*"
+  
+  # Monitoring Configuration
+  METRICS_ENABLED: "true"
+  METRICS_PORT: "9090"
+  METRICS_PATH: "/metrics"
+  
+  # Service Discovery Configuration
+  CLUSTER_DOMAIN: "cluster.local"
+  NAMESPACE: "mcp-servers"
+  
+  # External Service Endpoints
+  GITEA_INTERNAL_URL: "http://gitea-internal.gitea.svc.cluster.local:3000"
+  POSTGRES_CLUSTER_NAME: "gitea-postgres"
+  POSTGRES_NAMESPACE: "gitea"
+  REDIS_SERVICE_NAME: "gitea-redis"
+  REDIS_NAMESPACE: "gitea"
+  
+  # Claude Code Integration
+  CLAUDE_CODE_CONFIG_PATH: "/config/claude-code"
+  MCP_DISCOVERY_PATH: "/config/mcp-discovery"

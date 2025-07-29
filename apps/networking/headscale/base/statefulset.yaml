@@ -1,0 +1,125 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: headscale
+spec:
+  serviceName: headscale
+  replicas: 1
+  selector:
+    matchLabels:
+      app: headscale
+  template:
+    metadata:
+      labels:
+        app: headscale
+    spec:
+      initContainers:
+      - name: key-generator
+        image: alpine:latest
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            apk add --no-cache openssl
+            
+            # Function to generate headscale compatible private key
+            generate_headscale_key() {
+              # Generate 32 random bytes and encode as hex
+              KEY_HEX=$(openssl rand -hex 32)
+              echo "privkey:${KEY_HEX}"
+            }
+            
+            # Generate noise private key if it doesn't exist
+            if [ ! -f /vol/secret/noise_private.key ]; then
+              echo "Generating noise private key..."
+              generate_headscale_key > /vol/secret/noise_private.key
+              chmod 600 /vol/secret/noise_private.key
+            fi
+            
+            # Generate main private key if it doesn't exist
+            if [ ! -f /vol/secret/private.key ]; then
+              echo "Generating main private key..."
+              generate_headscale_key > /vol/secret/private.key
+              chmod 600 /vol/secret/private.key
+            fi
+            
+            # Generate DERP server private key if it doesn't exist
+            if [ ! -f /vol/secret/derp_server_private.key ]; then
+              echo "Generating DERP server private key..."
+              generate_headscale_key > /vol/secret/derp_server_private.key
+              chmod 600 /vol/secret/derp_server_private.key
+            fi
+            
+            echo "Key generation completed"
+        volumeMounts:
+        - name: secret
+          mountPath: /vol/secret
+      containers:
+        - name: headscale
+          image: "headscale/headscale:v0.26.1"
+          imagePullPolicy: IfNotPresent
+          command: ["headscale"]
+          args: ["serve", "-c", "/etc/headscale/config.yaml"]
+          env:
+            - name: HEADSCALE_DATABASE_POSTGRES_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: headscale-db-postgres-creds-1password
+                  key: password
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: headscale-db-postgres-creds-1password
+                  key: password
+          ports:
+            - name: http
+              protocol: TCP
+              containerPort: 8080
+            - name: derp
+              protocol: TCP
+              containerPort: 3478
+            - name: metrics
+              protocol: TCP
+              containerPort: 9090
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            timeoutSeconds: 5
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            timeoutSeconds: 5
+            periodSeconds: 5
+          volumeMounts:
+            - name: config
+              mountPath: /vol/config
+            - name: data
+              mountPath: /vol/data
+            - name: secret
+              mountPath: /vol/secret
+            - name: etc
+              mountPath: /etc/headscale
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+      volumes:
+        - name: config
+          configMap:
+            name: headscale-site
+        - name: etc
+          configMap:
+            name: headscale-etc
+        - name: data
+          persistentVolumeClaim:
+            claimName: headscale-data-pvc
+        - name: secret
+          persistentVolumeClaim:
+            claimName: headscale-secret-pvc

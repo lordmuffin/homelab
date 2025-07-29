@@ -1,0 +1,70 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: influxdb-backup-pvc
+  namespace: monitoring
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: ssd
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: influxdb-backup
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/part-of: monitoring
+    app.kubernetes.io/component: backup
+spec:
+  schedule: "0 2 * * *"  # Daily at 2am
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: influxdb-backup
+            image: influxdb:1.8-alpine
+            command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Starting backup process..."
+              BACKUP_DIR="/backups/$(date +%Y%m%d)"
+              mkdir -p $BACKUP_DIR
+              
+              # Perform portable backup
+              influxd backup -portable $BACKUP_DIR
+              
+              # Cleanup old backups (keep last 7 days)
+              find /backups -type d -mtime +7 -exec rm -rf {} \; 2>/dev/null || true
+              
+              echo "Backup completed successfully"
+            env:
+            - name: INFLUXDB_HOST
+              value: "influxdb-service.monitoring.svc.cluster.local"
+            - name: INFLUXDB_ADMIN_USER
+              valueFrom:
+                secretKeyRef:
+                  name: influxdb-creds-1password
+                  key: DB_USERNAME
+            - name: INFLUXDB_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: influxdb-creds-1password
+                  key: DB_PASSWORD
+            volumeMounts:
+            - name: influxdb-backup
+              mountPath: /backups
+          restartPolicy: OnFailure
+          volumes:
+          - name: influxdb-backup
+            persistentVolumeClaim:
+              claimName: influxdb-backup-pvc

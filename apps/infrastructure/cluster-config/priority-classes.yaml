@@ -1,0 +1,80 @@
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: system-critical
+value: 2000000000
+globalDefault: false
+description: "System critical workloads (monitoring, DNS, etc.)"
+
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: infrastructure-high
+value: 1000000000
+globalDefault: false
+description: "High priority infrastructure components"
+
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: application-high
+value: 500000000
+globalDefault: false
+description: "High priority application workloads"
+
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: application-normal
+value: 100000000
+globalDefault: true
+description: "Normal priority application workloads"
+
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: batch-low
+value: 50000000
+globalDefault: false
+description: "Low priority batch workloads"
+
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: development
+value: 10000000
+globalDefault: false
+description: "Development and testing workloads"
+
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: media-processing
+value: 75000000
+globalDefault: false
+description: "Media processing workloads"
+
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: ml-training
+value: 80000000
+globalDefault: false
+description: "Machine learning training workloads"
+
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: database
+value: 800000000
+globalDefault: false
+description: "Database workloads requiring high priority"

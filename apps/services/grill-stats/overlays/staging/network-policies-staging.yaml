@@ -1,0 +1,446 @@
+# Staging Environment Network Policy Overrides
+# This file contains network policies for staging environment with moderate restrictions
+
+---
+# Staging Environment Network Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: staging-environment-policy
+  namespace: grill-stats-staging
+  labels:
+    app.kubernetes.io/name: staging-environment
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: staging
+    environment: staging
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: grill-stats
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow access from Traefik ingress controller
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: traefik
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: traefik
+  # Allow access from monitoring namespace
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+  # Allow inter-service communication within grill-stats
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: grill-stats
+  # Allow access from testing tools for integration testing
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: integration-test
+  # Allow access from load testing tools
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: load-test
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow inter-service communication
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: grill-stats
+  # Allow external service access (more restrictive than dev)
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+
+---
+# Staging Database Access Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: staging-database-access-policy
+  namespace: grill-stats-staging
+  labels:
+    app.kubernetes.io/name: staging-database
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+    environment: staging
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: database
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow database access from grill-stats services
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: grill-stats
+    ports:
+    - protocol: TCP
+      port: 5432  # PostgreSQL
+    - protocol: TCP
+      port: 8086  # InfluxDB
+    - protocol: TCP
+      port: 6379  # Redis
+  # Allow database monitoring
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: monitoring
+    ports:
+    - protocol: TCP
+      port: 9187  # postgres-exporter
+    - protocol: TCP
+      port: 9121  # redis-exporter
+    - protocol: TCP
+      port: 8086  # influxdb metrics
+  # Allow backup jobs
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: backup
+    ports:
+    - protocol: TCP
+      port: 5432
+    - protocol: TCP
+      port: 8086
+    - protocol: TCP
+      port: 6379
+  # Allow database integration tests
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: integration-test
+    ports:
+    - protocol: TCP
+      port: 5432
+    - protocol: TCP
+      port: 8086
+    - protocol: TCP
+      port: 6379
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow database replication (if configured)
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: database
+    ports:
+    - protocol: TCP
+      port: 5432
+    - protocol: TCP
+      port: 8086
+    - protocol: TCP
+      port: 6379
+
+---
+# Staging External Service Access Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: staging-external-service-access-policy
+  namespace: grill-stats-staging
+  labels:
+    app.kubernetes.io/name: staging-external-service
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: external-api
+    environment: staging
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: grill-stats
+  policyTypes:
+  - Egress
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow ThermoWorks API access (use staging endpoints if available)
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+  # Allow HashiCorp Vault access
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: vault
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: vault
+    ports:
+    - protocol: TCP
+      port: 8200
+  # Allow 1Password Connect access
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: onepassword
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: onepassword-connect
+    ports:
+    - protocol: TCP
+      port: 8080
+  # Allow Home Assistant access (staging instance)
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: home-assistant-staging
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: home-assistant
+    ports:
+    - protocol: TCP
+      port: 8123
+  # Allow NTP time synchronization
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+    ports:
+    - protocol: UDP
+      port: 123
+
+---
+# Staging Monitoring Access Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: staging-monitoring-access-policy
+  namespace: grill-stats-staging
+  labels:
+    app.kubernetes.io/name: staging-monitoring
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: monitoring
+    environment: staging
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: grill-stats
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow Prometheus metrics scraping
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: prometheus
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 9090
+  # Allow Grafana access
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: grafana
+    ports:
+    - protocol: TCP
+      port: 8080
+  # Allow health checks
+  - from: []
+    ports:
+    - protocol: TCP
+      port: 8080
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow external monitoring services (limited)
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+    ports:
+    - protocol: TCP
+      port: 443
+
+---
+# Staging Integration Test Access Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: staging-integration-test-access-policy
+  namespace: grill-stats-staging
+  labels:
+    app.kubernetes.io/name: staging-integration-test
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: integration-test
+    environment: staging
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: integration-test
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow access from CI/CD systems
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: ci-cd
+  # Allow monitoring of test results
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 8080
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow access to all grill-stats services for testing
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: grill-stats
+  # Allow access to databases for test data setup
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: database
+    ports:
+    - protocol: TCP
+      port: 5432
+    - protocol: TCP
+      port: 8086
+    - protocol: TCP
+      port: 6379
+  # Allow external test dependencies
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+
+---
+# Staging Load Test Access Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: staging-load-test-access-policy
+  namespace: grill-stats-staging
+  labels:
+    app.kubernetes.io/name: staging-load-test
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: load-test
+    environment: staging
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: load-test
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow monitoring of load test metrics
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 8080
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow load testing of all grill-stats services
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: grill-stats
+  # Allow load testing through ingress
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: traefik
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 443

@@ -33,6 +33,7 @@ resources:
 
   # 1Password Secrets
   - base/secrets/secrets.yaml
+  - base/secrets/headscale.yaml
 
   # Applications
   # - base/apps/ha.yaml
@@ -40,6 +41,7 @@ resources:
   # - base/apps/wyze.yaml
 
   # Monitoring
+  - base/monitoring/netdata.yaml
   - base/monitoring/kuma.yaml
   - base/monitoring/beszel.yaml
   - base/monitoring/glance.yaml
@@ -172,8 +174,6 @@ commonAnnotations:
 # - base/matrix/signal.yaml
 # Vault plugin
 # ArgoCD Remote Resources
-# Image Updater
-# - https://github.com/argoproj-labs/argocd-image-updater/manifests/base
 # Custom CSS Styles
 # components:
 # # Extensions controller component

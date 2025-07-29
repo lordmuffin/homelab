@@ -18,6 +18,9 @@ spec:
   routes:
     - match: Host(`grafana.lab.apj.dev`)
       kind: Rule
+      middlewares:
+        - name: traefik-forward-auth
+          namespace: traefik
       services:
         - name: grafana
           port: 3000

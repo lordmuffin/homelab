@@ -1,0 +1,260 @@
+name: Terraform Plan
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'terraform/**'
+      - '.gitea/workflows/terraform-*.yml'
+  push:
+    branches:
+      - 'feature/*'
+    paths:
+      - 'terraform/**'
+
+env:
+  # Terraform version
+  TF_VERSION: '1.5.7'
+  # Azure Storage Account configuration
+  ARM_USE_AZUREAD: true
+  ARM_USE_CLI: false
+  ARM_STORAGE_USE_AZUREAD: true
+  # Terraform configuration
+  TF_IN_AUTOMATION: true
+  TF_INPUT: false
+
+jobs:
+  terraform-plan:
+    name: 'Terraform Plan'
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        environment: [dev-lab, prod-lab]
+        module: [main, vault, unifi, vultr, b2]
+        exclude:
+          # Exclude specific module/environment combinations if needed
+          - environment: dev-lab
+            module: b2
+      fail-fast: false
+    
+    environment: ${{ matrix.environment }}
+    
+    defaults:
+      run:
+        shell: bash
+        working-directory: terraform
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup Azure CLI
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+      
+      - name: Configure Terraform Backend
+        run: |
+          # Create backend configuration for Azure Storage
+          cat > backend.tf << EOF
+          terraform {
+            backend "azurerm" {
+              resource_group_name  = "${{ secrets.AZURE_BACKEND_RESOURCE_GROUP }}"
+              storage_account_name = "${{ secrets.AZURE_BACKEND_STORAGE_ACCOUNT }}"
+              container_name       = "${{ secrets.AZURE_BACKEND_CONTAINER_NAME }}"
+              key                  = "${{ matrix.environment }}/${{ matrix.module }}.tfstate"
+            }
+          }
+          EOF
+          
+          echo "Created backend configuration for ${{ matrix.environment }}/${{ matrix.module }}"
+      
+      - name: Set Working Directory
+        run: |
+          if [ "${{ matrix.module }}" != "main" ]; then
+            echo "WORKING_DIR=terraform/modules/${{ matrix.module }}" >> $GITHUB_ENV
+          else
+            echo "WORKING_DIR=terraform" >> $GITHUB_ENV
+          fi
+      
+      - name: Terraform Format Check
+        working-directory: ${{ env.WORKING_DIR || 'terraform' }}
+        run: |
+          terraform fmt -check -recursive
+          if [ $? -ne 0 ]; then
+            echo "❌ Terraform formatting check failed"
+            echo "Run 'terraform fmt -recursive' to fix formatting issues"
+            exit 1
+          fi
+          echo "✅ Terraform formatting check passed"
+      
+      - name: Terraform Init
+        working-directory: ${{ env.WORKING_DIR || 'terraform' }}
+        run: |
+          terraform init \
+            -backend-config="resource_group_name=${{ secrets.AZURE_BACKEND_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ secrets.AZURE_BACKEND_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=${{ secrets.AZURE_BACKEND_CONTAINER_NAME }}" \
+            -backend-config="key=${{ matrix.environment }}/${{ matrix.module }}.tfstate"
+      
+      - name: Terraform Validate
+        working-directory: ${{ env.WORKING_DIR || 'terraform' }}
+        run: |
+          terraform validate
+          echo "✅ Terraform configuration is valid"
+      
+      - name: Terraform Plan
+        working-directory: ${{ env.WORKING_DIR || 'terraform' }}
+        env:
+          # Environment-specific variables
+          TF_VAR_api_key: ${{ secrets.RACKSPACE_API_KEY }}
+          TF_VAR_environment: ${{ matrix.environment }}
+        run: |
+          # Create plan file
+          terraform plan \
+            -input=false \
+            -out=tfplan-${{ matrix.environment }}-${{ matrix.module }}.out \
+            -detailed-exitcode
+          
+          # Store exit code for later use
+          echo "PLAN_EXIT_CODE=$?" >> $GITHUB_ENV
+          
+          # Generate human-readable plan
+          terraform show -no-color tfplan-${{ matrix.environment }}-${{ matrix.module }}.out > plan-output.txt
+          
+          echo "✅ Terraform plan completed for ${{ matrix.environment }}/${{ matrix.module }}"
+      
+      - name: Upload Plan Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: terraform-plan-${{ matrix.environment }}-${{ matrix.module }}
+          path: |
+            ${{ env.WORKING_DIR || 'terraform' }}/tfplan-${{ matrix.environment }}-${{ matrix.module }}.out
+            ${{ env.WORKING_DIR || 'terraform' }}/plan-output.txt
+          retention-days: 30
+      
+      - name: Comment Plan on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            
+            // Read plan output
+            const workingDir = process.env.WORKING_DIR || 'terraform';
+            const planOutput = fs.readFileSync(path.join(workingDir, 'plan-output.txt'), 'utf8');
+            
+            // Determine plan status
+            const exitCode = process.env.PLAN_EXIT_CODE;
+            let statusEmoji = '✅';
+            let statusText = 'No changes';
+            
+            if (exitCode === '1') {
+              statusEmoji = '❌';
+              statusText = 'Plan failed';
+            } else if (exitCode === '2') {
+              statusEmoji = '📋';
+              statusText = 'Changes detected';
+            }
+            
+            // Create comment body
+            const comment = `
+            ## ${statusEmoji} Terraform Plan: ${{ matrix.environment }}/${{ matrix.module }}
+            
+            **Status:** ${statusText}
+            **Environment:** \`${{ matrix.environment }}\`
+            **Module:** \`${{ matrix.module }}\`
+            **Commit:** ${context.sha.substring(0, 7)}
+            
+            <details>
+            <summary>📋 Plan Output</summary>
+            
+            \`\`\`terraform
+            ${planOutput.substring(0, 60000)}${planOutput.length > 60000 ? '\n\n... (truncated)' : ''}
+            \`\`\`
+            
+            </details>
+            
+            ---
+            *Plan generated at ${new Date().toISOString()}*
+            `;
+            
+            // Post comment
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+      
+      - name: Plan Status Check
+        run: |
+          case "$PLAN_EXIT_CODE" in
+            0)
+              echo "✅ No changes detected"
+              ;;
+            1)
+              echo "❌ Terraform plan failed"
+              exit 1
+              ;;
+            2)
+              echo "📋 Changes detected in plan"
+              ;;
+            *)
+              echo "❓ Unknown plan exit code: $PLAN_EXIT_CODE"
+              exit 1
+              ;;
+          esac
+      
+      - name: Security Scan (Optional)
+        working-directory: ${{ env.WORKING_DIR || 'terraform' }}
+        continue-on-error: true
+        run: |
+          # Install and run tfsec if available
+          if command -v tfsec &> /dev/null; then
+            echo "🔍 Running Terraform security scan..."
+            tfsec . --format json > tfsec-results.json || true
+            
+            # Check if there are any HIGH or CRITICAL issues
+            if [ -f tfsec-results.json ]; then
+              high_critical=$(jq '[.results[] | select(.severity == "HIGH" or .severity == "CRITICAL")] | length' tfsec-results.json)
+              if [ "$high_critical" -gt 0 ]; then
+                echo "⚠️  Security scan found $high_critical HIGH/CRITICAL issues"
+                jq '.results[] | select(.severity == "HIGH" or .severity == "CRITICAL")' tfsec-results.json
+              else
+                echo "✅ Security scan passed"
+              fi
+            fi
+          else
+            echo "ℹ️  tfsec not available, skipping security scan"
+          fi
+
+  plan-summary:
+    name: 'Plan Summary'
+    needs: terraform-plan
+    runs-on: ubuntu-latest
+    if: always() && github.event_name == 'pull_request'
+    
+    steps:
+      - name: Plan Summary
+        run: |
+          echo "## 📋 Terraform Plan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All Terraform plans have completed. Check individual job outputs for details." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Next Steps:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Review plan outputs in PR comments" >> $GITHUB_STEP_SUMMARY
+          echo "- Approve PR to trigger apply workflow" >> $GITHUB_STEP_SUMMARY
+          echo "- Merge PR to deploy changes to infrastructure" >> $GITHUB_STEP_SUMMARY

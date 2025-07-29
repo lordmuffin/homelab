@@ -1,0 +1,164 @@
+# Let's Encrypt Production Certificate Issuer
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: cert-manager
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  acme:
+    email: admin@homelab.local
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-prod-key
+    solvers:
+    - http01:
+        ingress:
+          class: traefik
+    - dns01:
+        cloudflare:
+          email: admin@homelab.local
+          apiTokenSecretRef:
+            name: cloudflare-api-token-secret
+            key: api-token
+---
+# Let's Encrypt Staging Certificate Issuer
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: cert-manager
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  acme:
+    email: admin@homelab.local
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-staging-key
+    solvers:
+    - http01:
+        ingress:
+          class: traefik
+    - dns01:
+        cloudflare:
+          email: admin@homelab.local
+          apiTokenSecretRef:
+            name: cloudflare-api-token-secret
+            key: api-token
+---
+# Self-Signed Certificate Issuer for Development
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned-issuer
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: cert-manager
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  selfSigned: {}
+---
+# Main Production Certificate
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: grill-stats-tls
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: cert-manager
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  secretName: grill-stats-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+    - grill-stats.homelab.local
+    - api.grill-stats.homelab.local
+    - grill-stats.prod.homelab.local
+    - grill-stats.dev.homelab.local
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days
+  subject:
+    organizations:
+      - homelab
+  privateKey:
+    algorithm: RSA
+    encoding: PKCS1
+    size: 2048
+  usages:
+    - digital signature
+    - key encipherment
+    - server auth
+---
+# Development Environment Certificate
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: grill-stats-dev-tls
+  namespace: grill-stats-dev
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: cert-manager
+    app.kubernetes.io/part-of: grill-stats
+    environment: dev
+spec:
+  secretName: grill-stats-dev-tls
+  issuerRef:
+    name: selfsigned-issuer
+    kind: ClusterIssuer
+  dnsNames:
+    - grill-stats.dev.homelab.local
+    - api.grill-stats.dev.homelab.local
+    - localhost
+  duration: 8760h # 1 year
+  renewBefore: 720h # 30 days
+  subject:
+    organizations:
+      - homelab-dev
+  privateKey:
+    algorithm: RSA
+    encoding: PKCS1
+    size: 2048
+  usages:
+    - digital signature
+    - key encipherment
+    - server auth
+---
+# Staging Environment Certificate
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: grill-stats-staging-tls
+  namespace: grill-stats-staging
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: cert-manager
+    app.kubernetes.io/part-of: grill-stats
+    environment: staging
+spec:
+  secretName: grill-stats-staging-tls
+  issuerRef:
+    name: letsencrypt-staging
+    kind: ClusterIssuer
+  dnsNames:
+    - grill-stats.staging.homelab.local
+    - api.grill-stats.staging.homelab.local
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days
+  subject:
+    organizations:
+      - homelab-staging
+  privateKey:
+    algorithm: RSA
+    encoding: PKCS1
+    size: 2048
+  usages:
+    - digital signature
+    - key encipherment
+    - server auth

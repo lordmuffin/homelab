@@ -1,0 +1,205 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis
+  namespace: grill-stats
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+      - name: redis
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 512Mi
+        env:
+        - name: REDIS_ENV
+          value: "development"
+  volumeClaimTemplates:
+  - metadata:
+      name: redis-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 5Gi  # Smaller storage for dev
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-config
+  namespace: grill-stats
+data:
+  redis.conf: |
+    # Development Redis Configuration
+    bind 0.0.0.0
+    port 6379
+    protected-mode yes
+    requirepass ${REDIS_PASSWORD}
+
+    # Persistence - less aggressive for dev
+    save 900 1
+    save 300 10
+    save 60 1000
+
+    # Memory management - smaller limits for dev
+    maxmemory 384mb
+    maxmemory-policy allkeys-lru
+
+    # Logging - more verbose for dev
+    loglevel verbose
+    logfile ""
+
+    # Connection handling
+    timeout 300
+    tcp-keepalive 300
+    tcp-backlog 511
+
+    # Database configuration
+    databases 16
+
+    # Keyspace notifications
+    notify-keyspace-events "Ex"
+
+    # RDB persistence
+    rdbcompression yes
+    rdbchecksum yes
+    dbfilename dump.rdb
+    dir /data
+
+    # AOF persistence - disabled for dev to improve performance
+    appendonly no
+
+    # Performance tuning - relaxed for dev
+    stop-writes-on-bgsave-error no
+    lazyfree-lazy-eviction yes
+    lazyfree-lazy-expire yes
+    lazyfree-lazy-server-del yes
+
+    # Slow log - more sensitive for dev debugging
+    slowlog-log-slower-than 1000
+    slowlog-max-len 256
+
+    # Dev-specific settings
+    hash-max-ziplist-entries 512
+    hash-max-ziplist-value 64
+    set-max-intset-entries 512
+    zset-max-ziplist-entries 128
+    zset-max-ziplist-value 64
+    list-max-ziplist-size -2
+    list-compress-depth 0
+
+    # Active rehashing
+    activerehashing yes
+
+    # Jemalloc background thread
+    jemalloc-bg-thread yes
+
+    # Lua script timeout
+    lua-time-limit 5000
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-cache-config
+  namespace: grill-stats
+data:
+  cache-config.json: |
+    {
+      "session_management": {
+        "ttl": 1800,
+        "key_prefix": "session:",
+        "database": 0,
+        "description": "JWT tokens and user sessions - shorter TTL for dev"
+      },
+      "live_temperature_data": {
+        "ttl": 60,
+        "key_prefix": "temp:",
+        "database": 1,
+        "description": "Real-time temperature readings - longer TTL for dev testing"
+      },
+      "device_status": {
+        "ttl": 120,
+        "key_prefix": "device:",
+        "database": 2,
+        "description": "Device connection and status information"
+      },
+      "api_responses": {
+        "ttl": 600,
+        "key_prefix": "api:",
+        "database": 3,
+        "description": "Cached API responses - longer TTL for dev"
+      },
+      "thermoworks_api": {
+        "ttl": 1200,
+        "key_prefix": "tw:",
+        "database": 4,
+        "description": "ThermoWorks API responses - longer TTL for dev"
+      },
+      "rate_limiting": {
+        "ttl": 3600,
+        "key_prefix": "rate:",
+        "database": 5,
+        "description": "Rate limiting - relaxed for dev"
+      },
+      "sse_connections": {
+        "ttl": 3600,
+        "key_prefix": "sse:",
+        "database": 6,
+        "description": "Server-Sent Events connection tracking"
+      },
+      "aggregated_data": {
+        "ttl": 1800,
+        "key_prefix": "agg:",
+        "database": 7,
+        "description": "Pre-computed aggregated temperature data"
+      }
+    }
+---
+# Disable Sentinel for dev environment
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis-sentinel
+  namespace: grill-stats
+spec:
+  replicas: 0  # Disable Sentinel in dev
+---
+# Reduce backup frequency for dev
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: redis-backup
+  namespace: grill-stats
+spec:
+  schedule: "0 6 * * 0"  # Weekly on Sunday at 6 AM
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: redis-backup
+            resources:
+              requests:
+                cpu: 50m
+                memory: 64Mi
+              limits:
+                cpu: 100m
+                memory: 128Mi
+---
+# Reduce backup storage for dev
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-backup-pvc
+  namespace: grill-stats
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi  # Smaller backup storage for dev

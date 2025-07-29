@@ -1,0 +1,220 @@
+---
+# ServiceMonitor for Kubernetes API Server
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: kubernetes-apiserver
+  namespace: monitoring
+  labels:
+    app: kubernetes-apiserver
+spec:
+  selector:
+    matchLabels:
+      component: apiserver
+      provider: kubernetes
+  namespaceSelector:
+    matchNames:
+    - default
+  endpoints:
+  - port: https
+    scheme: https
+    tlsConfig:
+      caFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+      serverName: kubernetes
+    bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+
+---
+# ServiceMonitor for Node Exporter
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: node-exporter
+  namespace: monitoring
+  labels:
+    app: node-exporter
+spec:
+  selector:
+    matchLabels:
+      app: node-exporter
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+
+---
+# ServiceMonitor for kubelet
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: kubelet
+  namespace: monitoring
+  labels:
+    app: kubelet
+spec:
+  selector:
+    matchLabels:
+      k8s-app: kubelet
+  namespaceSelector:
+    matchNames:
+    - kube-system
+  endpoints:
+  - port: https-metrics
+    scheme: https
+    tlsConfig:
+      caFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+      serverName: kubernetes
+    bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+    relabelings:
+    - sourceLabels: [__meta_kubernetes_node_name]
+      regex: (.+)
+      targetLabel: __address__
+      replacement: ${1}:10250
+
+---
+# ServiceMonitor for cAdvisor
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: cadvisor
+  namespace: monitoring
+  labels:
+    app: cadvisor
+spec:
+  selector:
+    matchLabels:
+      k8s-app: kubelet
+  namespaceSelector:
+    matchNames:
+    - kube-system
+  endpoints:
+  - port: https-metrics
+    scheme: https
+    path: /metrics/cadvisor
+    tlsConfig:
+      caFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+      serverName: kubernetes
+    bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+
+---
+# ServiceMonitor for kube-state-metrics
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: kube-state-metrics
+  namespace: monitoring
+  labels:
+    app: kube-state-metrics
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kube-state-metrics
+  endpoints:
+  - port: http-metrics
+    interval: 30s
+    path: /metrics
+
+---
+# ServiceMonitor for Ingress Controllers
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ingress-nginx
+  namespace: monitoring
+  labels:
+    app: ingress-nginx
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ingress-nginx
+  namespaceSelector:
+    matchNames:
+    - ingress-nginx
+  endpoints:
+  - port: prometheus
+    interval: 30s
+    path: /metrics
+
+---
+# ServiceMonitor for ArgoCD
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: argocd-metrics
+  namespace: monitoring
+  labels:
+    app: argocd-metrics
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: metrics
+      app.kubernetes.io/name: argocd-metrics
+  namespaceSelector:
+    matchNames:
+    - argocd
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+
+---
+# ServiceMonitor for Cert-Manager
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: cert-manager
+  namespace: monitoring
+  labels:
+    app: cert-manager
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cert-manager
+  namespaceSelector:
+    matchNames:
+    - cert-manager
+  endpoints:
+  - port: tcp-prometheus-servicemonitor
+    interval: 60s
+    path: /metrics
+
+---
+# ServiceMonitor for Velero
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: velero
+  namespace: monitoring
+  labels:
+    app: velero
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: velero
+  namespaceSelector:
+    matchNames:
+    - velero
+  endpoints:
+  - port: monitoring
+    interval: 60s
+    path: /metrics
+
+---
+# ServiceMonitor for Services Namespace
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: services-monitoring
+  namespace: monitoring
+  labels:
+    app: services-monitoring
+spec:
+  selector:
+    matchLabels:
+      monitoring: "true"
+  namespaceSelector:
+    matchNames:
+    - services
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics

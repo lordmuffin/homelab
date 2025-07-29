@@ -1,0 +1,177 @@
+---
+# High Performance NVMe SSD Storage
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nvme
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false"
+    description: "High performance NVMe SSD storage for latency-sensitive workloads"
+provisioner: org.democratic-csi.iscsi-nfs
+parameters:
+  fsType: ext4
+  detachedVolumesFromSnapshots: "false"
+  detachedVolumesFromVolumes: "false"
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Delete
+mountOptions:
+  - noatime
+  - nodiratime
+
+---
+# Standard SATA SSD Storage (Default)
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: sata
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+    description: "Standard SATA SSD storage for general workloads"
+provisioner: org.democratic-csi.iscsi-nfs
+parameters:
+  fsType: ext4
+  detachedVolumesFromSnapshots: "false"
+  detachedVolumesFromVolumes: "false"
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Delete
+
+---
+# High Capacity HDD Storage
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: hdd
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false"
+    description: "High capacity HDD storage for archival and bulk data"
+provisioner: org.democratic-csi.iscsi-nfs
+parameters:
+  fsType: ext4
+  detachedVolumesFromSnapshots: "false"
+  detachedVolumesFromVolumes: "false"
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Delete
+
+---
+# Database Optimized Storage
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: database
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false"
+    description: "Database optimized storage with high IOPS"
+provisioner: org.democratic-csi.iscsi-nfs
+parameters:
+  fsType: ext4
+  detachedVolumesFromSnapshots: "true"
+  detachedVolumesFromVolumes: "true"
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Retain
+mountOptions:
+  - noatime
+  - nodiratime
+  - barrier=0
+
+---
+# Media Storage for Large Files
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: media
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false"
+    description: "Media storage optimized for large sequential files"
+provisioner: org.democratic-csi.iscsi-nfs
+parameters:
+  fsType: ext4
+  detachedVolumesFromSnapshots: "false"
+  detachedVolumesFromVolumes: "false"
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Delete
+mountOptions:
+  - noatime
+  - nodiratime
+
+---
+# ML/AI Storage for Model Training
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: ml-training
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false"
+    description: "ML/AI training storage with high throughput"
+provisioner: org.democratic-csi.iscsi-nfs
+parameters:
+  fsType: ext4
+  detachedVolumesFromSnapshots: "true"
+  detachedVolumesFromVolumes: "false"
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Delete
+mountOptions:
+  - noatime
+  - nodiratime
+
+---
+# Backup Storage
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: backup
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false"
+    description: "Backup storage with retention policies"
+provisioner: org.democratic-csi.iscsi-nfs
+parameters:
+  fsType: ext4
+  detachedVolumesFromSnapshots: "true"
+  detachedVolumesFromVolumes: "true"
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Retain
+
+---
+# Monitoring Storage
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: monitoring
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false"
+    description: "Monitoring storage with time-series optimization"
+provisioner: org.democratic-csi.iscsi-nfs
+parameters:
+  fsType: ext4
+  detachedVolumesFromSnapshots: "true"
+  detachedVolumesFromVolumes: "false"
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Delete
+mountOptions:
+  - noatime
+  - nodiratime
+
+---
+# Temporary/Ephemeral Storage
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: ephemeral
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false"
+    description: "Ephemeral storage for temporary workloads"
+provisioner: org.democratic-csi.iscsi-nfs
+parameters:
+  fsType: ext4
+  detachedVolumesFromSnapshots: "false"
+  detachedVolumesFromVolumes: "false"
+allowVolumeExpansion: false
+volumeBindingMode: Immediate
+reclaimPolicy: Delete

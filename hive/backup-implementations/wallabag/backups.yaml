@@ -1,0 +1,295 @@
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: wallabag-postgres-backup
+  namespace: wallabag
+spec:
+  schedule: "0 3 * * *" # Daily at 3AM
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: postgres-backup
+              image: postgres:latest
+              env:
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: wallabag-db-postgres-creds-1password
+                      key: password
+                - name: POSTGRES_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: wallabag-db-postgres-creds-1password
+                      key: username
+                - name: POSTGRES_HOST
+                  value: wallabag-database-rw.wallabag.svc.cluster.local
+                - name: POSTGRES_DB
+                  value: wallabag
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  set -euo pipefail
+                  
+                  MAX_RETRIES=5
+                  RETRY_DELAYS=(10 20 40 80 160)
+                  
+                  log_info() {
+                      echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] INFO: $*" >&2
+                  }
+                  
+                  log_error() {
+                      echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] ERROR: $*" >&2
+                  }
+                  
+                  error_trap() {
+                      local exit_code=$?
+                      local line_number=$1
+                      log_error "Wallabag backup failed at line $line_number with exit code $exit_code"
+                      exit $exit_code
+                  }
+                  
+                  trap 'error_trap $LINENO' ERR
+                  
+                  retry_with_backoff() {
+                      local cmd="$1"
+                      local attempt=1
+                      
+                      while [[ $attempt -le $MAX_RETRIES ]]; do
+                          log_info "Attempt $attempt/$MAX_RETRIES: $cmd"
+                          
+                          if eval "$cmd"; then
+                              log_info "Command succeeded on attempt $attempt"
+                              return 0
+                          else
+                              local exit_code=$?
+                              log_error "Command failed on attempt $attempt with exit code $exit_code"
+                              
+                              if [[ $attempt -eq $MAX_RETRIES ]]; then
+                                  log_error "All $MAX_RETRIES attempts failed"
+                                  return $exit_code
+                              fi
+                              
+                              local delay=${RETRY_DELAYS[$((attempt-1))]}
+                              log_info "Waiting $delay seconds before next attempt..."
+                              sleep "$delay"
+                              ((attempt++))
+                          fi
+                      done
+                  }
+                  
+                  BACKUP_FILE="wallabag_backup_$(date +%Y%m%d_%H%M%S).sql.gz"
+                  
+                  log_info "🔄 Starting Wallabag PostgreSQL backup: $BACKUP_FILE"
+                  
+                  # Validate environment variables
+                  if [[ -z "${POSTGRES_HOST:-}" || -z "${POSTGRES_USER:-}" || -z "${POSTGRES_DB:-}" ]]; then
+                      log_error "Missing required environment variables"
+                      exit 1
+                  fi
+                  
+                  # Test connection with retry
+                  retry_with_backoff "pg_isready -h '$POSTGRES_HOST' -U '$POSTGRES_USER' -d '$POSTGRES_DB'"
+                  
+                  # Create backup with retry
+                  retry_with_backoff "pg_dump -h '$POSTGRES_HOST' -U '$POSTGRES_USER' -d '$POSTGRES_DB' --verbose --no-owner --no-privileges | gzip > /mnt/backup/$BACKUP_FILE"
+                  
+                  # Validate backup file
+                  if [[ ! -f "/mnt/backup/$BACKUP_FILE" ]]; then
+                      log_error "Backup file not created: /mnt/backup/$BACKUP_FILE"
+                      exit 1
+                  fi
+                  
+                  if [[ ! -s "/mnt/backup/$BACKUP_FILE" ]]; then
+                      log_error "Backup file is empty: /mnt/backup/$BACKUP_FILE"
+                      exit 1
+                  fi
+                  
+                  # Test compressed file integrity
+                  if ! gzip -t "/mnt/backup/$BACKUP_FILE"; then
+                      log_error "Backup file is corrupted: /mnt/backup/$BACKUP_FILE"
+                      exit 1
+                  fi
+                  
+                  # Log success with file size
+                  BACKUP_SIZE=$(du -h "/mnt/backup/$BACKUP_FILE" | cut -f1)
+                  log_info "✅ Backup completed successfully: $BACKUP_FILE ($BACKUP_SIZE)"
+                  
+                  # Signal the next container
+                  touch /mnt/backup/.done
+              volumeMounts:
+                - name: backup-storage
+                  mountPath: /mnt/backup
+            - name: b2-uploader
+              image: backblazeit/b2:latest
+              env:
+                - name: B2_APPLICATION_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: backblaze-cloud-homelab-creds-1password
+                      key: keyID
+                - name: B2_APPLICATION_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: backblaze-cloud-homelab-creds-1password
+                      key: applicationKey
+                - name: B2_BUCKET_NAME
+                  value: "cloud-homelab-backups"
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  set -euo pipefail
+                  
+                  MAX_RETRIES=5
+                  RETRY_DELAYS=(10 20 40 80 160)
+                  
+                  log_info() {
+                      echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] INFO: $*" >&2
+                  }
+                  
+                  log_error() {
+                      echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] ERROR: $*" >&2
+                  }
+                  
+                  retry_with_backoff() {
+                      local cmd="$1"
+                      local attempt=1
+                      
+                      while [[ $attempt -le $MAX_RETRIES ]]; do
+                          log_info "Attempt $attempt/$MAX_RETRIES: $cmd"
+                          
+                          if eval "$cmd"; then
+                              log_info "Command succeeded on attempt $attempt"
+                              return 0
+                          else
+                              local exit_code=$?
+                              log_error "Command failed on attempt $attempt with exit code $exit_code"
+                              
+                              if [[ $attempt -eq $MAX_RETRIES ]]; then
+                                  log_error "All $MAX_RETRIES attempts failed"
+                                  return $exit_code
+                              fi
+                              
+                              local delay=${RETRY_DELAYS[$((attempt-1))]}
+                              log_info "Waiting $delay seconds before next attempt..."
+                              sleep "$delay"
+                              ((attempt++))
+                          fi
+                      done
+                  }
+                  
+                  log_info "🔄 Starting B2 upload process..."
+                  
+                  # Validate environment variables
+                  if [[ -z "${B2_APPLICATION_KEY_ID:-}" || -z "${B2_APPLICATION_KEY:-}" || -z "${B2_BUCKET_NAME:-}" ]]; then
+                      log_error "Missing required B2 environment variables"
+                      exit 1
+                  fi
+                  
+                  # Wait for backup completion with timeout (max 30 minutes)
+                  timeout=1800
+                  elapsed=0
+                  while [[ ! -f /mnt/backup/.done ]]; do
+                      if [[ $elapsed -ge $timeout ]]; then
+                          log_error "Timeout waiting for backup completion"
+                          exit 1
+                      fi
+                      log_info "Waiting for backup completion... (${elapsed}s elapsed)"
+                      sleep 5
+                      ((elapsed+=5))
+                  done
+                  
+                  # Find the backup file
+                  BACKUP_FILE=$(ls /mnt/backup/wallabag_backup_*.sql.gz | head -1 2>/dev/null || true)
+                  if [[ -z "$BACKUP_FILE" ]]; then
+                      log_error "No backup file found matching pattern: wallabag_backup_*.sql.gz"
+                      exit 1
+                  fi
+                  
+                  # Validate backup file exists and has content
+                  if [[ ! -f "$BACKUP_FILE" ]]; then
+                      log_error "Backup file not found: $BACKUP_FILE"
+                      exit 1
+                  fi
+                  
+                  if [[ ! -s "$BACKUP_FILE" ]]; then
+                      log_error "Backup file is empty: $BACKUP_FILE"
+                      exit 1
+                  fi
+                  
+                  # Upload to B2 with retry
+                  UPLOAD_PATH="wallabag/$(basename "$BACKUP_FILE")"
+                  log_info "Uploading to B2: $UPLOAD_PATH"
+                  retry_with_backoff "b2v4 file upload '$B2_BUCKET_NAME' '$BACKUP_FILE' '$UPLOAD_PATH'"
+                  
+                  log_info "✅ B2 upload completed successfully: $UPLOAD_PATH"
+              volumeMounts:
+                - name: backup-storage
+                  mountPath: /mnt/backup
+          restartPolicy: OnFailure
+          volumes:
+            - name: backup-storage
+              emptyDir: {}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: wallabag-cleanup
+  namespace: wallabag
+spec:
+  schedule: "0 4 1 * *" # Monthly cleanup on 1st at 4AM
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: b2-cleanup
+              image: backblazeit/b2:latest
+              env:
+                - name: B2_APPLICATION_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: backblaze-cloud-homelab-creds-1password
+                      key: keyID
+                - name: B2_APPLICATION_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: backblaze-cloud-homelab-creds-1password
+                      key: applicationKey
+                - name: B2_BUCKET_NAME
+                  value: "cloud-homelab-backups"
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  set -euo pipefail
+                  
+                  log_info() {
+                      echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] INFO: $*" >&2
+                  }
+                  
+                  log_info "🔄 Starting Wallabag backup cleanup (keeping last 30 days)..."
+                  
+                  # List files older than 30 days and delete them
+                  CUTOFF_DATE=$(date -d '30 days ago' +%Y%m%d)
+                  
+                  b2v4 file ls "$B2_BUCKET_NAME" wallabag/ | while read -r file_info; do
+                      # Extract filename from b2 ls output (format: "fileId fileName size uploadTime")
+                      filename=$(echo "$file_info" | awk '{print $2}')
+                      
+                      # Extract date from filename (wallabag_backup_YYYYMMDD_HHMMSS.sql.gz)
+                      if [[ $filename =~ wallabag_backup_([0-9]{8})_[0-9]{6}\.sql\.gz$ ]]; then
+                          file_date=${BASH_REMATCH[1]}
+                          
+                          if [[ $file_date < $CUTOFF_DATE ]]; then
+                              log_info "Deleting old backup: $filename (date: $file_date)"
+                              file_id=$(echo "$file_info" | awk '{print $1}')
+                              b2v4 file delete "$file_id" "$filename"
+                          fi
+                      fi
+                  done
+                  
+                  log_info "✅ Wallabag backup cleanup completed"
+          restartPolicy: OnFailure

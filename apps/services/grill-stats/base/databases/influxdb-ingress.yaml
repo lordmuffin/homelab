@@ -1,0 +1,122 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: influxdb-ingress
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.middlewares: "grill-stats-auth@kubernetescrd"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    traefik.ingress.kubernetes.io/router.priority: "100"
+spec:
+  ingressClassName: traefik
+  tls:
+  - hosts:
+    - influxdb.homelab.local
+    secretName: influxdb-tls
+  rules:
+  - host: influxdb.homelab.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: influxdb-service
+            port:
+              number: 8086
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: influxdb-auth
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+spec:
+  basicAuth:
+    secret: influxdb-auth-secret
+    removeHeader: true
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: influxdb-headers
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+spec:
+  headers:
+    customRequestHeaders:
+      X-Forwarded-Proto: https
+      X-Forwarded-For: ""
+    customResponseHeaders:
+      X-Frame-Options: DENY
+      X-Content-Type-Options: nosniff
+      X-XSS-Protection: "1; mode=block"
+      Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+      Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;"
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: influxdb-ratelimit
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+spec:
+  rateLimit:
+    average: 100
+    period: 1m
+    burst: 200
+    sourceCriterion:
+      ipStrategy:
+        depth: 1
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: MiddlewareChain
+metadata:
+  name: influxdb-chain
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+spec:
+  middlewares:
+  - name: influxdb-ratelimit
+  - name: influxdb-headers
+  - name: influxdb-auth
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: influxdb-auth-secret
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+    managed-by: onepassword-connect
+  annotations:
+    onepassword.com/item-path: "vaults/grill-stats/items/influxdb-auth"
+type: Opaque
+stringData:
+  users: |
+    # Basic auth users for InfluxDB web interface
+    # Format: username:password_hash
+    # Generate with: htpasswd -nb username password
+    admin:$2y$10$placeholder_hash_for_admin_user
+    monitor:$2y$10$placeholder_hash_for_monitor_user

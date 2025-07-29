@@ -1,0 +1,159 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitea-mcp
+  namespace: mcp-servers
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gitea-mcp
+      app.kubernetes.io/component: mcp-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: gitea-mcp
+        app.kubernetes.io/component: mcp-server
+        monitoring: "enabled"
+    spec:
+      serviceAccountName: mcp-server-base
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: gitea-mcp
+          image: node:20-alpine
+          imagePullPolicy: IfNotPresent
+          workingDir: /app
+          command:
+            - /bin/sh
+            - -c
+            - |
+              # Install required packages
+              apk add --no-cache git curl
+              
+              # Install MCP server dependencies
+              npm install -g @modelcontextprotocol/server-github
+              
+              # Create startup script
+              cat > /app/start.sh << 'EOF'
+              #!/bin/sh
+              set -e
+              
+              # Wait for Gitea to be available
+              echo "Waiting for Gitea to be available..."
+              while ! curl -s -o /dev/null -w "%{http_code}" "$GITEA_BASE_URL/api/v1/version" | grep -q "200"; do
+                echo "Gitea not ready, waiting..."
+                sleep 5
+              done
+              
+              echo "Starting Gitea MCP Server..."
+              exec node /usr/local/lib/node_modules/@modelcontextprotocol/server-github/dist/index.js
+              EOF
+              
+              chmod +x /app/start.sh
+              exec /app/start.sh
+          env:
+            - name: GITEA_BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: gitea-mcp-config
+                  key: GITEA_BASE_URL
+            - name: GITEA_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: gitea-mcp-token-1password
+                  key: token
+            - name: GITHUB_PERSONAL_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: gitea-mcp-token-1password
+                  key: token
+            - name: MCP_SERVER_NAME
+              value: "gitea-mcp"
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: mcp-servers-shared-config
+                  key: LOG_LEVEL
+            - name: METRICS_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: mcp-servers-shared-config
+                  key: METRICS_ENABLED
+            - name: METRICS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: mcp-servers-shared-config
+                  key: METRICS_PORT
+          ports:
+            - name: mcp
+              containerPort: 3000
+              protocol: TCP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: mcp
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: mcp
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /health
+              port: mcp
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 10
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+            - name: app-data
+              mountPath: /app-data
+      volumes:
+        - name: config
+          configMap:
+            name: gitea-mcp-config
+            defaultMode: 0644
+        - name: tmp
+          emptyDir: {}
+        - name: app-data
+          emptyDir: {}
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirst

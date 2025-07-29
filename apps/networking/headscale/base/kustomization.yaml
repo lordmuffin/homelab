@@ -3,8 +3,9 @@ resources:
   - configmap.yaml
   - ingress.yaml
   - service.yaml
-generatorOptions:
-  disableNameSuffixHash: true
+  - statefulset.yaml
+  - tailscale-subnet-router.yaml
+  - db.yaml
 configMapGenerator:
   - name: headscale-site
     files:
@@ -12,8 +13,8 @@ configMapGenerator:
     envs:
       - site/public.env
   - name: headscale-etc
-    literals:
-      - config.json={}
+    files:
+      - config.yaml
 # secretGenerator:
 #   - name: headscale
 #     files:

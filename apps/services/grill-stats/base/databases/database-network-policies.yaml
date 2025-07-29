@@ -1,0 +1,529 @@
+# Database Network Policies for Grill-Stats Platform
+# This file contains comprehensive network policies for database access control
+
+---
+# PostgreSQL Network Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgresql-network-policy
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: postgresql
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow from Auth Service
+  - from:
+    - podSelector:
+        matchLabels:
+          app: auth-service
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Allow from Device Service
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: device-service
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Allow from Historical Service (TimescaleDB)
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: historical-service
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Allow from Encryption Service (for metadata)
+  - from:
+    - podSelector:
+        matchLabels:
+          app: encryption-service
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Allow from backup jobs
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: postgresql-backup
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Allow from database maintenance jobs
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: database-maintenance
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Allow PostgreSQL exporter for Prometheus
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: postgres-exporter
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Allow from monitoring namespace
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 9187  # postgres-exporter metrics port
+  # Allow health checks from within namespace
+  - from:
+    - namespaceSelector: {}
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/component: health-check
+    ports:
+    - protocol: TCP
+      port: 5432
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow PostgreSQL replication (if configured)
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: postgresql
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Allow connection to PostgreSQL monitoring
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: postgres-exporter
+    ports:
+    - protocol: TCP
+      port: 9187
+
+---
+# InfluxDB Network Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: influxdb-network-policy
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: influxdb
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow from Temperature Service
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: temperature-service
+    ports:
+    - protocol: TCP
+      port: 8086
+  # Allow from Historical Service
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: historical-service
+    ports:
+    - protocol: TCP
+      port: 8086
+  # Allow from Device Service (for direct writes)
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: device-service
+    ports:
+    - protocol: TCP
+      port: 8086
+  # Allow from backup jobs
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: influxdb-backup
+    ports:
+    - protocol: TCP
+      port: 8086
+  # Allow from database maintenance jobs
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: database-maintenance
+    ports:
+    - protocol: TCP
+      port: 8086
+  # Allow InfluxDB monitoring
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 8086  # Native InfluxDB metrics endpoint
+  # Allow Grafana access for dashboards
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: grafana
+    ports:
+    - protocol: TCP
+      port: 8086
+  # Allow health checks
+  - from: []
+    ports:
+    - protocol: TCP
+      port: 8086
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow InfluxDB clustering (if configured)
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: influxdb
+    ports:
+    - protocol: TCP
+      port: 8088  # InfluxDB RPC port
+    - protocol: TCP
+      port: 8089  # InfluxDB UDP port
+
+---
+# TimescaleDB Network Policy (PostgreSQL-based)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: timescaledb-network-policy
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: timescaledb
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: timescaledb
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow from Historical Service
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: historical-service
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Allow from Temperature Service (for long-term storage)
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: temperature-service
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Allow from backup jobs
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: timescaledb-backup
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Allow PostgreSQL exporter for monitoring
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: postgres-exporter
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Allow from monitoring namespace
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 9187  # postgres-exporter metrics port
+  # Allow Grafana access for dashboards
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: grafana
+    ports:
+    - protocol: TCP
+      port: 5432
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow TimescaleDB replication (if configured)
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: timescaledb
+    ports:
+    - protocol: TCP
+      port: 5432
+
+---
+# Database Backup Jobs Network Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: database-backup-network-policy
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: backup
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow monitoring of backup jobs
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 8080
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow PostgreSQL access
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: postgresql
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Allow InfluxDB access
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: influxdb
+    ports:
+    - protocol: TCP
+      port: 8086
+  # Allow TimescaleDB access
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: timescaledb
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Allow Redis access
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  # Allow external backup storage (S3, etc.)
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+
+---
+# Database Monitoring Network Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: database-monitoring-network-policy
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/component: database-monitoring
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: database-monitoring
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow Prometheus to scrape metrics
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: prometheus
+    ports:
+    - protocol: TCP
+      port: 9187  # postgres-exporter
+    - protocol: TCP
+      port: 9121  # redis-exporter
+    - protocol: TCP
+      port: 8086  # influxdb metrics
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow PostgreSQL monitoring
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: postgresql
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Allow InfluxDB monitoring
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: influxdb
+    ports:
+    - protocol: TCP
+      port: 8086
+  # Allow Redis monitoring
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  # Allow TimescaleDB monitoring
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: timescaledb
+    ports:
+    - protocol: TCP
+      port: 5432
+
+---
+# Database Maintenance Jobs Network Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: database-maintenance-network-policy
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/component: database-maintenance
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: database-maintenance
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow monitoring of maintenance jobs
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 8080
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow PostgreSQL maintenance
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: postgresql
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Allow InfluxDB maintenance
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: influxdb
+    ports:
+    - protocol: TCP
+      port: 8086
+  # Allow TimescaleDB maintenance
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: timescaledb
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Allow Redis maintenance
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: redis
+    ports:
+    - protocol: TCP
+      port: 6379

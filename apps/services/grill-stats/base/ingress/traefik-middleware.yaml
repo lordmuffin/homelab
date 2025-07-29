@@ -1,0 +1,309 @@
+# Security Headers Middleware
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: grill-stats-security-headers
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: middleware
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  headers:
+    frameDeny: true
+    sslRedirect: true
+    browserXssFilter: true
+    contentTypeNosniff: true
+    forceSTSHeader: true
+    stsIncludeSubdomains: true
+    stsPreload: true
+    stsSeconds: 31536000
+    customRequestHeaders:
+      X-Forwarded-Proto: "https"
+      X-Forwarded-Port: "443"
+    customResponseHeaders:
+      X-Frame-Options: "SAMEORIGIN"
+      Content-Security-Policy: "default-src 'self' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' wss: https:; media-src 'self';"
+      Referrer-Policy: "strict-origin-when-cross-origin"
+      Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+      X-Content-Type-Options: "nosniff"
+      X-XSS-Protection: "1; mode=block"
+---
+# Compression Middleware
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: grill-stats-compress
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: middleware
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  compress:
+    excludedContentTypes:
+      - "text/event-stream"
+      - "application/grpc"
+---
+# Web UI Rate Limiting
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: grill-stats-web-rate-limit
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: middleware
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  rateLimit:
+    average: 100
+    period: 1m
+    burst: 50
+---
+# API Rate Limiting
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: grill-stats-api-rate-limit
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: middleware
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  rateLimit:
+    average: 1000
+    period: 1m
+    burst: 200
+---
+# WebSocket Rate Limiting
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: grill-stats-websocket-rate-limit
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: middleware
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  rateLimit:
+    average: 500
+    period: 1m
+    burst: 100
+---
+# Health Check Rate Limiting
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: grill-stats-health-rate-limit
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: middleware
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  rateLimit:
+    average: 60
+    period: 1m
+    burst: 20
+---
+# CORS Configuration
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: grill-stats-cors
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: middleware
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  headers:
+    accessControlAllowMethods:
+      - "GET"
+      - "POST"
+      - "PUT"
+      - "DELETE"
+      - "OPTIONS"
+      - "PATCH"
+    accessControlAllowHeaders:
+      - "Content-Type"
+      - "Authorization"
+      - "X-Requested-With"
+      - "Accept"
+      - "Origin"
+      - "Cache-Control"
+      - "X-File-Name"
+    accessControlAllowOriginList:
+      - "https://grill-stats.homelab.local"
+      - "https://grill-stats.prod.homelab.local"
+      - "https://grill-stats.dev.homelab.local"
+      - "https://api.grill-stats.homelab.local"
+    accessControlExposeHeaders:
+      - "X-Total-Count"
+      - "X-Rate-Limit-Limit"
+      - "X-Rate-Limit-Remaining"
+      - "X-Rate-Limit-Reset"
+    accessControlMaxAge: 3600
+    addVaryHeader: true
+    accessControlAllowCredentials: true
+---
+# WebSocket Headers
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: grill-stats-websocket-headers
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: middleware
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  headers:
+    customRequestHeaders:
+      X-Forwarded-Proto: "https"
+      X-Forwarded-Port: "443"
+      Connection: "upgrade"
+      Upgrade: "websocket"
+    customResponseHeaders:
+      Connection: "upgrade"
+      Upgrade: "websocket"
+---
+# Server-Sent Events Headers
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: grill-stats-sse-headers
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: middleware
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  headers:
+    customRequestHeaders:
+      X-Forwarded-Proto: "https"
+      X-Forwarded-Port: "443"
+      Cache-Control: "no-cache"
+      Connection: "keep-alive"
+    customResponseHeaders:
+      Content-Type: "text/event-stream"
+      Cache-Control: "no-cache"
+      Connection: "keep-alive"
+      Access-Control-Allow-Origin: "*"
+---
+# Health Check Headers
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: grill-stats-health-headers
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: middleware
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  headers:
+    customResponseHeaders:
+      Content-Type: "application/json"
+      Cache-Control: "no-cache, no-store, must-revalidate"
+      Pragma: "no-cache"
+      Expires: "0"
+---
+# Authentication Middleware
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: grill-stats-auth-middleware
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: middleware
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  forwardAuth:
+    address: "http://auth-service.grill-stats.svc.cluster.local:8082/api/auth/verify"
+    authResponseHeaders:
+      - "X-User-Id"
+      - "X-User-Email"
+      - "X-User-Role"
+      - "X-Auth-Token"
+      - "X-Session-Id"
+    authRequestHeaders:
+      - "Authorization"
+      - "Cookie"
+    trustForwardHeader: true
+---
+# Error Pages Middleware
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: grill-stats-error-pages
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: middleware
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  errors:
+    status:
+      - "404"
+      - "500-599"
+    service:
+      name: web-ui-service
+      port: 80
+    query: "/error/{status}.html"
+---
+# IP Whitelist Middleware (for admin endpoints)
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: grill-stats-ip-whitelist
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: middleware
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  ipWhiteList:
+    sourceRange:
+      - "10.0.0.0/8"
+      - "172.16.0.0/12"
+      - "192.168.0.0/16"
+      - "127.0.0.1/32"
+---
+# Security Chain for Web UI
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: grill-stats-security-chain
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: middleware
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  chain:
+    middlewares:
+      - name: grill-stats-security-headers
+      - name: grill-stats-compress
+      - name: grill-stats-error-pages
+---
+# Security Chain for API
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: grill-stats-api-security-chain
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: middleware
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  chain:
+    middlewares:
+      - name: grill-stats-security-headers
+      - name: grill-stats-compress
+      - name: grill-stats-error-pages

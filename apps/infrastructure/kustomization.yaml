@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - cluster-config
+  - storage-classes
+  - network-policies
+  - monitoring-namespace
+  - backup-solutions
+
+namespace: infrastructure
+
+patchesStrategicMerge: []
+
+commonLabels:
+  app.kubernetes.io/part-of: homelab-infrastructure
+  app.kubernetes.io/managed-by: kustomize
+
+commonAnnotations:
+  config.kubernetes.io/local-config: "true"
+  homelab.io/infrastructure-component: "true"

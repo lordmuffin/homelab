@@ -1,0 +1,123 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: wallabag-restore
+  namespace: wallabag
+spec:
+  template:
+    spec:
+      containers:
+        - name: restore-wallabag
+          image: postgres:latest
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: wallabag-db-postgres-creds-1password
+                  key: password
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: wallabag-db-postgres-creds-1password
+                  key: username
+            - name: POSTGRES_HOST
+              value: wallabag-database-rw.wallabag.svc.cluster.local
+            - name: POSTGRES_DB
+              value: wallabag
+            - name: B2_APPLICATION_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: backblaze-cloud-homelab-creds-1password
+                  key: keyID
+            - name: B2_APPLICATION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: backblaze-cloud-homelab-creds-1password
+                  key: applicationKey
+            - name: B2_BUCKET_NAME
+              value: "cloud-homelab-backups"
+            - name: RESTORE_DATE
+              value: "LATEST" # Can be set to specific date like "20241127" or "LATEST"
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -euo pipefail
+              
+              # Install b2 CLI
+              apt-get update && apt-get install -y curl python3 python3-pip
+              pip3 install b2sdk
+              
+              log_info() {
+                  echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] INFO: $*" >&2
+              }
+              
+              log_error() {
+                  echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] ERROR: $*" >&2
+              }
+              
+              log_info "🔄 Starting Wallabag database restore..."
+              
+              # Validate environment variables
+              if [[ -z "${POSTGRES_HOST:-}" || -z "${POSTGRES_USER:-}" || -z "${POSTGRES_DB:-}" ]]; then
+                  log_error "Missing required PostgreSQL environment variables"
+                  exit 1
+              fi
+              
+              if [[ -z "${B2_APPLICATION_KEY_ID:-}" || -z "${B2_APPLICATION_KEY:-}" || -z "${B2_BUCKET_NAME:-}" ]]; then
+                  log_error "Missing required B2 environment variables"
+                  exit 1
+              fi
+              
+              # Authorize with B2
+              b2 account authorize "$B2_APPLICATION_KEY_ID" "$B2_APPLICATION_KEY"
+              
+              # Find backup file to restore
+              if [[ "${RESTORE_DATE}" == "LATEST" ]]; then
+                  log_info "Finding latest backup..."
+                  BACKUP_FILENAME=$(b2 file ls "$B2_BUCKET_NAME" wallabag/ | grep "wallabag_backup_" | sort -k2 | tail -1 | awk '{print $2}')
+              else
+                  log_info "Looking for backup from date: ${RESTORE_DATE}"
+                  BACKUP_FILENAME=$(b2 file ls "$B2_BUCKET_NAME" wallabag/ | grep "wallabag_backup_${RESTORE_DATE}" | head -1 | awk '{print $2}')
+              fi
+              
+              if [[ -z "$BACKUP_FILENAME" ]]; then
+                  log_error "No backup file found for restore criteria: ${RESTORE_DATE}"
+                  exit 1
+              fi
+              
+              log_info "Found backup file: $BACKUP_FILENAME"
+              
+              # Download backup file
+              mkdir -p /tmp/restore
+              log_info "Downloading backup from B2..."
+              if ! b2 file download "$B2_BUCKET_NAME" "wallabag/$BACKUP_FILENAME" "/tmp/restore/backup.sql.gz"; then
+                  log_error "Failed to download backup file"
+                  exit 1
+              fi
+              
+              # Test database connection
+              log_info "Testing database connection..."
+              if ! pg_isready -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB"; then
+                  log_error "Cannot connect to database"
+                  exit 1
+              fi
+              
+              # Decompress and restore
+              log_info "Decompressing backup..."
+              gunzip /tmp/restore/backup.sql.gz
+              
+              log_info "Restoring database (this may take several minutes)..."
+              if psql -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f /tmp/restore/backup.sql; then
+                  log_info "✅ Database restore completed successfully"
+              else
+                  log_error "Database restore failed"
+                  exit 1
+              fi
+              
+              # Cleanup
+              rm -rf /tmp/restore
+              
+              log_info "✅ Wallabag restore completed successfully"
+      restartPolicy: Never
+  backoffLimit: 3

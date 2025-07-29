@@ -37,6 +37,7 @@ resources:
 
   # 1Password Secrets
   - base/secrets/secrets.yaml
+  - base/secrets/couchdb.yaml
   # - base/secrets/arr-stack.yaml
   # - base/secrets/tailscale.yaml
   # - base/secrets/headscale.yaml
@@ -74,13 +75,12 @@ resources:
 
   # - https://github.com/lordmuffin/homelab/apps/networking/tailscale
   # - https://github.com/lordmuffin/homelab/apps/networking/cloudflared
-  - https://raw.githubusercontent.com/argoproj/argo-cd/v2.11.0/manifests/install.yaml
+  - https://raw.githubusercontent.com/argoproj/argo-cd/v3.0.0/manifests/install.yaml
   - base/styles-cm.yaml
 
 namespace: argocd
 images:
   - name: quay.io/argoproj/argocd
-    newTag: v2.9.3
 patches:
   # - path: overlay/argo-cd-repo-server-ksops-patch.yaml
   #   target: 

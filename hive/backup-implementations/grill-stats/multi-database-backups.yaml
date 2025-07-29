@@ -1,0 +1,548 @@
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: grill-stats-comprehensive-backup
+  namespace: grill-stats
+spec:
+  schedule: "0 0 * * *" # Daily at midnight
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: postgresql-backup
+              image: postgres:latest
+              env:
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: grill-stats-db-credentials-1password
+                      key: password
+                - name: POSTGRES_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: grill-stats-db-credentials-1password
+                      key: username
+                - name: POSTGRES_HOST
+                  value: grill-stats-postgresql.grill-stats.svc.cluster.local
+                - name: POSTGRES_DB
+                  value: grill-stats
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  set -euo pipefail
+                  
+                  MAX_RETRIES=5
+                  RETRY_DELAYS=(10 20 40 80 160)
+                  
+                  log_info() {
+                      echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] [POSTGRES] INFO: $*" >&2
+                  }
+                  
+                  log_error() {
+                      echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] [POSTGRES] ERROR: $*" >&2
+                  }
+                  
+                  error_trap() {
+                      local exit_code=$?
+                      local line_number=$1
+                      log_error "PostgreSQL backup failed at line $line_number with exit code $exit_code"
+                      exit $exit_code
+                  }
+                  
+                  trap 'error_trap $LINENO' ERR
+                  
+                  retry_with_backoff() {
+                      local cmd="$1"
+                      local attempt=1
+                      
+                      while [[ $attempt -le $MAX_RETRIES ]]; do
+                          log_info "Attempt $attempt/$MAX_RETRIES: $cmd"
+                          
+                          if eval "$cmd"; then
+                              log_info "Command succeeded on attempt $attempt"
+                              return 0
+                          else
+                              local exit_code=$?
+                              log_error "Command failed on attempt $attempt with exit code $exit_code"
+                              
+                              if [[ $attempt -eq $MAX_RETRIES ]]; then
+                                  log_error "All $MAX_RETRIES attempts failed"
+                                  return $exit_code
+                              fi
+                              
+                              local delay=${RETRY_DELAYS[$((attempt-1))]}
+                              log_info "Waiting $delay seconds before next attempt..."
+                              sleep "$delay"
+                              ((attempt++))
+                          fi
+                      done
+                  }
+                  
+                  TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+                  BACKUP_FILE="grill_stats_postgres_backup_${TIMESTAMP}.sql.gz"
+                  
+                  log_info "🔄 Starting Grill-Stats PostgreSQL backup: $BACKUP_FILE"
+                  
+                  # Validate environment variables
+                  if [[ -z "${POSTGRES_HOST:-}" || -z "${POSTGRES_USER:-}" || -z "${POSTGRES_DB:-}" ]]; then
+                      log_error "Missing required environment variables"
+                      exit 1
+                  fi
+                  
+                  # Test connection with retry
+                  retry_with_backoff "pg_isready -h '$POSTGRES_HOST' -U '$POSTGRES_USER' -d '$POSTGRES_DB'"
+                  
+                  # Create backup with retry (include all schemas and data)
+                  retry_with_backoff "pg_dump -h '$POSTGRES_HOST' -U '$POSTGRES_USER' -d '$POSTGRES_DB' --verbose --no-owner --no-privileges --schema-only --data-only | gzip > /mnt/backup/$BACKUP_FILE"
+                  
+                  # Validate backup file
+                  if [[ ! -f "/mnt/backup/$BACKUP_FILE" ]] || [[ ! -s "/mnt/backup/$BACKUP_FILE" ]]; then
+                      log_error "Backup file creation failed or is empty"
+                      exit 1
+                  fi
+                  
+                  if ! gzip -t "/mnt/backup/$BACKUP_FILE"; then
+                      log_error "Backup file is corrupted"
+                      exit 1
+                  fi
+                  
+                  BACKUP_SIZE=$(du -h "/mnt/backup/$BACKUP_FILE" | cut -f1)
+                  log_info "✅ PostgreSQL backup completed successfully: $BACKUP_FILE ($BACKUP_SIZE)"
+                  
+                  # Signal completion
+                  touch /mnt/backup/.postgres_done
+              volumeMounts:
+                - name: backup-storage
+                  mountPath: /mnt/backup
+            - name: influxdb-backup
+              image: influxdb:2.7
+              env:
+                - name: INFLUX_HOST
+                  value: grill-stats-influxdb.grill-stats.svc.cluster.local
+                - name: INFLUX_PORT
+                  value: "8086"
+                - name: INFLUX_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: grill-stats-influxdb-auth
+                      key: admin-token
+                - name: INFLUX_ORG
+                  value: grill-stats
+                - name: INFLUX_BUCKET
+                  value: grill-data
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  set -euo pipefail
+                  
+                  log_info() {
+                      echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] [INFLUXDB] INFO: $*" >&2
+                  }
+                  
+                  log_error() {
+                      echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] [INFLUXDB] ERROR: $*" >&2
+                  }
+                  
+                  TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+                  BACKUP_FILE="grill_stats_influxdb_backup_${TIMESTAMP}.tar.gz"
+                  
+                  log_info "🔄 Starting Grill-Stats InfluxDB backup: $BACKUP_FILE"
+                  
+                  # Test InfluxDB connection
+                  if ! influx ping --host "http://$INFLUX_HOST:$INFLUX_PORT"; then
+                      log_error "Cannot connect to InfluxDB"
+                      exit 1
+                  fi
+                  
+                  # Export InfluxDB data using backup command
+                  mkdir -p /mnt/backup/influx_export
+                  
+                  # Export all data from the bucket
+                  influx backup /mnt/backup/influx_export \
+                    --host "http://$INFLUX_HOST:$INFLUX_PORT" \
+                    --token "$INFLUX_TOKEN" \
+                    --org "$INFLUX_ORG" \
+                    --bucket "$INFLUX_BUCKET"
+                  
+                  # Create compressed archive
+                  cd /mnt/backup
+                  tar -czf "$BACKUP_FILE" influx_export/
+                  
+                  # Validate backup
+                  if [[ ! -f "/mnt/backup/$BACKUP_FILE" ]] || [[ ! -s "/mnt/backup/$BACKUP_FILE" ]]; then
+                      log_error "InfluxDB backup failed or is empty"
+                      exit 1
+                  fi
+                  
+                  if ! tar -tzf "/mnt/backup/$BACKUP_FILE" >/dev/null; then
+                      log_error "InfluxDB backup file is corrupted"
+                      exit 1
+                  fi
+                  
+                  # Cleanup temporary directory
+                  rm -rf /mnt/backup/influx_export
+                  
+                  BACKUP_SIZE=$(du -h "/mnt/backup/$BACKUP_FILE" | cut -f1)
+                  log_info "✅ InfluxDB backup completed successfully: $BACKUP_FILE ($BACKUP_SIZE)"
+                  
+                  # Signal completion
+                  touch /mnt/backup/.influxdb_done
+              volumeMounts:
+                - name: backup-storage
+                  mountPath: /mnt/backup
+            - name: redis-backup
+              image: redis:latest
+              env:
+                - name: REDIS_HOST
+                  value: grill-stats-redis.grill-stats.svc.cluster.local
+                - name: REDIS_PORT
+                  value: "6379"
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  set -euo pipefail
+                  
+                  log_info() {
+                      echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] [REDIS] INFO: $*" >&2
+                  }
+                  
+                  log_error() {
+                      echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] [REDIS] ERROR: $*" >&2
+                  }
+                  
+                  TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+                  BACKUP_FILE="grill_stats_redis_backup_${TIMESTAMP}.rdb.gz"
+                  
+                  log_info "🔄 Starting Grill-Stats Redis backup: $BACKUP_FILE"
+                  
+                  # Test Redis connection
+                  if ! redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" ping; then
+                      log_error "Cannot connect to Redis"
+                      exit 1
+                  fi
+                  
+                  # Create Redis backup using RDB dump
+                  redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" --rdb "/mnt/backup/redis_backup.rdb"
+                  
+                  # Validate and compress
+                  if [[ ! -f "/mnt/backup/redis_backup.rdb" ]] || [[ ! -s "/mnt/backup/redis_backup.rdb" ]]; then
+                      log_error "Redis backup failed or is empty"
+                      exit 1
+                  fi
+                  
+                  gzip "/mnt/backup/redis_backup.rdb"
+                  mv "/mnt/backup/redis_backup.rdb.gz" "/mnt/backup/$BACKUP_FILE"
+                  
+                  BACKUP_SIZE=$(du -h "/mnt/backup/$BACKUP_FILE" | cut -f1)
+                  log_info "✅ Redis backup completed successfully: $BACKUP_FILE ($BACKUP_SIZE)"
+                  
+                  # Signal completion
+                  touch /mnt/backup/.redis_done
+              volumeMounts:
+                - name: backup-storage
+                  mountPath: /mnt/backup
+            - name: config-backup
+              image: busybox:latest
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -e
+                  
+                  log_info() {
+                      echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] [CONFIG] INFO: $*" >&2
+                  }
+                  
+                  TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+                  CONFIG_BACKUP="grill_stats_config_backup_${TIMESTAMP}.tar.gz"
+                  
+                  log_info "🔄 Starting Grill-Stats configuration backup: $CONFIG_BACKUP"
+                  
+                  # Create configuration backup
+                  cd /config
+                  tar -czf "/mnt/backup/$CONFIG_BACKUP" . 2>/dev/null || true
+                  
+                  if [[ -s "/mnt/backup/$CONFIG_BACKUP" ]]; then
+                      CONFIG_SIZE=$(du -h "/mnt/backup/$CONFIG_BACKUP" | cut -f1)
+                      log_info "✅ Configuration backup completed: $CONFIG_BACKUP ($CONFIG_SIZE)"
+                  else
+                      log_info "⚠️ No configuration files found to backup"
+                      echo '{"no_config": true}' > "/mnt/backup/no_config_${TIMESTAMP}.json"
+                  fi
+                  
+                  # Signal completion
+                  touch /mnt/backup/.config_done
+              volumeMounts:
+                - name: backup-storage
+                  mountPath: /mnt/backup
+                - name: grill-stats-config
+                  mountPath: /config
+            - name: b2-uploader
+              image: backblazeit/b2:latest
+              env:
+                - name: B2_APPLICATION_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: backblaze-cloud-homelab-creds-1password
+                      key: keyID
+                - name: B2_APPLICATION_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: backblaze-cloud-homelab-creds-1password
+                      key: applicationKey
+                - name: B2_BUCKET_NAME
+                  value: "cloud-homelab-backups"
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  set -euo pipefail
+                  
+                  MAX_RETRIES=5
+                  RETRY_DELAYS=(10 20 40 80 160)
+                  
+                  log_info() {
+                      echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] [B2] INFO: $*" >&2
+                  }
+                  
+                  log_error() {
+                      echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] [B2] ERROR: $*" >&2
+                  }
+                  
+                  retry_with_backoff() {
+                      local cmd="$1"
+                      local attempt=1
+                      
+                      while [[ $attempt -le $MAX_RETRIES ]]; do
+                          log_info "Attempt $attempt/$MAX_RETRIES: $cmd"
+                          
+                          if eval "$cmd"; then
+                              log_info "Command succeeded on attempt $attempt"
+                              return 0
+                          else
+                              local exit_code=$?
+                              log_error "Command failed on attempt $attempt with exit code $exit_code"
+                              
+                              if [[ $attempt -eq $MAX_RETRIES ]]; then
+                                  log_error "All $MAX_RETRIES attempts failed"
+                                  return $exit_code
+                              fi
+                              
+                              local delay=${RETRY_DELAYS[$((attempt-1))]}
+                              log_info "Waiting $delay seconds before next attempt..."
+                              sleep "$delay"
+                              ((attempt++))
+                          fi
+                      done
+                  }
+                  
+                  log_info "🔄 Starting B2 upload process for Grill-Stats multi-database backup..."
+                  
+                  # Wait for all backups to complete
+                  timeout=3600  # 60 minutes
+                  elapsed=0
+                  while [[ ! -f /mnt/backup/.postgres_done ]] || [[ ! -f /mnt/backup/.influxdb_done ]] || [[ ! -f /mnt/backup/.redis_done ]] || [[ ! -f /mnt/backup/.config_done ]]; do
+                      if [[ $elapsed -ge $timeout ]]; then
+                          log_error "Timeout waiting for backup completion"
+                          exit 1
+                      fi
+                      
+                      postgres_status="❌"
+                      influxdb_status="❌"
+                      redis_status="❌"
+                      config_status="❌"
+                      
+                      [[ -f /mnt/backup/.postgres_done ]] && postgres_status="✅"
+                      [[ -f /mnt/backup/.influxdb_done ]] && influxdb_status="✅"
+                      [[ -f /mnt/backup/.redis_done ]] && redis_status="✅"
+                      [[ -f /mnt/backup/.config_done ]] && config_status="✅"
+                      
+                      log_info "Waiting for backup completion... PostgreSQL: $postgres_status InfluxDB: $influxdb_status Redis: $redis_status Config: $config_status (${elapsed}s elapsed)"
+                      sleep 15
+                      ((elapsed+=15))
+                  done
+                  
+                  # Get timestamp from any backup file
+                  TIMESTAMP=$(ls /mnt/backup/grill_stats_*_backup_*.* | head -1 | sed -n 's/.*_\([0-9]\{8\}_[0-9]\{6\}\).*/\1/p')
+                  if [[ -z "$TIMESTAMP" ]]; then
+                      log_error "Could not determine backup timestamp"
+                      exit 1
+                  fi
+                  
+                  # Upload PostgreSQL backup
+                  POSTGRES_BACKUP="grill_stats_postgres_backup_${TIMESTAMP}.sql.gz"
+                  if [[ -f "/mnt/backup/$POSTGRES_BACKUP" ]] && [[ -s "/mnt/backup/$POSTGRES_BACKUP" ]]; then
+                      UPLOAD_PATH="grill-stats/postgresql/$POSTGRES_BACKUP"
+                      log_info "Uploading PostgreSQL backup to B2: $UPLOAD_PATH"
+                      retry_with_backoff "b2v4 file upload '$B2_BUCKET_NAME' '/mnt/backup/$POSTGRES_BACKUP' '$UPLOAD_PATH'"
+                  else
+                      log_error "PostgreSQL backup file not found or empty: $POSTGRES_BACKUP"
+                      exit 1
+                  fi
+                  
+                  # Upload InfluxDB backup
+                  INFLUXDB_BACKUP="grill_stats_influxdb_backup_${TIMESTAMP}.tar.gz"
+                  if [[ -f "/mnt/backup/$INFLUXDB_BACKUP" ]] && [[ -s "/mnt/backup/$INFLUXDB_BACKUP" ]]; then
+                      UPLOAD_PATH="grill-stats/influxdb/$INFLUXDB_BACKUP"
+                      log_info "Uploading InfluxDB backup to B2: $UPLOAD_PATH"
+                      retry_with_backoff "b2v4 file upload '$B2_BUCKET_NAME' '/mnt/backup/$INFLUXDB_BACKUP' '$UPLOAD_PATH'"
+                  else
+                      log_error "InfluxDB backup file not found or empty: $INFLUXDB_BACKUP"
+                      exit 1
+                  fi
+                  
+                  # Upload Redis backup
+                  REDIS_BACKUP="grill_stats_redis_backup_${TIMESTAMP}.rdb.gz"
+                  if [[ -f "/mnt/backup/$REDIS_BACKUP" ]] && [[ -s "/mnt/backup/$REDIS_BACKUP" ]]; then
+                      UPLOAD_PATH="grill-stats/redis/$REDIS_BACKUP"
+                      log_info "Uploading Redis backup to B2: $UPLOAD_PATH"
+                      retry_with_backoff "b2v4 file upload '$B2_BUCKET_NAME' '/mnt/backup/$REDIS_BACKUP' '$UPLOAD_PATH'"
+                  else
+                      log_error "Redis backup file not found or empty: $REDIS_BACKUP"
+                      exit 1
+                  fi
+                  
+                  # Upload config backup (if exists)
+                  CONFIG_BACKUP="grill_stats_config_backup_${TIMESTAMP}.tar.gz"
+                  if [[ -f "/mnt/backup/$CONFIG_BACKUP" ]] && [[ -s "/mnt/backup/$CONFIG_BACKUP" ]]; then
+                      UPLOAD_PATH="grill-stats/config/$CONFIG_BACKUP"
+                      log_info "Uploading configuration backup to B2: $UPLOAD_PATH"
+                      retry_with_backoff "b2v4 file upload '$B2_BUCKET_NAME' '/mnt/backup/$CONFIG_BACKUP' '$UPLOAD_PATH'"
+                  fi
+                  
+                  # Create and upload comprehensive backup metadata
+                  METADATA_FILE="grill_stats_backup_metadata_${TIMESTAMP}.json"
+                  
+                  POSTGRES_SIZE=$(du -h "/mnt/backup/$POSTGRES_BACKUP" | cut -f1)
+                  INFLUXDB_SIZE=$(du -h "/mnt/backup/$INFLUXDB_BACKUP" | cut -f1)
+                  REDIS_SIZE=$(du -h "/mnt/backup/$REDIS_BACKUP" | cut -f1)
+                  CONFIG_SIZE=""
+                  [[ -f "/mnt/backup/$CONFIG_BACKUP" ]] && CONFIG_SIZE=$(du -h "/mnt/backup/$CONFIG_BACKUP" | cut -f1)
+                  
+                  cat > "/mnt/backup/$METADATA_FILE" << EOF
+                  {
+                    "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+                    "backup_type": "comprehensive_multi_database",
+                    "components": {
+                      "postgresql": {
+                        "file": "$POSTGRES_BACKUP",
+                        "size": "$POSTGRES_SIZE",
+                        "status": "completed"
+                      },
+                      "influxdb": {
+                        "file": "$INFLUXDB_BACKUP",
+                        "size": "$INFLUXDB_SIZE",
+                        "status": "completed"
+                      },
+                      "redis": {
+                        "file": "$REDIS_BACKUP",
+                        "size": "$REDIS_SIZE",
+                        "status": "completed"
+                      },
+                      "configuration": {
+                        "file": "$CONFIG_BACKUP",
+                        "size": "$CONFIG_SIZE",
+                        "status": "$([ -f /mnt/backup/$CONFIG_BACKUP ] && echo completed || echo no_data)"
+                      }
+                    },
+                    "grill_stats_version": "$(echo $GRILL_STATS_VERSION || echo 'unknown')",
+                    "backup_strategy": "parallel_multi_container"
+                  }
+                  EOF
+                  
+                  UPLOAD_PATH="grill-stats/metadata/$METADATA_FILE"
+                  log_info "Uploading metadata to B2: $UPLOAD_PATH"
+                  retry_with_backoff "b2v4 file upload '$B2_BUCKET_NAME' '/mnt/backup/$METADATA_FILE' '$UPLOAD_PATH'"
+                  
+                  log_info "✅ B2 upload completed successfully for all Grill-Stats backup components"
+              volumeMounts:
+                - name: backup-storage
+                  mountPath: /mnt/backup
+          restartPolicy: OnFailure
+          volumes:
+            - name: backup-storage
+              emptyDir: {}
+            - name: grill-stats-config
+              configMap:
+                name: grill-stats-config
+                optional: true
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: grill-stats-cleanup
+  namespace: grill-stats
+spec:
+  schedule: "0 7 1 * *" # Monthly cleanup on 1st at 7AM
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: b2-cleanup
+              image: backblazeit/b2:latest
+              env:
+                - name: B2_APPLICATION_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: backblaze-cloud-homelab-creds-1password
+                      key: keyID
+                - name: B2_APPLICATION_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: backblaze-cloud-homelab-creds-1password
+                      key: applicationKey
+                - name: B2_BUCKET_NAME
+                  value: "cloud-homelab-backups"
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  set -euo pipefail
+                  
+                  log_info() {
+                      echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] INFO: $*" >&2
+                  }
+                  
+                  log_info "🔄 Starting Grill-Stats backup cleanup (keeping last 45 days)..."
+                  
+                  # Keep more backups for complex multi-database system
+                  CUTOFF_DATE=$(date -d '45 days ago' +%Y%m%d)
+                  
+                  # Function to clean backup files in a specific path
+                  cleanup_path() {
+                      local path=$1
+                      local pattern=$2
+                      
+                      b2v4 file ls "$B2_BUCKET_NAME" "$path" | while read -r file_info; do
+                          filename=$(echo "$file_info" | awk '{print $2}')
+                          
+                          if [[ $filename =~ $pattern ]]; then
+                              file_date=${BASH_REMATCH[1]}
+                              
+                              if [[ $file_date < $CUTOFF_DATE ]]; then
+                                  log_info "Deleting old backup: $filename (date: $file_date)"
+                                  file_id=$(echo "$file_info" | awk '{print $1}')
+                                  b2v4 file delete "$file_id" "$filename"
+                              fi
+                          fi
+                      done
+                  }
+                  
+                  # Clean PostgreSQL backups
+                  cleanup_path "grill-stats/postgresql/" "grill_stats_postgres_backup_([0-9]{8})_[0-9]{6}\.sql\.gz$"
+                  
+                  # Clean InfluxDB backups
+                  cleanup_path "grill-stats/influxdb/" "grill_stats_influxdb_backup_([0-9]{8})_[0-9]{6}\.tar\.gz$"
+                  
+                  # Clean Redis backups
+                  cleanup_path "grill-stats/redis/" "grill_stats_redis_backup_([0-9]{8})_[0-9]{6}\.rdb\.gz$"
+                  
+                  # Clean config backups
+                  cleanup_path "grill-stats/config/" "grill_stats_config_backup_([0-9]{8})_[0-9]{6}\.tar\.gz$"
+                  
+                  # Clean metadata files
+                  cleanup_path "grill-stats/metadata/" "grill_stats_backup_metadata_([0-9]{8})_[0-9]{6}\.json$"
+                  
+                  log_info "✅ Grill-Stats backup cleanup completed"
+          restartPolicy: OnFailure

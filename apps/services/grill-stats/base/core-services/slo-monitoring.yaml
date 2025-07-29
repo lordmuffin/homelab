@@ -1,0 +1,486 @@
+# SLO/SLI Monitoring Configuration with Sloth
+apiVersion: sloth.slok.dev/v1
+kind: PrometheusServiceLevel
+metadata:
+  name: grill-stats-slo
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: slo
+spec:
+  service: "grill-stats"
+  labels:
+    team: "platform"
+    owner: "sre"
+    environment: "production"
+  slos:
+  # Request Availability SLO - 99.9% uptime
+  - name: "requests-availability"
+    objective: 99.9
+    description: "API requests should be available 99.9% of the time"
+    sli:
+      events:
+        error_query: |
+          sum(rate(http_requests_total{job=~"grill-stats-.*",status=~"5.."}[5m]))
+        total_query: |
+          sum(rate(http_requests_total{job=~"grill-stats-.*"}[5m]))
+    alerting:
+      name: GrillStatsRequestsAvailability
+      labels:
+        category: "slo"
+        severity: "critical"
+        service: "grill-stats"
+      annotations:
+        summary: "Grill Stats request availability SLO violation"
+        description: "Request availability is below 99.9% SLO target"
+        runbook_url: "https://homelab.local/runbooks/grill-stats/slo-availability"
+      page_alert:
+        labels:
+          severity: "critical"
+          priority: "high"
+        annotations:
+          summary: "Critical SLO violation - immediate action required"
+      ticket_alert:
+        labels:
+          severity: "warning"
+          priority: "medium"
+        annotations:
+          summary: "SLO violation - investigation required"
+
+  # Response Time SLO - 95th percentile < 500ms
+  - name: "response-time-latency"
+    objective: 95.0
+    description: "95% of requests should complete within 500ms"
+    sli:
+      events:
+        error_query: |
+          sum(rate(http_request_duration_seconds_bucket{job=~"grill-stats-.*",le="0.5"}[5m]))
+        total_query: |
+          sum(rate(http_request_duration_seconds_bucket{job=~"grill-stats-.*",le="+Inf"}[5m]))
+    alerting:
+      name: GrillStatsResponseTimeLatency
+      labels:
+        category: "slo"
+        severity: "warning"
+        service: "grill-stats"
+      annotations:
+        summary: "Grill Stats response time SLO violation"
+        description: "Response time SLO is below 95% target"
+        runbook_url: "https://homelab.local/runbooks/grill-stats/slo-latency"
+      page_alert:
+        labels:
+          severity: "warning"
+      ticket_alert:
+        labels:
+          severity: "info"
+
+  # Temperature Data Freshness SLO - 99.5% data within 60 seconds
+  - name: "temperature-data-freshness"
+    objective: 99.5
+    description: "99.5% of temperature data should be fresh (within 60 seconds)"
+    sli:
+      events:
+        error_query: |
+          count(time() - grill_stats_last_temperature_reading_timestamp > 60)
+        total_query: |
+          count(grill_stats_device_online_status == 1)
+    alerting:
+      name: GrillStatsTemperatureDataFreshness
+      labels:
+        category: "slo"
+        severity: "warning"
+        service: "grill-stats"
+      annotations:
+        summary: "Grill Stats temperature data freshness SLO violation"
+        description: "Temperature data freshness is below 99.5% SLO target"
+        runbook_url: "https://homelab.local/runbooks/grill-stats/slo-data-freshness"
+      page_alert:
+        labels:
+          severity: "warning"
+      ticket_alert:
+        labels:
+          severity: "info"
+
+  # Device Connectivity SLO - 99% devices online
+  - name: "device-connectivity"
+    objective: 99.0
+    description: "99% of registered devices should be online"
+    sli:
+      events:
+        error_query: |
+          count(grill_stats_device_online_status == 0)
+        total_query: |
+          count(grill_stats_device_online_status)
+    alerting:
+      name: GrillStatsDeviceConnectivity
+      labels:
+        category: "slo"
+        severity: "warning"
+        service: "grill-stats"
+      annotations:
+        summary: "Grill Stats device connectivity SLO violation"
+        description: "Device connectivity is below 99% SLO target"
+        runbook_url: "https://homelab.local/runbooks/grill-stats/slo-device-connectivity"
+      page_alert:
+        labels:
+          severity: "warning"
+      ticket_alert:
+        labels:
+          severity: "info"
+
+  # Authentication Success Rate SLO - 99.5% success rate
+  - name: "authentication-success-rate"
+    objective: 99.5
+    description: "99.5% of authentication attempts should succeed"
+    sli:
+      events:
+        error_query: |
+          sum(rate(auth_failures_total[5m]))
+        total_query: |
+          sum(rate(auth_attempts_total[5m]))
+    alerting:
+      name: GrillStatsAuthenticationSuccessRate
+      labels:
+        category: "slo"
+        severity: "warning"
+        service: "grill-stats"
+      annotations:
+        summary: "Grill Stats authentication success rate SLO violation"
+        description: "Authentication success rate is below 99.5% SLO target"
+        runbook_url: "https://homelab.local/runbooks/grill-stats/slo-auth-success"
+      page_alert:
+        labels:
+          severity: "warning"
+      ticket_alert:
+        labels:
+          severity: "info"
+---
+# Additional SLO Configuration for Database Services
+apiVersion: sloth.slok.dev/v1
+kind: PrometheusServiceLevel
+metadata:
+  name: grill-stats-database-slo
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database-slo
+spec:
+  service: "grill-stats-database"
+  labels:
+    team: "platform"
+    owner: "database"
+    environment: "production"
+  slos:
+  # Database Availability SLO - 99.95% uptime
+  - name: "database-availability"
+    objective: 99.95
+    description: "Database services should be available 99.95% of the time"
+    sli:
+      events:
+        error_query: |
+          count(up{job=~"postgresql-.*|redis-.*|influxdb-.*"} == 0)
+        total_query: |
+          count(up{job=~"postgresql-.*|redis-.*|influxdb-.*"})
+    alerting:
+      name: GrillStatsDatabaseAvailability
+      labels:
+        category: "slo"
+        severity: "critical"
+        service: "grill-stats"
+      annotations:
+        summary: "Grill Stats database availability SLO violation"
+        description: "Database availability is below 99.95% SLO target"
+        runbook_url: "https://homelab.local/runbooks/grill-stats/slo-database-availability"
+      page_alert:
+        labels:
+          severity: "critical"
+      ticket_alert:
+        labels:
+          severity: "warning"
+
+  # Database Query Performance SLO - 95% queries < 100ms
+  - name: "database-query-performance"
+    objective: 95.0
+    description: "95% of database queries should complete within 100ms"
+    sli:
+      events:
+        error_query: |
+          sum(rate(grill_stats_database_query_duration_seconds_bucket{le="0.1"}[5m]))
+        total_query: |
+          sum(rate(grill_stats_database_query_duration_seconds_bucket{le="+Inf"}[5m]))
+    alerting:
+      name: GrillStatsDatabaseQueryPerformance
+      labels:
+        category: "slo"
+        severity: "warning"
+        service: "grill-stats"
+      annotations:
+        summary: "Grill Stats database query performance SLO violation"
+        description: "Database query performance is below 95% SLO target"
+        runbook_url: "https://homelab.local/runbooks/grill-stats/slo-database-performance"
+      page_alert:
+        labels:
+          severity: "warning"
+      ticket_alert:
+        labels:
+          severity: "info"
+---
+# SLO Dashboard Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: slo-dashboard-config
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: slo-dashboard
+data:
+  slo-config.yaml: |
+    # SLO Configuration for Grill Stats Platform
+    slos:
+      - name: "Request Availability"
+        target: 99.9
+        window: "30d"
+        metric: "grill_stats:slo_availability_30d"
+        error_budget: 0.1
+
+      - name: "Response Time"
+        target: 95.0
+        window: "30d"
+        metric: "grill_stats:slo_latency_p95_30d"
+        error_budget: 5.0
+
+      - name: "Temperature Data Freshness"
+        target: 99.5
+        window: "30d"
+        metric: "grill_stats:slo_data_freshness_current"
+        error_budget: 0.5
+
+      - name: "Device Connectivity"
+        target: 99.0
+        window: "30d"
+        metric: "grill_stats:device_utilization_ratio"
+        error_budget: 1.0
+
+      - name: "Authentication Success"
+        target: 99.5
+        window: "30d"
+        metric: "grill_stats:auth_success_rate_5m"
+        error_budget: 0.5
+
+    # Error Budget Policies
+    error_budget_policies:
+      - name: "Fast Burn"
+        condition: "error_budget_burn_rate > 14.4"
+        action: "page"
+        severity: "critical"
+
+      - name: "Slow Burn"
+        condition: "error_budget_burn_rate > 6"
+        action: "ticket"
+        severity: "warning"
+
+      - name: "Very Slow Burn"
+        condition: "error_budget_burn_rate > 3"
+        action: "ticket"
+        severity: "info"
+
+    # SLI Definitions
+    slis:
+      availability:
+        description: "Percentage of successful requests"
+        query: "(1 - (sum(rate(http_requests_total{status=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m])))) * 100"
+
+      latency:
+        description: "95th percentile response time"
+        query: "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))"
+
+      data_freshness:
+        description: "Percentage of fresh temperature data"
+        query: "(count(time() - grill_stats_last_temperature_reading_timestamp <= 60) / count(grill_stats_device_online_status == 1)) * 100"
+
+      device_connectivity:
+        description: "Percentage of devices online"
+        query: "(count(grill_stats_device_online_status == 1) / count(grill_stats_device_online_status)) * 100"
+
+      auth_success:
+        description: "Authentication success rate"
+        query: "(1 - (sum(rate(auth_failures_total[5m])) / sum(rate(auth_attempts_total[5m])))) * 100"
+---
+# SLO Monitoring Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: slo-monitoring
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: slo-monitoring
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: slo
+spec:
+  selector:
+    app.kubernetes.io/name: slo-monitoring
+  ports:
+  - port: 8080
+    targetPort: 8080
+    name: http
+  type: ClusterIP
+---
+# SLO Monitoring Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: slo-monitoring
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: slo-monitoring
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: slo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: slo-monitoring
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: slo-monitoring
+        app.kubernetes.io/part-of: grill-stats
+        app.kubernetes.io/component: slo
+    spec:
+      containers:
+      - name: slo-monitoring
+        image: slok/sloth:latest
+        args:
+        - --config-file=/etc/sloth/slo-config.yaml
+        - --prometheus-url=http://prometheus:9090
+        - --listen-address=0.0.0.0:8080
+        ports:
+        - containerPort: 8080
+          name: http
+        volumeMounts:
+        - name: config
+          mountPath: /etc/sloth
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 15
+      volumes:
+      - name: config
+        configMap:
+          name: slo-dashboard-config
+---
+# ServiceMonitor for SLO Monitoring
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: slo-monitoring
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: slo-monitoring
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: slo
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: slo-monitoring
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+  namespaceSelector:
+    matchNames:
+    - grill-stats
+---
+# SLO Error Budget Alert Rules
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: slo-error-budget-alerts
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: slo-alerts
+spec:
+  groups:
+  - name: grill-stats-error-budget
+    interval: 30s
+    rules:
+    # Fast burn rate alerts (2% of error budget in 1 hour)
+    - alert: GrillStatsErrorBudgetFastBurn
+      expr: |
+        (
+          sum(rate(http_requests_total{job=~"grill-stats-.*",status=~"5.."}[1h]))
+          /
+          sum(rate(http_requests_total{job=~"grill-stats-.*"}[1h]))
+        ) > 0.02
+      for: 2m
+      labels:
+        severity: critical
+        service: grill-stats
+        category: slo
+        burn_rate: fast
+      annotations:
+        summary: "Fast error budget burn rate detected"
+        description: "Error budget is being consumed at {{ $value | humanizePercentage }} rate, which will exhaust the monthly budget in less than 3 days"
+        runbook_url: "https://homelab.local/runbooks/grill-stats/error-budget-burn"
+
+    # Slow burn rate alerts (10% of error budget in 6 hours)
+    - alert: GrillStatsErrorBudgetSlowBurn
+      expr: |
+        (
+          sum(rate(http_requests_total{job=~"grill-stats-.*",status=~"5.."}[6h]))
+          /
+          sum(rate(http_requests_total{job=~"grill-stats-.*"}[6h]))
+        ) > 0.005
+      for: 15m
+      labels:
+        severity: warning
+        service: grill-stats
+        category: slo
+        burn_rate: slow
+      annotations:
+        summary: "Slow error budget burn rate detected"
+        description: "Error budget is being consumed at {{ $value | humanizePercentage }} rate over 6 hours"
+        runbook_url: "https://homelab.local/runbooks/grill-stats/error-budget-burn"
+
+    # Error budget exhaustion warning
+    - alert: GrillStatsErrorBudgetExhaustion
+      expr: |
+        (
+          1 - (
+            sum(rate(http_requests_total{job=~"grill-stats-.*",status=~"5.."}[30d]))
+            /
+            sum(rate(http_requests_total{job=~"grill-stats-.*"}[30d]))
+          )
+        ) * 100 < 99.9
+      for: 5m
+      labels:
+        severity: warning
+        service: grill-stats
+        category: slo
+        burn_rate: exhausted
+      annotations:
+        summary: "Error budget near exhaustion"
+        description: "Monthly error budget is {{ $value }}% consumed, approaching the 99.9% SLO target"
+        runbook_url: "https://homelab.local/runbooks/grill-stats/error-budget-exhaustion"

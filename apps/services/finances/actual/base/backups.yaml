@@ -1,0 +1,277 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: actual-backup
+  namespace: services
+spec:
+  schedule: "30 1 * * *" # Daily at 1:30AM (offset from other services)
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: actual-backup
+              image: alpine:latest
+              resources:
+                requests:
+                  memory: "256Mi"
+                  cpu: "250m"
+                limits:
+                  memory: "512Mi"
+                  cpu: "500m"
+              env:
+                - name: BACKUP_NAME
+                  value: "actual"
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  # Strict error handling
+                  set -eu
+                  
+                  # Retry configuration
+                  MAX_RETRIES=3
+                  
+                  # Logging functions
+                  log_info() {
+                      echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] INFO: $*" >&2
+                  }
+                  
+                  log_error() {
+                      echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] ERROR: $*" >&2
+                  }
+                  
+                  # Error trap handler - simplified for sh compatibility
+                  error_trap() {
+                      exit_code=$?
+                      if [ $exit_code -ne 0 ]; then
+                          log_error "Actual backup failed with exit code $exit_code"
+                          exit $exit_code
+                      fi
+                  }
+                  
+                  trap 'error_trap' EXIT
+                  
+                  # Retry function with exponential backoff
+                  retry_with_backoff() {
+                      cmd="$1"
+                      attempt=1
+                      
+                      while [ $attempt -le $MAX_RETRIES ]; do
+                          log_info "Attempt $attempt/$MAX_RETRIES: $cmd"
+                          
+                          if eval "$cmd"; then
+                              log_info "Command succeeded on attempt $attempt"
+                              return 0
+                          else
+                              exit_code=$?
+                              log_error "Command failed on attempt $attempt with exit code $exit_code"
+                              
+                              if [ $attempt -eq $MAX_RETRIES ]; then
+                                  log_error "All $MAX_RETRIES attempts failed"
+                                  return $exit_code
+                              fi
+                              
+                              # Calculate delay: 10 * attempt seconds
+                              delay=$((10 * attempt))
+                              log_info "Waiting $delay seconds before next attempt..."
+                              sleep "$delay"
+                              attempt=$((attempt + 1))
+                          fi
+                      done
+                  }
+                  
+                  # Install required tools
+                  apk add --no-cache tar gzip
+                  
+                  BACKUP_FILE="actual_backup_$(date +%Y%m%d_%H%M%S).tar.gz"
+                  
+                  log_info "🔄 Starting Actual Budget backup: $BACKUP_FILE"
+                  log_info "Backing up both ACTUAL_SERVER_FILES and ACTUAL_USER_FILES from /data"
+                  
+                  # Validate data directory exists and has content
+                  if [ ! -d "/data" ]; then
+                      log_error "Data directory /data does not exist"
+                      exit 1
+                  fi
+                  
+                  # Check if there's actually data to backup
+                  if [ -z "$(find /data -type f -print -quit)" ]; then
+                      log_error "No files found in /data directory - nothing to backup"
+                      exit 1
+                  fi
+                  
+                  # Create backup with retry
+                  log_info "Creating compressed backup of /data directory..."
+                  retry_with_backoff "cd /data && tar -czf /mnt/backup/$BACKUP_FILE --exclude='lost+found' ."
+                  
+                  # Validate backup file
+                  if [ ! -f "/mnt/backup/$BACKUP_FILE" ]; then
+                      log_error "Backup file not created: /mnt/backup/$BACKUP_FILE"
+                      exit 1
+                  fi
+                  
+                  if [ ! -s "/mnt/backup/$BACKUP_FILE" ]; then
+                      log_error "Backup file is empty: /mnt/backup/$BACKUP_FILE"
+                      exit 1
+                  fi
+                  
+                  # Test compressed file integrity
+                  if ! gzip -t "/mnt/backup/$BACKUP_FILE"; then
+                      log_error "Backup file is corrupted: /mnt/backup/$BACKUP_FILE"
+                      exit 1
+                  fi
+                  
+                  # Log success with file size and contents summary
+                  BACKUP_SIZE=$(du -h "/mnt/backup/$BACKUP_FILE" | cut -f1)
+                  FILE_COUNT=$(tar -tzf "/mnt/backup/$BACKUP_FILE" | wc -l)
+                  log_info "✅ Backup completed successfully: $BACKUP_FILE ($BACKUP_SIZE, $FILE_COUNT files)"
+                  
+                  # Signal the next container that the backup is completed
+                  touch /mnt/backup/.done
+              volumeMounts:
+                - name: actual-data
+                  mountPath: /data
+                  readOnly: true
+                - name: backup-storage
+                  mountPath: /mnt/backup
+            - name: b2-uploader
+              image: backblazeit/b2:latest
+              resources:
+                requests:
+                  memory: "64Mi"
+                  cpu: "50m"
+                limits:
+                  memory: "128Mi"
+                  cpu: "100m"
+              env:
+                - name: B2_APPLICATION_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: backblaze-cloud-homelab-creds-1password
+                      key: keyID
+                - name: B2_APPLICATION_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: backblaze-cloud-homelab-creds-1password
+                      key: applicationKey
+                - name: B2_BUCKET_NAME
+                  value: "cloud-homelab-backups"
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  # Strict error handling
+                  set -eu
+                  
+                  # Retry configuration
+                  MAX_RETRIES=5
+                  
+                  # Logging functions
+                  log_info() {
+                      echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] INFO: $*" >&2
+                  }
+                  
+                  log_error() {
+                      echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] ERROR: $*" >&2
+                  }
+                  
+                  # Error trap handler - simplified for sh compatibility
+                  error_trap() {
+                      exit_code=$?
+                      if [ $exit_code -ne 0 ]; then
+                          log_error "B2 upload failed with exit code $exit_code"
+                          exit $exit_code
+                      fi
+                  }
+                  
+                  trap 'error_trap' EXIT
+                  
+                  # Retry function with exponential backoff
+                  retry_with_backoff() {
+                      cmd="$1"
+                      attempt=1
+                      
+                      while [ $attempt -le $MAX_RETRIES ]; do
+                          log_info "Attempt $attempt/$MAX_RETRIES: $cmd"
+                          
+                          if eval "$cmd"; then
+                              log_info "Command succeeded on attempt $attempt"
+                              return 0
+                          else
+                              exit_code=$?
+                              log_error "Command failed on attempt $attempt with exit code $exit_code"
+                              
+                              if [ $attempt -eq $MAX_RETRIES ]; then
+                                  log_error "All $MAX_RETRIES attempts failed"
+                                  return $exit_code
+                              fi
+                              
+                              # Calculate delay: 10 * attempt seconds
+                              delay=$((10 * attempt))
+                              log_info "Waiting $delay seconds before next attempt..."
+                              sleep "$delay"
+                              attempt=$((attempt + 1))
+                          fi
+                      done
+                  }
+                  
+                  log_info "🔄 Starting B2 upload process for Actual Budget..."
+                  
+                  # Validate environment variables
+                  if [ -z "${B2_APPLICATION_KEY_ID:-}" ] || [ -z "${B2_APPLICATION_KEY:-}" ] || [ -z "${B2_BUCKET_NAME:-}" ]; then
+                      log_error "Missing required B2 environment variables"
+                      exit 1
+                  fi
+                  
+                  # Wait for backup completion with timeout (max 30 minutes)
+                  timeout=1800  # 30 minutes
+                  elapsed=0
+                  while [ ! -f /mnt/backup/.done ]; do
+                      if [ $elapsed -ge $timeout ]; then
+                          log_error "Timeout waiting for backup completion"
+                          exit 1
+                      fi
+                      log_info "Waiting for backup completion... (${elapsed}s elapsed)"
+                      sleep 5
+                      elapsed=$((elapsed + 5))
+                  done
+                  
+                  # Find the backup file
+                  BACKUP_FILE=$(ls /mnt/backup/actual_backup_*.tar.gz | head -1 2>/dev/null || true)
+                  if [ -z "$BACKUP_FILE" ]; then
+                      log_error "No backup file found matching pattern: actual_backup_*.tar.gz"
+                      exit 1
+                  fi
+                  
+                  # Validate backup file exists and has content
+                  if [ ! -f "$BACKUP_FILE" ]; then
+                      log_error "Backup file not found: $BACKUP_FILE"
+                      exit 1
+                  fi
+                  
+                  if [ ! -s "$BACKUP_FILE" ]; then
+                      log_error "Backup file is empty: $BACKUP_FILE"
+                      exit 1
+                  fi
+                  
+                  # Upload to B2 with retry
+                  UPLOAD_PATH="actual/$(basename "$BACKUP_FILE")"
+                  log_info "Uploading to B2: $UPLOAD_PATH"
+                  retry_with_backoff "b2v4 file upload '$B2_BUCKET_NAME' '$BACKUP_FILE' '$UPLOAD_PATH'"
+                  
+                  log_info "✅ B2 upload completed successfully: $UPLOAD_PATH"
+                  
+                  # Note: Retention cleanup is handled by B2 lifecycle rules or external cleanup jobs
+                  # to avoid dependency issues with jq in the B2 container image
+                  
+                  log_info "✅ Actual Budget backup process completed successfully"
+              volumeMounts:
+                - name: backup-storage
+                  mountPath: /mnt/backup
+          restartPolicy: OnFailure
+          volumes:
+            - name: actual-data
+              persistentVolumeClaim:
+                claimName: actual-storage
+            - name: backup-storage
+              emptyDir: {}

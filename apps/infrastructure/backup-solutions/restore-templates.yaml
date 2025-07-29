@@ -1,0 +1,231 @@
+---
+# Disaster Recovery Restore Template
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: disaster-recovery-restore
+  namespace: velero
+data:
+  restore-procedure.md: |
+    # Disaster Recovery Restore Procedure
+    
+    ## Prerequisites
+    1. Velero CLI installed and configured
+    2. Access to backup storage location
+    3. Target cluster ready and accessible
+    
+    ## Full Cluster Restore
+    ```bash
+    # List available backups
+    velero backup get
+    
+    # Create restore from latest daily backup
+    velero restore create cluster-restore-$(date +%Y%m%d) \
+      --from-backup daily-cluster-backup-$(date +%Y%m%d-%H%M%S) \
+      --restore-volumes \
+      --wait
+    
+    # Monitor restore progress
+    velero restore describe cluster-restore-$(date +%Y%m%d)
+    velero restore logs cluster-restore-$(date +%Y%m%d)
+    ```
+    
+    ## Selective Namespace Restore
+    ```bash
+    # Restore specific namespace
+    velero restore create services-restore-$(date +%Y%m%d) \
+      --from-backup daily-cluster-backup-latest \
+      --include-namespaces services \
+      --restore-volumes \
+      --wait
+    ```
+    
+    ## Database Point-in-Time Recovery
+    ```bash
+    # Restore database to specific point in time
+    velero restore create db-restore-$(date +%Y%m%d) \
+      --from-backup database-backup-$(date +%Y%m%d-%H%M%S) \
+      --include-resources persistentvolumeclaims,persistentvolumes \
+      --label-selector app.kubernetes.io/component=database \
+      --restore-volumes \
+      --wait
+    ```
+
+---
+# Emergency Restore Job Template
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: emergency-restore-job
+  namespace: velero
+spec:
+  template:
+    spec:
+      serviceAccountName: velero
+      restartPolicy: OnFailure
+      containers:
+      - name: emergency-restore
+        image: velero/velero:v1.12.0
+        command:
+        - /bin/bash
+        - -c
+        - |
+          echo "Starting emergency restore procedure..."
+          
+          # Find latest backup
+          LATEST_BACKUP=$(velero backup get --output json | jq -r '.items[] | select(.status.phase == "Completed") | .metadata.name' | head -1)
+          
+          if [ -z "$LATEST_BACKUP" ]; then
+            echo "No completed backups found!"
+            exit 1
+          fi
+          
+          echo "Latest backup found: $LATEST_BACKUP"
+          
+          # Create emergency restore
+          velero restore create emergency-restore-$(date +%Y%m%d-%H%M%S) \
+            --from-backup $LATEST_BACKUP \
+            --exclude-namespaces velero,kube-system,kube-public \
+            --restore-volumes \
+            --wait
+          
+          echo "Emergency restore completed"
+        env:
+        - name: VELERO_NAMESPACE
+          value: velero
+        volumeMounts:
+        - name: velero-credentials
+          mountPath: /credentials
+          readOnly: true
+      volumes:
+      - name: velero-credentials
+        secret:
+          secretName: velero-credentials
+
+---
+# Restore Validation Job
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: restore-validation
+  namespace: velero
+spec:
+  template:
+    spec:
+      serviceAccountName: velero
+      restartPolicy: OnFailure
+      containers:
+      - name: validation
+        image: bitnami/kubectl:latest
+        command:
+        - /bin/bash
+        - -c
+        - |
+          echo "Validating restore completion..."
+          
+          # Check pod status
+          echo "Checking pod status..."
+          kubectl get pods --all-namespaces | grep -v Running | grep -v Completed
+          
+          # Check PVC status
+          echo "Checking PVC status..."
+          kubectl get pvc --all-namespaces | grep -v Bound
+          
+          # Check service endpoints
+          echo "Checking service endpoints..."
+          kubectl get endpoints --all-namespaces | grep -v "AGE"
+          
+          # Validate critical services
+          echo "Validating critical services..."
+          CRITICAL_SERVICES="argocd prometheus grafana"
+          for service in $CRITICAL_SERVICES; do
+            if kubectl get service $service -n monitoring &>/dev/null; then
+              echo "✓ Service $service is available"
+            else
+              echo "✗ Service $service is missing"
+            fi
+          done
+          
+          echo "Restore validation completed"
+
+---
+# Cross-Region Restore Template
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cross-region-restore-template
+  namespace: velero
+data:
+  cross-region-restore.yaml: |
+    apiVersion: velero.io/v1
+    kind: Restore
+    metadata:
+      name: cross-region-restore
+      namespace: velero
+    spec:
+      backupName: "BACKUP_NAME_PLACEHOLDER"
+      includedNamespaces:
+      - "*"
+      excludedNamespaces:
+      - velero
+      - kube-system
+      - kube-public
+      - kube-node-lease
+      restorePVs: true
+      preserveNodePorts: false
+      includeClusterResources: true
+      namespaceMapping:
+        old-namespace: new-namespace  # Map old to new namespace names
+      labelSelector:
+        matchLabels:
+          backup-eligible: "true"
+      hooks:
+        resources:
+        - name: post-restore-validation
+          postHooks:
+          - exec:
+              container: validation-container
+              command:
+              - /scripts/validate-restore.sh
+              onError: Continue
+
+---
+# Application-Specific Restore Templates
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-restore-templates
+  namespace: velero
+data:
+  database-restore.yaml: |
+    apiVersion: velero.io/v1
+    kind: Restore
+    metadata:
+      name: database-restore
+    spec:
+      backupName: "DATABASE_BACKUP_NAME"
+      includedResources:
+      - persistentvolumeclaims
+      - persistentvolumes
+      - secrets
+      - configmaps
+      - deployments
+      - statefulsets
+      - services
+      labelSelector:
+        matchLabels:
+          app.kubernetes.io/component: database
+      restorePVs: true
+      
+  monitoring-restore.yaml: |
+    apiVersion: velero.io/v1
+    kind: Restore
+    metadata:
+      name: monitoring-restore
+    spec:
+      backupName: "MONITORING_BACKUP_NAME"
+      includedNamespaces:
+      - monitoring
+      - logging
+      restorePVs: true
+      includeClusterResources: false

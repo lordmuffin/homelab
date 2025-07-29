@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: grill-stats
+  labels:
+    environment: prod-lab
+    deployment.homelab/type: production
+    name: grill-stats
+  annotations:
+    deployment.homelab/managed-by: "argocd"
+    deployment.homelab/environment: "prod-lab"
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: grill-stats-quota
+  namespace: grill-stats
+  labels:
+    environment: prod-lab
+spec:
+  hard:
+    requests.cpu: "8"
+    requests.memory: 16Gi
+    limits.cpu: "16"
+    limits.memory: 32Gi
+    pods: "50"
+    persistentvolumeclaims: "20"
+    services: "20"
+    secrets: "30"
+    configmaps: "30"
+    ingresses.networking.k8s.io: "10"
+    networkpolicies.networking.k8s.io: "20"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: grill-stats-limits
+  namespace: grill-stats
+  labels:
+    environment: prod-lab
+spec:
+  limits:
+  - default:
+      cpu: "1"
+      memory: "1Gi"
+    defaultRequest:
+      cpu: "250m"
+      memory: "256Mi"
+    type: Container
+  - default:
+      storage: "20Gi"
+    defaultRequest:
+      storage: "5Gi"
+    type: PersistentVolumeClaim

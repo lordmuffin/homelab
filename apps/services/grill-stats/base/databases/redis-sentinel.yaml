@@ -1,0 +1,178 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis-sentinel
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: redis-sentinel
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+spec:
+  serviceName: redis-sentinel
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: redis-sentinel
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: redis-sentinel
+        app.kubernetes.io/part-of: grill-stats
+        app.kubernetes.io/component: database
+    spec:
+      securityContext:
+        fsGroup: 999
+        runAsUser: 999
+        runAsNonRoot: true
+      containers:
+      - name: redis-sentinel
+        image: redis:7-alpine
+        ports:
+        - containerPort: 26379
+          name: sentinel
+        command:
+        - redis-sentinel
+        - /etc/redis/sentinel.conf
+        - --sentinel
+        env:
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: grill-stats-secrets
+              key: REDIS_PASSWORD
+        - name: SENTINEL_QUORUM
+          value: "2"
+        - name: SENTINEL_DOWN_AFTER
+          value: "5000"
+        - name: SENTINEL_FAILOVER_TIMEOUT
+          value: "10000"
+        volumeMounts:
+        - name: redis-sentinel-config
+          mountPath: /etc/redis
+        - name: sentinel-data
+          mountPath: /data
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+        readinessProbe:
+          exec:
+            command:
+            - redis-cli
+            - -p
+            - "26379"
+            - ping
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          exec:
+            command:
+            - redis-cli
+            - -p
+            - "26379"
+            - ping
+          initialDelaySeconds: 15
+          periodSeconds: 20
+      volumes:
+      - name: redis-sentinel-config
+        configMap:
+          name: redis-sentinel-config
+          defaultMode: 0755
+  volumeClaimTemplates:
+  - metadata:
+      name: sentinel-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-sentinel
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: redis-sentinel
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+spec:
+  selector:
+    app.kubernetes.io/name: redis-sentinel
+  ports:
+  - port: 26379
+    targetPort: sentinel
+    name: sentinel
+  type: ClusterIP
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-sentinel-config
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: redis-sentinel
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+data:
+  sentinel.conf: |
+    # Sentinel configuration for Redis high availability
+    port 26379
+    bind 0.0.0.0
+
+    # Sentinel monitoring configuration
+    sentinel monitor grill-stats-master redis-0.redis-service.grill-stats.svc.cluster.local 6379 2
+    sentinel auth-pass grill-stats-master ${REDIS_PASSWORD}
+    sentinel down-after-milliseconds grill-stats-master 5000
+    sentinel parallel-syncs grill-stats-master 1
+    sentinel failover-timeout grill-stats-master 10000
+
+    # Sentinel announcement - helps with service discovery
+    sentinel announce-ip ${HOSTNAME}.redis-sentinel.grill-stats.svc.cluster.local
+    sentinel announce-port 26379
+
+    # Sentinel logging
+    logfile ""
+    loglevel notice
+
+    # Sentinel configuration persistence
+    dir /data
+
+    # Sentinel security
+    protected-mode no  # Disabled for internal cluster communication
+
+    # Sentinel scripts (optional notification scripts)
+    # sentinel notification-script grill-stats-master /path/to/notification-script.sh
+    # sentinel client-reconfig-script grill-stats-master /path/to/reconfig-script.sh
+
+    # Sentinel performance tuning
+    sentinel resolve-hostnames yes
+    sentinel announce-hostnames yes
+
+    # Sentinel failover configuration
+    sentinel deny-scripts-reconfig yes
+
+    # Additional monitoring settings
+    sentinel master-reboot-down-after-period grill-stats-master 0
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-sentinel-headless
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: redis-sentinel
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+spec:
+  selector:
+    app.kubernetes.io/name: redis-sentinel
+  ports:
+  - port: 26379
+    targetPort: sentinel
+    name: sentinel
+  type: ClusterIP
+  clusterIP: None  # Headless service for StatefulSet

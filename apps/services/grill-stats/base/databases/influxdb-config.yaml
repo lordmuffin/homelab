@@ -1,0 +1,489 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: influxdb-config
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+data:
+  config.yml: |
+    # InfluxDB 2.x Configuration
+    # Database Engine Configuration
+    engine-path: /var/lib/influxdb2/engine
+    bolt-path: /var/lib/influxdb2/influxd.bolt
+
+    # HTTP Server Configuration
+    http-bind-address: ":8086"
+    http-read-header-timeout: "10s"
+    http-read-timeout: "0s"
+    http-write-timeout: "0s"
+    http-idle-timeout: "3m"
+    http-max-body-size: 25000000
+
+    # Query Configuration
+    query-concurrency: 10
+    query-queue-size: 50
+
+    # Storage Configuration
+    storage-cache-max-memory-size: 1073741824
+    storage-cache-snapshot-memory-size: 26214400
+    storage-cache-snapshot-write-cold-duration: "10m"
+    storage-compact-full-write-cold-duration: "4h"
+    storage-compact-throughput-burst: 50331648
+    storage-max-concurrent-compactions: 3
+    storage-max-index-log-file-size: 1048576
+    storage-series-id-set-cache-size: 100
+
+    # Write ahead log
+    storage-wal-fsync-delay: "0s"
+    storage-wal-max-concurrent-writes: 0
+    storage-wal-max-write-delay: "10m"
+
+    # Metrics Configuration
+    metrics-disabled: false
+
+    # Logging Configuration
+    log-level: info
+
+    # TLS Configuration (disabled for internal cluster communication)
+    tls-cert: ""
+    tls-key: ""
+
+    # Feature Flags
+    feature-flags: []
+
+    # Flux Configuration
+    flux-enabled: true
+    flux-log-enabled: false
+
+    # UI Configuration
+    ui-disabled: false
+
+    # Session Configuration
+    session-length: 60
+    session-renew-disabled: false
+
+    # Data Retention
+    storage-retention-check-interval: "30m"
+
+    # Hardening Configuration
+    no-tasks: false
+    pprof-disabled: false
+
+    # Reporting Configuration
+    reporting-disabled: true
+
+    # Tracing Configuration
+    tracing-type: ""
+
+    # Storage Configuration
+    storage-shard-precreator-check-interval: "10m"
+    storage-shard-precreator-advance-period: "30m"
+    storage-write-timeout: "10s"
+
+    # Query Configuration
+    query-initial-memory-bytes: 0
+    query-max-memory-bytes: 0
+    query-memory-bytes: 0
+
+    # Coordinator Configuration
+    coordinator-max-select-point: 0
+    coordinator-max-select-series: 0
+    coordinator-max-select-buckets: 0
+
+  influxdb.conf: |
+    # InfluxDB 2.x Main Configuration
+    # This is the main configuration file for InfluxDB 2.x
+
+    # Global settings
+    reporting-disabled = true
+
+    # HTTP settings
+    [http]
+    bind-address = ":8086"
+    auth-enabled = true
+    realm = "InfluxDB"
+    max-body-size = 25000000
+    max-concurrent-requests = 0
+    max-enqueued-requests = 0
+    enqueued-request-timeout = "0s"
+
+    # Query settings
+    [query]
+    timeout = "0s"
+    max-select-point = 0
+    max-select-series = 0
+    max-select-buckets = 0
+
+    # Storage settings
+    [storage]
+    max-concurrent-compactions = 3
+    max-index-log-file-size = 1048576
+
+    # Write Ahead Log settings
+    [storage.wal]
+    fsync-delay = "0s"
+
+    # Coordinator settings
+    [coordinator]
+    write-timeout = "10s"
+    max-concurrent-queries = 0
+    query-timeout = "0s"
+    log-queries-after = "0s"
+    max-select-point = 0
+    max-select-series = 0
+    max-select-buckets = 0
+
+    # Continuous queries settings
+    [continuous_queries]
+    enabled = true
+    log-enabled = true
+    query-stats-enabled = false
+    run-interval = "1s"
+
+    # Retention policy settings
+    [retention]
+    enabled = true
+    check-interval = "30m"
+
+    # Shard precreation settings
+    [shard-precreation]
+    enabled = true
+    check-interval = "10m"
+    advance-period = "30m"
+
+    # Monitor settings
+    [monitor]
+    store-enabled = true
+    store-database = "_internal"
+    store-interval = "10s"
+
+    # Logging settings
+    [logging]
+    format = "auto"
+    level = "info"
+    suppress-logo = false
+
+    # Performance settings
+    [data]
+    query-log-enabled = false
+    cache-max-memory-size = 1073741824
+    cache-snapshot-memory-size = 26214400
+    cache-snapshot-write-cold-duration = "10m"
+    compact-full-write-cold-duration = "4h"
+    compact-throughput-burst = 50331648
+
+    # Security settings
+    [tls]
+    min-version = ""
+    max-version = ""
+
+    # Backup settings
+    [backup]
+    enabled = false
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: influxdb-init-scripts
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+data:
+  01-setup-buckets.sh: |
+    #!/bin/bash
+    set -e
+
+    echo "🔧 Setting up InfluxDB buckets and retention policies..."
+
+    # Wait for InfluxDB to be ready
+    until curl -f http://localhost:8086/ping; do
+        echo "⏳ Waiting for InfluxDB to be ready..."
+        sleep 5
+    done
+
+    echo "✅ InfluxDB is ready, proceeding with bucket setup..."
+
+    # Get admin token from environment
+    ADMIN_TOKEN="${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}"
+    ORG="${DOCKER_INFLUXDB_INIT_ORG}"
+
+    # Create buckets with different retention policies
+    echo "📊 Creating buckets with retention policies..."
+
+    # Real-time bucket (7 days retention)
+    influx bucket create \
+      --name grill-stats-realtime \
+      --org "$ORG" \
+      --retention 168h \
+      --token "$ADMIN_TOKEN" \
+      --host http://localhost:8086 || echo "Real-time bucket already exists"
+
+    # Hourly aggregated bucket (90 days retention)
+    influx bucket create \
+      --name grill-stats-hourly \
+      --org "$ORG" \
+      --retention 2160h \
+      --token "$ADMIN_TOKEN" \
+      --host http://localhost:8086 || echo "Hourly bucket already exists"
+
+    # Daily aggregated bucket (1 year retention)
+    influx bucket create \
+      --name grill-stats-daily \
+      --org "$ORG" \
+      --retention 8760h \
+      --token "$ADMIN_TOKEN" \
+      --host http://localhost:8086 || echo "Daily bucket already exists"
+
+    # Archive bucket (infinite retention)
+    influx bucket create \
+      --name grill-stats-archive \
+      --org "$ORG" \
+      --retention 0 \
+      --token "$ADMIN_TOKEN" \
+      --host http://localhost:8086 || echo "Archive bucket already exists"
+
+    echo "✅ Buckets created successfully!"
+
+  02-setup-tasks.sh: |
+    #!/bin/bash
+    set -e
+
+    echo "🔧 Setting up InfluxDB tasks for data aggregation..."
+
+    # Wait for InfluxDB to be ready
+    until curl -f http://localhost:8086/ping; do
+        echo "⏳ Waiting for InfluxDB to be ready..."
+        sleep 5
+    done
+
+    ADMIN_TOKEN="${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}"
+    ORG="${DOCKER_INFLUXDB_INIT_ORG}"
+
+    # Create hourly downsampling task
+    cat > /tmp/hourly-downsample.flux << 'EOF'
+    import "influxdata/influxdb/tasks"
+
+    option task = {
+      name: "downsample-hourly-temperature",
+      every: 1h,
+      offset: 5m,
+    }
+
+    from(bucket: "grill-stats-realtime")
+      |> range(start: -1h)
+      |> filter(fn: (r) => r._measurement == "temperature_readings")
+      |> aggregateWindow(every: 1h, fn: mean, createEmpty: false)
+      |> to(bucket: "grill-stats-hourly")
+    EOF
+
+    # Create daily downsampling task
+    cat > /tmp/daily-downsample.flux << 'EOF'
+    import "influxdata/influxdb/tasks"
+
+    option task = {
+      name: "downsample-daily-temperature",
+      every: 1d,
+      offset: 10m,
+    }
+
+    from(bucket: "grill-stats-hourly")
+      |> range(start: -1d)
+      |> filter(fn: (r) => r._measurement == "temperature_readings")
+      |> aggregateWindow(every: 1d, fn: mean, createEmpty: false)
+      |> to(bucket: "grill-stats-daily")
+    EOF
+
+    # Create archive task
+    cat > /tmp/archive-task.flux << 'EOF'
+    import "influxdata/influxdb/tasks"
+
+    option task = {
+      name: "archive-temperature-data",
+      every: 1d,
+      offset: 30m,
+    }
+
+    from(bucket: "grill-stats-daily")
+      |> range(start: -1d)
+      |> filter(fn: (r) => r._measurement == "temperature_readings")
+      |> to(bucket: "grill-stats-archive")
+    EOF
+
+    # Create tasks
+    echo "📈 Creating hourly downsampling task..."
+    influx task create \
+      --file /tmp/hourly-downsample.flux \
+      --org "$ORG" \
+      --token "$ADMIN_TOKEN" \
+      --host http://localhost:8086 || echo "Hourly task already exists"
+
+    echo "📈 Creating daily downsampling task..."
+    influx task create \
+      --file /tmp/daily-downsample.flux \
+      --org "$ORG" \
+      --token "$ADMIN_TOKEN" \
+      --host http://localhost:8086 || echo "Daily task already exists"
+
+    echo "📈 Creating archive task..."
+    influx task create \
+      --file /tmp/archive-task.flux \
+      --org "$ORG" \
+      --token "$ADMIN_TOKEN" \
+      --host http://localhost:8086 || echo "Archive task already exists"
+
+    echo "✅ Tasks created successfully!"
+
+  03-setup-users.sh: |
+    #!/bin/bash
+    set -e
+
+    echo "🔧 Setting up InfluxDB users and tokens..."
+
+    # Wait for InfluxDB to be ready
+    until curl -f http://localhost:8086/ping; do
+        echo "⏳ Waiting for InfluxDB to be ready..."
+        sleep 5
+    done
+
+    ADMIN_TOKEN="${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}"
+    ORG="${DOCKER_INFLUXDB_INIT_ORG}"
+
+    # Create tokens for different services
+    echo "🔑 Creating service tokens..."
+
+    # Temperature service token (read/write to realtime bucket)
+    influx auth create \
+      --org "$ORG" \
+      --token "$ADMIN_TOKEN" \
+      --host http://localhost:8086 \
+      --description "Temperature Service Token" \
+      --write-buckets "grill-stats-realtime" \
+      --read-buckets "grill-stats-realtime,grill-stats-hourly,grill-stats-daily" || echo "Temperature service token already exists"
+
+    # Historical service token (read all buckets)
+    influx auth create \
+      --org "$ORG" \
+      --token "$ADMIN_TOKEN" \
+      --host http://localhost:8086 \
+      --description "Historical Service Token" \
+      --read-buckets "grill-stats-realtime,grill-stats-hourly,grill-stats-daily,grill-stats-archive" || echo "Historical service token already exists"
+
+    # Web UI token (read all buckets)
+    influx auth create \
+      --org "$ORG" \
+      --token "$ADMIN_TOKEN" \
+      --host http://localhost:8086 \
+      --description "Web UI Token" \
+      --read-buckets "grill-stats-realtime,grill-stats-hourly,grill-stats-daily,grill-stats-archive" || echo "Web UI token already exists"
+
+    # Monitoring token (read-only)
+    influx auth create \
+      --org "$ORG" \
+      --token "$ADMIN_TOKEN" \
+      --host http://localhost:8086 \
+      --description "Monitoring Token" \
+      --read-buckets "grill-stats-realtime,grill-stats-hourly,grill-stats-daily,grill-stats-archive" || echo "Monitoring token already exists"
+
+    echo "✅ Users and tokens created successfully!"
+
+  04-insert-sample-data.sh: |
+    #!/bin/bash
+    set -e
+
+    echo "🔧 Inserting sample temperature data..."
+
+    # Wait for InfluxDB to be ready
+    until curl -f http://localhost:8086/ping; do
+        echo "⏳ Waiting for InfluxDB to be ready..."
+        sleep 5
+    done
+
+    ADMIN_TOKEN="${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}"
+    ORG="${DOCKER_INFLUXDB_INIT_ORG}"
+    BUCKET="grill-stats-realtime"
+
+    # Insert sample data for testing
+    echo "🧪 Inserting sample temperature data..."
+
+    # Current timestamp in nanoseconds
+    CURRENT_TIME=$(date +%s)000000000
+
+    # Sample data for ThermoWorks Signals device
+    cat > /tmp/sample-data.txt << EOF
+    temperature_readings,device_id=signals_001,channel_id=1,probe_type=meat,user_id=test_user temperature=165.5,unit="F",battery_level=85,signal_strength=-45 $CURRENT_TIME
+    temperature_readings,device_id=signals_001,channel_id=2,probe_type=ambient,user_id=test_user temperature=225.0,unit="F",battery_level=85,signal_strength=-45 $CURRENT_TIME
+    temperature_readings,device_id=signals_001,channel_id=3,probe_type=meat,user_id=test_user temperature=155.2,unit="F",battery_level=85,signal_strength=-45 $CURRENT_TIME
+    temperature_readings,device_id=signals_001,channel_id=4,probe_type=meat,user_id=test_user temperature=140.8,unit="F",battery_level=85,signal_strength=-45 $CURRENT_TIME
+    device_status,device_id=signals_001,user_id=test_user online=true,battery_level=85,signal_strength=-45,connection_status="connected" $CURRENT_TIME
+    EOF
+
+    # Insert sample data
+    influx write \
+      --org "$ORG" \
+      --bucket "$BUCKET" \
+      --token "$ADMIN_TOKEN" \
+      --host http://localhost:8086 \
+      --file /tmp/sample-data.txt || echo "Sample data insertion failed"
+
+    echo "✅ Sample data inserted successfully!"
+
+  05-setup-monitoring.sh: |
+    #!/bin/bash
+    set -e
+
+    echo "🔧 Setting up InfluxDB monitoring..."
+
+    # Wait for InfluxDB to be ready
+    until curl -f http://localhost:8086/ping; do
+        echo "⏳ Waiting for InfluxDB to be ready..."
+        sleep 5
+    done
+
+    ADMIN_TOKEN="${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}"
+    ORG="${DOCKER_INFLUXDB_INIT_ORG}"
+
+    # Create monitoring bucket
+    influx bucket create \
+      --name grill-stats-monitoring \
+      --org "$ORG" \
+      --retention 720h \
+      --token "$ADMIN_TOKEN" \
+      --host http://localhost:8086 || echo "Monitoring bucket already exists"
+
+    # Create health check task
+    cat > /tmp/health-check.flux << 'EOF'
+    import "influxdata/influxdb/tasks"
+    import "system"
+
+    option task = {
+      name: "health-check-task",
+      every: 5m,
+    }
+
+    from(bucket: "grill-stats-realtime")
+      |> range(start: -5m)
+      |> filter(fn: (r) => r._measurement == "temperature_readings")
+      |> count()
+      |> map(fn: (r) => ({
+          _time: now(),
+          _measurement: "influxdb_health",
+          _field: "data_points_count",
+          _value: r._value,
+      }))
+      |> to(bucket: "grill-stats-monitoring")
+    EOF
+
+    # Create health check task
+    influx task create \
+      --file /tmp/health-check.flux \
+      --org "$ORG" \
+      --token "$ADMIN_TOKEN" \
+      --host http://localhost:8086 || echo "Health check task already exists"
+
+    echo "✅ Monitoring setup completed!"

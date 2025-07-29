@@ -6,3 +6,4 @@ resources:
 - svc.yaml
 - deployment.yaml
 - backups.yaml
+- media-backup.yaml

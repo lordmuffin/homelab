@@ -1,0 +1,569 @@
+# Production Environment Network Policy Overrides
+# This file contains strict network policies for production environment
+
+---
+# Production Environment Network Policy (Strict)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: prod-environment-policy
+  namespace: grill-stats-prod
+  labels:
+    app.kubernetes.io/name: prod-environment
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: production
+    environment: prod
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: grill-stats
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow access from Traefik ingress controller ONLY
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: traefik
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: traefik
+  # Allow access from monitoring namespace (restricted)
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: prometheus
+    ports:
+    - protocol: TCP
+      port: 8080
+  # Allow inter-service communication within grill-stats
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: grill-stats
+  # Allow health checks from Kubernetes
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: kube-proxy
+    ports:
+    - protocol: TCP
+      port: 8080
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow inter-service communication
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: grill-stats
+  # Allow database access
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: database
+    ports:
+    - protocol: TCP
+      port: 5432
+    - protocol: TCP
+      port: 8086
+    - protocol: TCP
+      port: 6379
+
+---
+# Production Database Access Policy (Highly Restricted)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: prod-database-access-policy
+  namespace: grill-stats-prod
+  labels:
+    app.kubernetes.io/name: prod-database
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+    environment: prod
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: database
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow database access ONLY from authorized grill-stats services
+  - from:
+    - podSelector:
+        matchLabels:
+          app: auth-service
+    ports:
+    - protocol: TCP
+      port: 5432
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: device-service
+    ports:
+    - protocol: TCP
+      port: 5432
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: temperature-service
+    ports:
+    - protocol: TCP
+      port: 8086
+    - protocol: TCP
+      port: 6379
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: historical-service
+    ports:
+    - protocol: TCP
+      port: 5432
+    - protocol: TCP
+      port: 8086
+  - from:
+    - podSelector:
+        matchLabels:
+          app: encryption-service
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Allow database monitoring (restricted)
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: postgres-exporter
+    ports:
+    - protocol: TCP
+      port: 5432
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: redis-exporter
+    ports:
+    - protocol: TCP
+      port: 6379
+  # Allow backup jobs (scheduled only)
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: backup
+        matchExpressions:
+        - key: app.kubernetes.io/name
+          operator: In
+          values: ["postgresql-backup", "influxdb-backup", "redis-backup"]
+    ports:
+    - protocol: TCP
+      port: 5432
+    - protocol: TCP
+      port: 8086
+    - protocol: TCP
+      port: 6379
+  # Allow Prometheus metrics collection
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: prometheus
+    ports:
+    - protocol: TCP
+      port: 9187  # postgres-exporter
+    - protocol: TCP
+      port: 9121  # redis-exporter
+    - protocol: TCP
+      port: 8086  # influxdb metrics
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow database replication (if configured)
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: database
+    ports:
+    - protocol: TCP
+      port: 5432
+    - protocol: TCP
+      port: 8086
+    - protocol: TCP
+      port: 6379
+
+---
+# Production External Service Access Policy (Highly Restricted)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: prod-external-service-access-policy
+  namespace: grill-stats-prod
+  labels:
+    app.kubernetes.io/name: prod-external-service
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: external-api
+    environment: prod
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: device-service
+  policyTypes:
+  - Egress
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow ThermoWorks API access (production endpoints only)
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+        - 127.0.0.0/8
+    ports:
+    - protocol: TCP
+      port: 443
+  # Allow NTP time synchronization
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+        - 127.0.0.0/8
+    ports:
+    - protocol: UDP
+      port: 123
+
+---
+# Production Vault Access Policy (Highly Restricted)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: prod-vault-access-policy
+  namespace: grill-stats-prod
+  labels:
+    app.kubernetes.io/name: prod-vault
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: secret-management
+    environment: prod
+spec:
+  podSelector:
+    matchLabels:
+      app: encryption-service
+  policyTypes:
+  - Egress
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow HashiCorp Vault access (production vault only)
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: vault
+        matchExpressions:
+        - key: environment
+          operator: In
+          values: ["prod", "production"]
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: vault
+    ports:
+    - protocol: TCP
+      port: 8200
+
+---
+# Production 1Password Connect Access Policy (Highly Restricted)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: prod-onepassword-access-policy
+  namespace: grill-stats-prod
+  labels:
+    app.kubernetes.io/name: prod-onepassword
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: secret-management
+    environment: prod
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: grill-stats
+  policyTypes:
+  - Egress
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow 1Password Connect access (production instance only)
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: onepassword
+        matchExpressions:
+        - key: environment
+          operator: In
+          values: ["prod", "production"]
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: onepassword-connect
+    ports:
+    - protocol: TCP
+      port: 8080
+
+---
+# Production Home Assistant Access Policy (Highly Restricted)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: prod-home-assistant-access-policy
+  namespace: grill-stats-prod
+  labels:
+    app.kubernetes.io/name: prod-home-assistant
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: home-automation
+    environment: prod
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: device-service
+  policyTypes:
+  - Egress
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow Home Assistant access (production instance only)
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: home-assistant
+        matchExpressions:
+        - key: environment
+          operator: In
+          values: ["prod", "production"]
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: home-assistant
+    ports:
+    - protocol: TCP
+      port: 8123
+
+---
+# Production Monitoring Access Policy (Restricted)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: prod-monitoring-access-policy
+  namespace: grill-stats-prod
+  labels:
+    app.kubernetes.io/name: prod-monitoring
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: monitoring
+    environment: prod
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: grill-stats
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow Prometheus metrics scraping (production Prometheus only)
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+        matchExpressions:
+        - key: environment
+          operator: In
+          values: ["prod", "production"]
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: prometheus
+    ports:
+    - protocol: TCP
+      port: 8080
+  # Allow health checks from Kubernetes
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    ports:
+    - protocol: TCP
+      port: 8080
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow external monitoring services (production approved only)
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+        - 127.0.0.0/8
+    ports:
+    - protocol: TCP
+      port: 443
+
+---
+# Production Backup Access Policy (Highly Restricted)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: prod-backup-access-policy
+  namespace: grill-stats-prod
+  labels:
+    app.kubernetes.io/name: prod-backup
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: backup
+    environment: prod
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: backup
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow monitoring of backup jobs
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: prometheus
+    ports:
+    - protocol: TCP
+      port: 8080
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow database access for backups
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: database
+    ports:
+    - protocol: TCP
+      port: 5432
+    - protocol: TCP
+      port: 8086
+    - protocol: TCP
+      port: 6379
+  # Allow external backup storage (production approved storage only)
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+        - 127.0.0.0/8
+    ports:
+    - protocol: TCP
+      port: 443
+
+---
+# Production Security Scanning Access Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: prod-security-scanning-policy
+  namespace: grill-stats-prod
+  labels:
+    app.kubernetes.io/name: prod-security-scanning
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: security
+    environment: prod
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: security-scanning
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow security scanning tools to access services
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: security-scanner
+    ports:
+    - protocol: TCP
+      port: 8080
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow scanning of all grill-stats services
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: grill-stats
+  # Allow external security services
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+        - 127.0.0.0/8
+    ports:
+    - protocol: TCP
+      port: 443

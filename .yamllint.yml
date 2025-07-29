@@ -1,0 +1,62 @@
+# YAML Linting Configuration for Homelab
+extends: default
+
+rules:
+  # Allow longer lines for complex Kubernetes manifests
+  line-length:
+    max: 120
+    allow-non-breakable-words: true
+    allow-non-breakable-inline-mappings: true
+
+  # Allow multiple documents in single files (common in Kubernetes)
+  document-start:
+    present: false
+
+  # Be more lenient with comments formatting
+  comments:
+    require-starting-space: true
+    min-spaces-from-content: 1
+
+  # Allow trailing spaces in certain contexts
+  trailing-spaces:
+    level: warning
+
+  # Be flexible with indentation in complex nested structures
+  indentation:
+    spaces: 2
+    indent-sequences: true
+    check-multi-line-strings: false
+
+  # Allow empty values for optional fields
+  empty-values:
+    forbid-in-block-mappings: false
+    forbid-in-flow-mappings: false
+
+  # Be lenient with key ordering for readability
+  key-ordering: disable
+
+  # Allow quoted strings for consistency
+  quoted-strings:
+    quote-type: any
+    required: false
+
+  # Allow truthy values (yes/no, on/off, true/false)
+  truthy:
+    allowed-values: ['true', 'false', 'yes', 'no', 'on', 'off']
+    check-keys: false
+
+ignore: |
+  # Ignore helm chart templates and generated files
+  **/charts/*/templates/
+  **/templates/
+  **/*.tpl
+  **/*.gotmpl
+  
+  # Ignore temporary and build artifacts
+  **/.tmp/
+  **/build/
+  **/dist/
+  
+  # Ignore specific complex configuration files
+  **/values.yaml
+  **/values-*.yaml

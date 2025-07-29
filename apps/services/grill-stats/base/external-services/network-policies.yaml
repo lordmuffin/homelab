@@ -1,0 +1,385 @@
+# External Services Network Policies for Grill-Stats Platform
+# This file contains network policies for external service communication
+
+---
+# ThermoWorks API Access Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: thermoworks-api-access-policy
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: thermoworks-api
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: external-api
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: device-service
+  policyTypes:
+  - Egress
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow HTTPS access to ThermoWorks API endpoints
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+    ports:
+    - protocol: TCP
+      port: 443
+  # Allow HTTP access to ThermoWorks API (if needed for redirects)
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+    ports:
+    - protocol: TCP
+      port: 80
+
+---
+# HashiCorp Vault Access Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: vault-access-policy
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: vault
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: secret-management
+spec:
+  podSelector:
+    matchLabels:
+      app: encryption-service
+  policyTypes:
+  - Egress
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow access to Vault in vault namespace
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: vault
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: vault
+    ports:
+    - protocol: TCP
+      port: 8200
+  # Allow access to Vault Agent (if deployed)
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: vault
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: vault-agent
+    ports:
+    - protocol: TCP
+      port: 8200
+
+---
+# 1Password Connect Access Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: onepassword-connect-access-policy
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: onepassword-connect
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: secret-management
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: grill-stats
+  policyTypes:
+  - Egress
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow access to 1Password Connect Server
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: onepassword
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: onepassword-connect
+    ports:
+    - protocol: TCP
+      port: 8080
+  # Allow access to 1Password Sync (if needed)
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: onepassword
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: onepassword-sync
+    ports:
+    - protocol: TCP
+      port: 8080
+
+---
+# Home Assistant Integration Access Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: home-assistant-access-policy
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: home-assistant
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: home-automation
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: device-service
+  policyTypes:
+  - Egress
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow access to Home Assistant in home-assistant namespace
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: home-assistant
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: home-assistant
+    ports:
+    - protocol: TCP
+      port: 8123
+  # Allow access to Home Assistant via external URL (if needed)
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 8123
+
+---
+# External Monitoring Services Access Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: external-monitoring-access-policy
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: external-monitoring
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: grill-stats
+  policyTypes:
+  - Egress
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow access to external monitoring services (Datadog, New Relic, etc.)
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+    ports:
+    - protocol: TCP
+      port: 443
+  # Allow access to external log aggregation services
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 6514  # Syslog over TLS
+
+---
+# NTP Time Synchronization Access Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ntp-access-policy
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: ntp
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: time-sync
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: grill-stats
+  policyTypes:
+  - Egress
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow NTP time synchronization
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+    ports:
+    - protocol: UDP
+      port: 123
+
+---
+# External Backup Storage Access Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: external-backup-access-policy
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: external-backup
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: backup
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: backup
+  policyTypes:
+  - Egress
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow access to S3-compatible storage (AWS S3, MinIO, etc.)
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+  # Allow access to alternative backup storage ports
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+    ports:
+    - protocol: TCP
+      port: 9000  # MinIO default port
+    - protocol: TCP
+      port: 9001  # MinIO console port
+
+---
+# External Certificate Authority Access Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: external-ca-access-policy
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: external-ca
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: certificate-management
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: grill-stats
+  policyTypes:
+  - Egress
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow access to external Certificate Authorities (Let's Encrypt, etc.)
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80  # ACME HTTP-01 challenge
+  # Allow OCSP (Online Certificate Status Protocol)
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+    ports:
+    - protocol: TCP
+      port: 80

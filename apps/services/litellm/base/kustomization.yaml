@@ -6,3 +6,4 @@ resources:
 - svc.yaml
 - db.yaml
 - ingress.yaml
+- backups.yaml

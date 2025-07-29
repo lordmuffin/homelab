@@ -1,0 +1,343 @@
+name: Terraform Apply
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'terraform/**'
+      - '.gitea/workflows/terraform-*.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'dev-lab'
+        type: choice
+        options:
+          - dev-lab
+          - prod-lab
+      module:
+        description: 'Module to deploy'
+        required: true
+        default: 'main'
+        type: choice
+        options:
+          - main
+          - vault
+          - unifi
+          - vultr
+          - b2
+      confirm_apply:
+        description: 'Type "apply" to confirm deployment'
+        required: true
+        type: string
+
+env:
+  # Terraform version
+  TF_VERSION: '1.5.7'
+  # Azure Storage Account configuration
+  ARM_USE_AZUREAD: true
+  ARM_USE_CLI: false
+  ARM_STORAGE_USE_AZUREAD: true
+  # Terraform configuration
+  TF_IN_AUTOMATION: true
+  TF_INPUT: false
+
+jobs:
+  pre-apply-checks:
+    name: 'Pre-Apply Security Checks'
+    runs-on: ubuntu-latest
+    outputs:
+      environments: ${{ steps.set-matrix.outputs.environments }}
+      modules: ${{ steps.set-matrix.outputs.modules }}
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Validate Manual Confirmation
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          if [ "${{ github.event.inputs.confirm_apply }}" != "apply" ]; then
+            echo "❌ Manual confirmation failed. You must type 'apply' to confirm deployment."
+            exit 1
+          fi
+          echo "✅ Manual confirmation validated"
+      
+      - name: Check Branch Protection
+        run: |
+          # Verify we're deploying from main branch
+          if [ "${{ github.ref }}" != "refs/heads/main" ] && [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            echo "❌ Terraform apply can only run from main branch"
+            exit 1
+          fi
+          echo "✅ Branch protection check passed"
+      
+      - name: Set Deployment Matrix
+        id: set-matrix
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            # Manual deployment - single environment/module
+            echo "environments=[\"${{ github.event.inputs.environment }}\"]" >> $GITHUB_OUTPUT
+            echo "modules=[\"${{ github.event.inputs.module }}\"]" >> $GITHUB_OUTPUT
+          else
+            # Automatic deployment - all environments and modules
+            echo "environments=[\"dev-lab\", \"prod-lab\"]" >> $GITHUB_OUTPUT
+            echo "modules=[\"main\", \"vault\", \"unifi\", \"vultr\", \"b2\"]" >> $GITHUB_OUTPUT
+          fi
+
+  terraform-apply:
+    name: 'Terraform Apply'
+    needs: pre-apply-checks
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        environment: ${{ fromJson(needs.pre-apply-checks.outputs.environments) }}
+        module: ${{ fromJson(needs.pre-apply-checks.outputs.modules) }}
+        exclude:
+          # Exclude specific module/environment combinations if needed
+          - environment: dev-lab
+            module: b2
+      fail-fast: false
+      max-parallel: 2  # Limit concurrent deployments for safety
+    
+    environment: 
+      name: ${{ matrix.environment }}
+      url: ${{ steps.set-output.outputs.environment_url }}
+    
+    defaults:
+      run:
+        shell: bash
+        working-directory: terraform
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup Azure CLI
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+      
+      - name: Configure Terraform Backend
+        run: |
+          # Create backend configuration for Azure Storage
+          cat > backend.tf << EOF
+          terraform {
+            backend "azurerm" {
+              resource_group_name  = "${{ secrets.AZURE_BACKEND_RESOURCE_GROUP }}"
+              storage_account_name = "${{ secrets.AZURE_BACKEND_STORAGE_ACCOUNT }}"
+              container_name       = "${{ secrets.AZURE_BACKEND_CONTAINER_NAME }}"
+              key                  = "${{ matrix.environment }}/${{ matrix.module }}.tfstate"
+            }
+          }
+          EOF
+          
+          echo "Created backend configuration for ${{ matrix.environment }}/${{ matrix.module }}"
+      
+      - name: Set Working Directory
+        run: |
+          if [ "${{ matrix.module }}" != "main" ]; then
+            echo "WORKING_DIR=terraform/modules/${{ matrix.module }}" >> $GITHUB_ENV
+          else
+            echo "WORKING_DIR=terraform" >> $GITHUB_ENV
+          fi
+      
+      - name: Download Plan Artifact (if available)
+        continue-on-error: true
+        uses: actions/download-artifact@v3
+        with:
+          name: terraform-plan-${{ matrix.environment }}-${{ matrix.module }}
+          path: ${{ env.WORKING_DIR || 'terraform' }}
+      
+      - name: Terraform Init
+        working-directory: ${{ env.WORKING_DIR || 'terraform' }}
+        run: |
+          terraform init \
+            -backend-config="resource_group_name=${{ secrets.AZURE_BACKEND_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ secrets.AZURE_BACKEND_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=${{ secrets.AZURE_BACKEND_CONTAINER_NAME }}" \
+            -backend-config="key=${{ matrix.environment }}/${{ matrix.module }}.tfstate"
+      
+      - name: Terraform Validate
+        working-directory: ${{ env.WORKING_DIR || 'terraform' }}
+        run: |
+          terraform validate
+          echo "✅ Terraform configuration is valid"
+      
+      - name: Pre-Apply Plan
+        working-directory: ${{ env.WORKING_DIR || 'terraform' }}
+        env:
+          TF_VAR_api_key: ${{ secrets.RACKSPACE_API_KEY }}
+          TF_VAR_environment: ${{ matrix.environment }}
+        run: |
+          # Generate fresh plan for apply
+          terraform plan \
+            -input=false \
+            -out=apply-plan-${{ matrix.environment }}-${{ matrix.module }}.out \
+            -detailed-exitcode
+          
+          # Store exit code
+          echo "PLAN_EXIT_CODE=$?" >> $GITHUB_ENV
+          
+          # Show plan summary
+          terraform show -no-color apply-plan-${{ matrix.environment }}-${{ matrix.module }}.out > apply-plan-output.txt
+          
+          echo "📋 Pre-apply plan completed for ${{ matrix.environment }}/${{ matrix.module }}"
+      
+      - name: Review Plan Before Apply
+        working-directory: ${{ env.WORKING_DIR || 'terraform' }}
+        run: |
+          case "$PLAN_EXIT_CODE" in
+            0)
+              echo "ℹ️  No changes detected - skipping apply"
+              echo "SKIP_APPLY=true" >> $GITHUB_ENV
+              ;;
+            1)
+              echo "❌ Plan failed - cannot apply"
+              exit 1
+              ;;
+            2)
+              echo "📋 Changes detected - proceeding with apply"
+              echo "SKIP_APPLY=false" >> $GITHUB_ENV
+              
+              # Show plan summary in logs
+              echo "📋 Plan Summary:"
+              grep -E "(Plan:|will be|will be)" apply-plan-output.txt | head -20
+              ;;
+            *)
+              echo "❓ Unknown plan exit code: $PLAN_EXIT_CODE"
+              exit 1
+              ;;
+          esac
+      
+      - name: Terraform Apply
+        if: env.SKIP_APPLY == 'false'
+        working-directory: ${{ env.WORKING_DIR || 'terraform' }}
+        env:
+          TF_VAR_api_key: ${{ secrets.RACKSPACE_API_KEY }}
+          TF_VAR_environment: ${{ matrix.environment }}
+        run: |
+          # Apply using the plan file
+          terraform apply \
+            -input=false \
+            -auto-approve \
+            apply-plan-${{ matrix.environment }}-${{ matrix.module }}.out
+          
+          echo "✅ Terraform apply completed successfully for ${{ matrix.environment }}/${{ matrix.module }}"
+      
+      - name: Generate Apply Summary
+        if: always()
+        working-directory: ${{ env.WORKING_DIR || 'terraform' }}
+        run: |
+          # Generate deployment summary
+          cat > apply-summary.txt << EOF
+          # Deployment Summary
+          
+          **Environment:** ${{ matrix.environment }}
+          **Module:** ${{ matrix.module }}
+          **Status:** $([ "$SKIP_APPLY" == "true" ] && echo "No Changes" || echo "Applied Successfully")
+          **Timestamp:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          **Commit:** ${{ github.sha }}
+          **Actor:** ${{ github.actor }}
+          
+          EOF
+          
+          # Add plan output if available
+          if [ -f apply-plan-output.txt ]; then
+            echo -e "\n## Plan Output\n" >> apply-summary.txt
+            echo '```' >> apply-summary.txt
+            cat apply-plan-output.txt >> apply-summary.txt
+            echo '```' >> apply-summary.txt
+          fi
+      
+      - name: Upload Apply Artifacts
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: terraform-apply-${{ matrix.environment }}-${{ matrix.module }}
+          path: |
+            ${{ env.WORKING_DIR || 'terraform' }}/apply-plan-${{ matrix.environment }}-${{ matrix.module }}.out
+            ${{ env.WORKING_DIR || 'terraform' }}/apply-plan-output.txt
+            ${{ env.WORKING_DIR || 'terraform' }}/apply-summary.txt
+          retention-days: 90
+      
+      - name: Set Environment Output
+        id: set-output
+        run: |
+          # Set environment URL based on module and environment
+          case "${{ matrix.module }}" in
+            "vault")
+              echo "environment_url=https://vault.${{ matrix.environment }}.your-domain.com" >> $GITHUB_OUTPUT
+              ;;
+            "unifi")
+              echo "environment_url=https://unifi.${{ matrix.environment }}.your-domain.com" >> $GITHUB_OUTPUT
+              ;;
+            *)
+              echo "environment_url=https://${{ matrix.environment }}.your-domain.com" >> $GITHUB_OUTPUT
+              ;;
+          esac
+      
+      - name: Post-Apply Verification
+        if: env.SKIP_APPLY == 'false'
+        working-directory: ${{ env.WORKING_DIR || 'terraform' }}
+        run: |
+          # Verify state after apply
+          terraform show -json > terraform-state.json
+          
+          # Basic verification that state is valid
+          if [ -f terraform-state.json ]; then
+            resource_count=$(jq '.values.root_module.resources | length' terraform-state.json)
+            echo "✅ State verification: $resource_count resources managed"
+          else
+            echo "⚠️  Warning: Could not verify terraform state"
+          fi
+
+  post-apply-notification:
+    name: 'Post-Apply Notification'
+    needs: [pre-apply-checks, terraform-apply]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Deployment Summary
+        run: |
+          echo "## 🚀 Terraform Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.terraform-apply.result }}" == "success" ]; then
+            echo "✅ **Status:** Deployment completed successfully" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.terraform-apply.result }}" == "failure" ]; then
+            echo "❌ **Status:** Deployment failed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️  **Status:** Deployment completed with warnings" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Details:**" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Actor:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Timestamp:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Check individual job outputs for detailed results." >> $GITHUB_STEP_SUMMARY
+      
+      - name: Notify on Failure
+        if: needs.terraform-apply.result == 'failure'
+        run: |
+          echo "❌ Terraform deployment failed!"
+          echo "Please check the workflow logs for details."
+          echo "Consider rolling back changes if necessary."
+          exit 1

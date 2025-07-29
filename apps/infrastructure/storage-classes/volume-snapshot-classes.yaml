@@ -1,0 +1,52 @@
+---
+# Default Volume Snapshot Class
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: default-snapshot
+  annotations:
+    snapshot.storage.kubernetes.io/is-default-class: "true"
+    description: "Default volume snapshot class"
+driver: org.democratic-csi.iscsi-nfs
+deletionPolicy: Delete
+parameters:
+  detachedSnapshots: "false"
+
+---
+# Database Snapshot Class with Retention
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: database-snapshot
+  annotations:
+    description: "Database snapshot class with extended retention"
+driver: org.democratic-csi.iscsi-nfs
+deletionPolicy: Retain
+parameters:
+  detachedSnapshots: "true"
+
+---
+# Backup Snapshot Class
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: backup-snapshot
+  annotations:
+    description: "Backup snapshot class for long-term retention"
+driver: org.democratic-csi.iscsi-nfs
+deletionPolicy: Retain
+parameters:
+  detachedSnapshots: "true"
+
+---
+# ML Training Snapshot Class
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: ml-training-snapshot
+  annotations:
+    description: "ML training snapshot class for model checkpoints"
+driver: org.democratic-csi.iscsi-nfs
+deletionPolicy: Delete
+parameters:
+  detachedSnapshots: "true"

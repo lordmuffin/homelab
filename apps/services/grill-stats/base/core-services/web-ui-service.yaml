@@ -1,0 +1,341 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-ui-service
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: web-ui
+    app.kubernetes.io/part-of: grill-stats
+    app: web-ui
+    component: frontend
+    tier: web
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: grill-stats
+      app.kubernetes.io/component: web-ui
+      app: web-ui
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: grill-stats
+        app.kubernetes.io/component: web-ui
+        app.kubernetes.io/part-of: grill-stats
+        app: web-ui
+        component: frontend
+        tier: web
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "80"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: grill-stats-web-ui
+      securityContext:
+        fsGroup: 101
+        runAsNonRoot: true
+        runAsUser: 101
+      containers:
+      - name: web-ui
+        image: grill-stats/web-ui:latest
+        ports:
+        - containerPort: 80
+          name: http
+          protocol: TCP
+        env:
+        - name: REACT_APP_API_BASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: web-ui-config
+              key: API_BASE_URL
+        - name: REACT_APP_WS_BASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: web-ui-config
+              key: WS_BASE_URL
+        - name: REACT_APP_ENVIRONMENT
+          valueFrom:
+            configMapKeyRef:
+              name: web-ui-config
+              key: ENVIRONMENT
+        - name: REACT_APP_VERSION
+          valueFrom:
+            configMapKeyRef:
+              name: web-ui-config
+              key: VERSION
+        - name: NGINX_WORKER_PROCESSES
+          valueFrom:
+            configMapKeyRef:
+              name: web-ui-config
+              key: NGINX_WORKER_PROCESSES
+        - name: NGINX_WORKER_CONNECTIONS
+          valueFrom:
+            configMapKeyRef:
+              name: web-ui-config
+              key: NGINX_WORKER_CONNECTIONS
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 101
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: nginx-cache
+          mountPath: /var/cache/nginx
+        - name: nginx-run
+          mountPath: /var/run
+        - name: nginx-config
+          mountPath: /etc/nginx/conf.d
+          readOnly: true
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: nginx-cache
+        emptyDir: {}
+      - name: nginx-run
+        emptyDir: {}
+      - name: nginx-config
+        configMap:
+          name: web-ui-nginx-config
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-ui-service
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: web-ui
+    app.kubernetes.io/part-of: grill-stats
+    app: web-ui
+    component: frontend
+    tier: web
+spec:
+  selector:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: web-ui
+    app: web-ui
+  ports:
+  - port: 80
+    targetPort: 80
+    name: http
+    protocol: TCP
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: web-ui-service-network-policy
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: web-ui
+    app: web-ui
+spec:
+  podSelector:
+    matchLabels:
+      app: web-ui
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: traefik
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: traefik
+    ports:
+    - protocol: TCP
+      port: 80
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: auth-service
+    ports:
+    - protocol: TCP
+      port: 8082
+  - to:
+    - podSelector:
+        matchLabels:
+          app: device-service
+    ports:
+    - protocol: TCP
+      port: 8080
+  - to:
+    - podSelector:
+        matchLabels:
+          app: temperature-service
+    ports:
+    - protocol: TCP
+      port: 8081
+  - to:
+    - podSelector:
+        matchLabels:
+          app: historical-data-service
+    ports:
+    - protocol: TCP
+      port: 8083
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-ui-config
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: web-ui
+    app: web-ui
+data:
+  API_BASE_URL: "https://grill-stats.homelab.local/api"
+  WS_BASE_URL: "wss://grill-stats.homelab.local/ws"
+  ENVIRONMENT: "production"
+  VERSION: "1.0.0"
+  NGINX_WORKER_PROCESSES: "2"
+  NGINX_WORKER_CONNECTIONS: "1024"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-ui-nginx-config
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: web-ui
+    app: web-ui
+data:
+  default.conf: |
+    upstream auth_service {
+        server auth-service.grill-stats.svc.cluster.local:8082;
+    }
+
+    upstream device_service {
+        server device-service.grill-stats.svc.cluster.local:8080;
+    }
+
+    upstream temperature_service {
+        server temperature-service.grill-stats.svc.cluster.local:8081;
+    }
+
+    upstream historical_data_service {
+        server historical-data-service.grill-stats.svc.cluster.local:8083;
+    }
+
+    server {
+        listen 80;
+        server_name _;
+
+        # Security headers
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-XSS-Protection "1; mode=block" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws: wss:;" always;
+
+        # Serve static files
+        location / {
+            root /usr/share/nginx/html;
+            index index.html index.htm;
+            try_files $uri $uri/ /index.html;
+        }
+
+        # API proxy
+        location /api/auth/ {
+            proxy_pass http://auth_service/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        location /api/devices/ {
+            proxy_pass http://device_service/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        location /api/temperature/ {
+            proxy_pass http://temperature_service/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        location /api/historical/ {
+            proxy_pass http://historical_data_service/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # WebSocket support
+        location /ws/ {
+            proxy_pass http://temperature_service/ws/;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # Health check endpoints
+        location /health {
+            access_log off;
+            return 200 "healthy\n";
+            add_header Content-Type text/plain;
+        }
+
+        location /ready {
+            access_log off;
+            return 200 "ready\n";
+            add_header Content-Type text/plain;
+        }
+    }
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: grill-stats-web-ui
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: web-ui
+    app: web-ui
+automountServiceAccountToken: false

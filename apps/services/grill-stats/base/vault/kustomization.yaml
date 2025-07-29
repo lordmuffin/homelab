@@ -1,0 +1,142 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: vault-transit-base
+  namespace: grill-stats
+
+resources:
+  - vault-transit-setup.yaml
+  - vault-kubernetes-auth.yaml
+  - vault-service-accounts.yaml
+  - vault-agent-config.yaml
+  - vault-monitoring.yaml
+
+commonLabels:
+  app: grill-stats
+  component: vault-transit
+
+namePrefix: vault-transit-
+
+namespace: grill-stats
+
+patchesStrategicMerge:
+  - |-
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: vault-transit-setup
+      namespace: grill-stats
+    data:
+      setup-transit.sh: |
+        #!/bin/bash
+        set -e
+
+        echo "Setting up Vault Transit Secrets Engine for ${ENVIRONMENT:-prod}..."
+
+        # Wait for Vault to be ready
+        until vault status > /dev/null 2>&1; do
+          echo "Waiting for Vault to be ready..."
+          sleep 5
+        done
+
+        # Enable transit secrets engine
+        echo "Enabling transit secrets engine..."
+        vault secrets enable -path=transit transit || echo "Transit engine already enabled"
+
+        # Create encryption keys for current environment
+        echo "Creating encryption keys for ${ENVIRONMENT:-prod}..."
+
+        # Environment-specific key creation
+        vault write -f transit/keys/thermoworks-user-credentials-${ENVIRONMENT:-prod} \
+          type=aes256-gcm96 \
+          allow_plaintext_backup=false \
+          deletion_allowed=false \
+          derived=false \
+          exportable=false || echo "User credentials key already exists"
+
+        vault write -f transit/keys/thermoworks-api-tokens-${ENVIRONMENT:-prod} \
+          type=aes256-gcm96 \
+          allow_plaintext_backup=false \
+          deletion_allowed=false \
+          derived=false \
+          exportable=false || echo "API tokens key already exists"
+
+        vault write -f transit/keys/thermoworks-device-credentials-${ENVIRONMENT:-prod} \
+          type=aes256-gcm96 \
+          allow_plaintext_backup=false \
+          deletion_allowed=false \
+          derived=false \
+          exportable=false || echo "Device credentials key already exists"
+
+        # Configure key rotation policies based on environment
+        echo "Configuring key rotation policies for ${ENVIRONMENT:-prod}..."
+
+        if [ "${ENVIRONMENT:-prod}" = "prod" ]; then
+          ROTATION_PERIOD="2160h"  # 90 days
+        elif [ "${ENVIRONMENT:-prod}" = "staging" ]; then
+          ROTATION_PERIOD="1440h"  # 60 days
+        else
+          ROTATION_PERIOD="720h"   # 30 days for dev
+        fi
+
+        vault write transit/keys/thermoworks-user-credentials-${ENVIRONMENT:-prod}/config \
+          min_decryption_version=1 \
+          min_encryption_version=0 \
+          deletion_allowed=false \
+          exportable=false \
+          allow_plaintext_backup=false \
+          auto_rotate_period=$ROTATION_PERIOD
+
+        vault write transit/keys/thermoworks-api-tokens-${ENVIRONMENT:-prod}/config \
+          min_decryption_version=1 \
+          min_encryption_version=0 \
+          deletion_allowed=false \
+          exportable=false \
+          allow_plaintext_backup=false \
+          auto_rotate_period=$ROTATION_PERIOD
+
+        vault write transit/keys/thermoworks-device-credentials-${ENVIRONMENT:-prod}/config \
+          min_decryption_version=1 \
+          min_encryption_version=0 \
+          deletion_allowed=false \
+          exportable=false \
+          allow_plaintext_backup=false \
+          auto_rotate_period=$ROTATION_PERIOD
+
+        # Configure audit logging
+        echo "Configuring audit logging for ${ENVIRONMENT:-prod}..."
+        vault audit enable -path=grill-stats-audit-${ENVIRONMENT:-prod} file \
+          file_path=/vault/audit/grill-stats-audit-${ENVIRONMENT:-prod}.log || echo "Audit logging already enabled"
+
+        echo "Vault Transit setup completed successfully for ${ENVIRONMENT:-prod}!"
+
+configMapGenerator:
+  - name: vault-environment-config
+    literals:
+      - ENVIRONMENT=prod
+      - VAULT_ADDR=https://vault.vault.svc.cluster.local:8200
+      - VAULT_SKIP_VERIFY=true
+      - VAULT_TRANSIT_PATH=transit
+      - VAULT_AUTH_PATH=auth/kubernetes
+      - VAULT_ROLE_PREFIX=grill-stats
+      - AUTO_ROTATE_ENABLED=true
+      - AUDIT_LOGGING_ENABLED=true
+      - MONITORING_ENABLED=true
+      - RATE_LIMIT_ENABLED=true
+      - RATE_LIMIT_REQUESTS_PER_SECOND=100
+      - RATE_LIMIT_BURST=200
+      - TOKEN_RENEWAL_THRESHOLD=3600
+      - TOKEN_MAX_TTL=86400
+      - ENCRYPTION_BATCH_SIZE=100
+      - ENCRYPTION_TIMEOUT=10s
+      - KEY_ROTATION_NOTIFICATION_ENABLED=true
+      - BACKUP_ENABLED=true
+      - BACKUP_RETENTION_DAYS=90
+
+replicas:
+  - name: vault-agent
+    count: 1
+  - name: vault-transit-setup-job
+    count: 1

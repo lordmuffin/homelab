@@ -20,6 +20,176 @@ spec:
         app: litellm
     spec:
       initContainers:
+        - name: restore-db-backup
+          image: alpine:latest
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c"]
+          args:
+            - |
+              set -e
+              echo "Starting LiteLLM database restoration check..."
+              
+              # Install required tools
+              apk add --no-cache postgresql-client curl
+              
+              # Download and install B2 CLI
+              curl -sL https://github.com/Backblaze/B2_Command_Line_Tool/releases/latest/download/b2-linux -o /usr/local/bin/b2
+              chmod +x /usr/local/bin/b2
+              
+              # Authorize B2
+              b2 authorize-account "$B2_APPLICATION_KEY_ID" "$B2_APPLICATION_KEY"
+              
+              # Search for database backups in litellm/ folder
+              echo "Searching for database backups in litellm/ folder..."
+              BACKUP_FILES=$(b2 ls "$B2_BUCKET_NAME" litellm/ | grep "pg_backup_.*\.sql\.gz" | sort -r) || true
+              
+              if [ -z "$BACKUP_FILES" ]; then
+                echo "No database backups found. Skipping restoration."
+                exit 0
+              fi
+              
+              # Get the latest backup
+              LATEST_BACKUP=$(echo "$BACKUP_FILES" | head -1 | awk '{print $1}')
+              echo "Found latest backup: $LATEST_BACKUP"
+              
+              # Check database connectivity
+              echo "Checking database connectivity..."
+              export PGPASSWORD="$POSTGRES_PASSWORD"
+              until pg_isready -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB"; do
+                echo "Waiting for database to be ready..."
+                sleep 5
+              done
+              
+              # Check if LiteLLM tables exist and have user data
+              echo "Checking for existing LiteLLM data..."
+              CONFIG_COUNT=0
+              SPEND_COUNT=0
+              
+              # Check if tables exist and count records
+              if psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "\dt" | grep -q "litellm_config"; then
+                CONFIG_COUNT=$(psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -t -c "SELECT COUNT(*) FROM litellm_config WHERE id > 0;" | tr -d ' ')
+              fi
+              
+              if psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "\dt" | grep -q "litellm_spend"; then
+                SPEND_COUNT=$(psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -t -c "SELECT COUNT(*) FROM litellm_spend WHERE id > 0;" | tr -d ' ')
+              fi
+              
+              echo "Found $CONFIG_COUNT configurations and $SPEND_COUNT spend records"
+              
+              # Skip restoration if user data exists (prevent data loss)
+              if [ "$CONFIG_COUNT" -gt 0 ] || [ "$SPEND_COUNT" -gt 5 ]; then
+                echo "Existing user data found. Skipping restoration to prevent data loss."
+                exit 0
+              fi
+              
+              # Download and restore backup
+              echo "Downloading backup: $LATEST_BACKUP"
+              b2 download-file-by-name "$B2_BUCKET_NAME" "$LATEST_BACKUP" /tmp/backup.sql.gz
+              
+              echo "Clearing existing database..."
+              psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+              
+              echo "Restoring database from backup..."
+              gunzip -c /tmp/backup.sql.gz | psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+              
+              # Validate restoration by checking for required tables
+              echo "Validating restoration..."
+              if psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "\dt" | grep -q "litellm_config" && \
+                 psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "\dt" | grep -q "litellm_spend"; then
+                echo "Database restoration completed successfully!"
+              else
+                echo "Database restoration validation failed!"
+                exit 1
+              fi
+          env:
+            - name: B2_APPLICATION_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: backblaze-cloud-homelab-creds-1password
+                  key: b2-application-key-id
+            - name: B2_APPLICATION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: backblaze-cloud-homelab-creds-1password
+                  key: b2-application-key
+            - name: B2_BUCKET_NAME
+              value: "cloud-homelab-backups"
+            - name: POSTGRES_HOST
+              value: "litellm-database-rw.services.svc.cluster.local"
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_DB
+              value: "litellm"
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: litellm-db-postgres-creds-1password
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: litellm-db-postgres-creds-1password
+                  key: password
+        - name: restore-file-backup
+          image: backblazeit/b2:latest
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c"]
+          args:
+            - |
+              set -e
+              echo "Starting LiteLLM file restoration check..."
+              
+              # Check if /data directory is empty or minimal
+              FILE_COUNT=$(find /data -type f | wc -l)
+              echo "Found $FILE_COUNT files in /data directory"
+              
+              # Skip restoration if directory contains substantial user data (more than 10 files)
+              if [ "$FILE_COUNT" -gt 10 ]; then
+                echo "Directory contains user data ($FILE_COUNT files). Skipping restoration to prevent data loss."
+                exit 0
+              fi
+              
+              # Authorize B2
+              b2 authorize-account "$B2_APPLICATION_KEY_ID" "$B2_APPLICATION_KEY"
+              
+              # Search for file backups in litellm/ folder
+              echo "Searching for file backups in litellm/ folder..."
+              BACKUP_FILES=$(b2 ls "$B2_BUCKET_NAME" litellm/ | grep "litellm_files_.*\.tar\.gz" | sort -r) || true
+              
+              if [ -z "$BACKUP_FILES" ]; then
+                echo "No file backups found. Skipping restoration."
+                exit 0
+              fi
+              
+              # Get the latest backup
+              LATEST_BACKUP=$(echo "$BACKUP_FILES" | head -1 | awk '{print $1}')
+              echo "Found latest backup: $LATEST_BACKUP"
+              
+              # Download and extract backup
+              echo "Downloading backup: $LATEST_BACKUP"
+              b2 download-file-by-name "$B2_BUCKET_NAME" "$LATEST_BACKUP" /tmp/files_backup.tar.gz
+              
+              echo "Extracting configuration data to /data..."
+              cd /data
+              tar -xzf /tmp/files_backup.tar.gz
+              
+              echo "File restoration completed successfully!"
+          env:
+            - name: B2_APPLICATION_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: backblaze-cloud-homelab-creds-1password
+                  key: b2-application-key-id
+            - name: B2_APPLICATION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: backblaze-cloud-homelab-creds-1password
+                  key: b2-application-key
+            - name: B2_BUCKET_NAME
+              value: "cloud-homelab-backups"
+          volumeMounts:
+            - name: litellm-data
+              mountPath: /data
         - name: volume-permissions
           image: busybox:1.36
           command: ["sh", "-c", "chown -R 1000:1000 /data"] # LiteLLM image runs as appuser (UID 1000)

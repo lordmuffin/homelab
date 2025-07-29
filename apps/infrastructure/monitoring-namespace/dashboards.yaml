@@ -1,0 +1,151 @@
+---
+# Grafana Dashboards ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: monitoring
+data:
+  kubernetes-cluster-overview.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "Kubernetes Cluster Overview",
+        "tags": ["kubernetes", "cluster"],
+        "style": "dark",
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Cluster Status",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "kube_node_status_condition{condition=\"Ready\",status=\"true\"}",
+                "legendFormat": "Ready Nodes"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+          },
+          {
+            "id": 2,
+            "title": "Pod Status",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "kube_pod_status_phase{phase=\"Running\"}",
+                "legendFormat": "Running Pods"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+          }
+        ],
+        "time": {"from": "now-1h", "to": "now"},
+        "refresh": "5s"
+      }
+    }
+    
+  homelab-services.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "HomeLab Services",
+        "tags": ["homelab", "services"],
+        "style": "dark",
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Service Availability",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "up{job=~\".*\"}",
+                "legendFormat": "{{ job }}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 24, "x": 0, "y": 0}
+          },
+          {
+            "id": 2,
+            "title": "HTTP Response Times",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, service))",
+                "legendFormat": "95th percentile - {{ service }}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8}
+          }
+        ],
+        "time": {"from": "now-1h", "to": "now"},
+        "refresh": "30s"
+      }
+    }
+    
+  node-exporter.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "Node Exporter Full",
+        "tags": ["node-exporter", "hardware"],
+        "style": "dark",
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "CPU Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "100 - (avg by(instance) (irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+                "legendFormat": "{{ instance }}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+          },
+          {
+            "id": 2,
+            "title": "Memory Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100",
+                "legendFormat": "{{ instance }}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+          }
+        ],
+        "time": {"from": "now-1h", "to": "now"},
+        "refresh": "30s"
+      }
+    }
+    
+  storage-overview.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "Storage Overview",
+        "tags": ["storage", "pvc"],
+        "style": "dark",
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "PVC Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes * 100",
+                "legendFormat": "{{ persistentvolumeclaim }}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 24, "x": 0, "y": 0}
+          }
+        ],
+        "time": {"from": "now-1h", "to": "now"},
+        "refresh": "1m"
+      }
+    }

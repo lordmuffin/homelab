@@ -1,0 +1,205 @@
+# Azure DevOps Template: Shared Variables
+# Centralized variable management for Terraform pipelines
+
+parameters:
+- name: environment
+  type: string
+  values:
+  - 'dev-lab'
+  - 'prod-lab'
+- name: terraformVersion
+  type: string
+  default: '1.8.0'  # Updated to latest stable
+- name: maxParallel
+  type: number
+  default: 5
+
+variables:
+# Terraform Configuration
+- name: TF_VERSION
+  value: ${{ parameters.terraformVersion }}
+- name: TF_IN_AUTOMATION
+  value: 'true'
+- name: TF_INPUT
+  value: 'false'
+- name: TF_CLI_ARGS
+  value: '-no-color'
+- name: TF_CLI_CONFIG_FILE
+  value: '$(Pipeline.Workspace)/.terraformrc'
+
+# Azure Backend Configuration (enhanced security)
+- name: ARM_USE_AZUREAD
+  value: 'true'
+- name: ARM_USE_CLI
+  value: 'true'
+- name: ARM_STORAGE_USE_AZUREAD
+  value: 'true'
+- name: ARM_SKIP_PROVIDER_REGISTRATION
+  value: 'false'
+- name: ARM_USE_OIDC
+  value: 'false'
+- name: AZURE_BACKEND_RESOURCE_GROUP
+  value: '$(TERRAFORM_BACKEND_RESOURCE_GROUP)'
+- name: AZURE_BACKEND_STORAGE_ACCOUNT
+  value: '$(TERRAFORM_BACKEND_STORAGE_ACCOUNT)'
+- name: AZURE_BACKEND_CONTAINER_NAME
+  value: '$(TERRAFORM_BACKEND_CONTAINER_NAME)'
+
+# Pipeline Optimization & Performance
+- name: TERRAFORM_CACHE_DIR
+  value: '$(Pipeline.Workspace)/.terraform'
+- name: TF_PLUGIN_CACHE_DIR
+  value: '$(Agent.TempDirectory)/terraform-plugins'
+- name: CHECKOV_CACHE_DIR
+  value: '$(Pipeline.Workspace)/.checkov'
+- name: TF_IN_AUTOMATION
+  value: 'true'
+- name: TF_INPUT
+  value: 'false'
+- name: TF_CLI_ARGS
+  value: '-no-color'
+
+# Security Tool Versions (pinned for reproducibility)
+- name: TFSEC_VERSION
+  value: '1.28.4'
+- name: CHECKOV_VERSION
+  value: '3.1.34'
+- name: TERRASCAN_VERSION
+  value: '1.18.11'
+
+# Working Directory Logic (set dynamically by pipeline scripts)
+# Note: WORKING_DIR is computed at runtime by PowerShell script based on Module parameter
+# This avoids Azure DevOps runtime expression limitations with if() function
+- name: StateKey
+  value: '$(Environment)/$(Module)/terraform.tfstate'
+- name: STATE_LOCK_TIMEOUT
+  value: '300s'
+# Backend configuration file path (computed dynamically with WORKING_DIR)
+# BACKEND_CONFIG_FILE is set in pipeline scripts as: $(WORKING_DIR)/backend.tf
+
+# Environment-specific variables
+- ${{ if eq(parameters.environment, 'dev-lab') }}:
+  - group: terraform-dev-lab
+  - group: azure-service-connections  # Secure service connection variables
+  - name: MAX_PARALLEL_JOBS
+    value: 5
+  - name: TIMEOUT_MINUTES
+    value: 30
+  - name: PLAN_TIMEOUT_MINUTES
+    value: 25
+  - name: APPLY_TIMEOUT_MINUTES
+    value: 45
+  - name: REQUIRE_APPROVAL
+    value: false
+  - name: ENVIRONMENT_TIER
+    value: 'Development'
+  - name: SECURITY_SCAN_LEVEL
+    value: 'standard'
+  - name: AUTO_APPROVE_MINOR_CHANGES
+    value: true
+
+- ${{ if eq(parameters.environment, 'prod-lab') }}:
+  - group: terraform-prod-lab
+  - group: azure-service-connections  # Secure service connection variables
+  - name: MAX_PARALLEL_JOBS
+    value: 2
+  - name: TIMEOUT_MINUTES
+    value: 60
+  - name: PLAN_TIMEOUT_MINUTES
+    value: 45
+  - name: APPLY_TIMEOUT_MINUTES
+    value: 90
+  - name: REQUIRE_APPROVAL
+    value: true
+  - name: ENVIRONMENT_TIER
+    value: 'Production'
+  - name: SECURITY_SCAN_LEVEL
+    value: 'strict'
+  - name: AUTO_APPROVE_MINOR_CHANGES
+    value: false
+  - name: ENABLE_BACKUP_VERIFICATION
+    value: true
+
+# Quality Gates & Thresholds
+- name: MAX_SECURITY_ISSUES
+  value: '0'  # Zero tolerance for critical/high security issues
+- name: MAX_DRIFT_THRESHOLD
+  value: '5'  # Maximum allowed resource drift count
+- name: MAX_PLAN_SIZE_MB
+  value: '50'  # Maximum plan file size in MB
+- name: MIN_TEST_COVERAGE
+  value: '80'  # Minimum test coverage percentage
+- name: MAX_RESOURCE_COUNT
+  value: '500'  # Maximum resources per plan
+- name: DRIFT_CHECK_INTERVAL
+  value: '24h'  # How often to check for drift
+
+# Security and Compliance (enhanced)
+- name: SECURITY_SCAN_ENABLED
+  value: true
+- name: COMPLIANCE_CHECK_ENABLED
+  value: true
+- name: DRIFT_DETECTION_ENABLED
+  value: true
+- name: SECURITY_FAIL_ON_HIGH
+  value: true
+- name: SECURITY_FAIL_ON_CRITICAL
+  value: true
+- name: ENABLE_SECRET_SCANNING
+  value: true
+- name: ENABLE_DEPENDENCY_SCANNING
+  value: true
+- name: SECURITY_BASELINE_ENABLED
+  value: true
+- name: COMPLIANCE_FRAMEWORK
+  value: 'CIS'
+
+# Cache Keys for Optimization (with enhanced versioning)
+- name: TerraformCacheKey
+  value: 'terraform-$(Agent.OS)-$(TF_VERSION)-$(Build.SourcesDirectory)/terraform'
+- name: SecurityScanCacheKey  
+  value: 'security-tools-$(Agent.OS)-$(TFSEC_VERSION)-$(CHECKOV_VERSION)-$(TERRASCAN_VERSION)'
+- name: ProviderCacheKey
+  value: 'terraform-providers-$(Agent.OS)-$(Build.SourcesDirectory)/.terraform.lock.hcl'
+
+# Notification Settings (secure references)
+- name: TEAMS_WEBHOOK_URL
+  value: $(TEAMS_WEBHOOK)
+- name: SLACK_WEBHOOK_URL
+  value: $(SLACK_WEBHOOK)
+- name: NOTIFICATION_ENABLED
+  value: true
+- name: NOTIFICATION_TIMEOUT
+  value: '30'
+- name: NOTIFICATION_RETRY_COUNT
+  value: '2'
+
+# Artifact Management
+- name: ARTIFACT_RETENTION_DAYS
+  value: 30
+- name: PLAN_ARTIFACT_NAME
+  value: 'terraform-plan-${{ parameters.environment }}'
+
+# Monitoring and Logging
+- name: LOG_LEVEL
+  value: 'INFO'
+- name: METRICS_ENABLED
+  value: true
+- name: AZURE_MONITOR_ENABLED
+  value: true
+
+# Feature Flags & Advanced Options
+- name: ENABLE_COST_ESTIMATION
+  value: 'true'
+- name: ENABLE_PARALLEL_VALIDATION
+  value: 'true'
+- name: ENABLE_SMART_CACHING
+  value: 'true'
+- name: ENABLE_ENHANCED_LOGGING
+  value: 'true'
+- name: ENABLE_DRIFT_DETECTION
+  value: 'true'
+- name: ENABLE_PLAN_ANALYSIS
+  value: 'true'
+- name: ENABLE_SECURITY_SCANNING
+  value: 'true'

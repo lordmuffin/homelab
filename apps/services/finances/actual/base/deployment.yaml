@@ -7,6 +7,7 @@ metadata:
     app: actual
   annotations:
     link.argocd.argoproj.io/external-link: https://finance.gruber.dev.br
+    deployment.kubernetes.io/revision: "2"
 spec:
   replicas: 1
   strategy:
@@ -19,12 +20,129 @@ spec:
       labels:
         app: actual
     spec:
+      initContainers:
+        - name: auto-restore
+          image: alpine:latest
+          env:
+            - name: B2_APPLICATION_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: backblaze-cloud-homelab-creds-1password
+                  key: keyID
+            - name: B2_APPLICATION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: backblaze-cloud-homelab-creds-1password
+                  key: applicationKey
+            - name: B2_BUCKET_NAME
+              value: "cloud-homelab-backups"
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              # Auto-restore script for fresh deployments
+              set -eu
+              
+              # Install required tools including B2 CLI
+              apk add --no-cache tar gzip curl jq python3 py3-pip
+              
+              # Install B2 CLI
+              pip3 install --break-system-packages b2
+              
+              # Logging functions
+              log_info() {
+                  echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] INIT: $*" >&2
+              }
+              
+              log_info "🔍 Checking if auto-restore is needed for Actual Budget..."
+              
+              # Check if data directory has any meaningful content
+              DATA_FILE_COUNT=$(find /data -type f 2>/dev/null | wc -l || echo "0")
+              
+              if [ "$DATA_FILE_COUNT" -gt 0 ]; then
+                log_info "Data directory contains $DATA_FILE_COUNT files - skipping auto-restore"
+                log_info "Existing deployment detected, using current data"
+                exit 0
+              fi
+              
+              log_info "Empty data directory detected, attempting auto-restore..."
+              
+              # Validate B2 credentials
+              if [ -z "${B2_APPLICATION_KEY_ID:-}" ] || [ -z "${B2_APPLICATION_KEY:-}" ] || [ -z "${B2_BUCKET_NAME:-}" ]; then
+                  log_info "B2 credentials not available - starting with fresh data"
+                  mkdir -p /data/server-files /data/user-files
+                  exit 0
+              fi
+              
+              # Try to find the latest backup
+              log_info "Searching for latest backup in B2..."
+              BACKUP_TO_RESTORE=$(b2 ls --json b2://$B2_BUCKET_NAME/actual/ 2>/dev/null | jq -r '.[] | select(.fileName | startswith("actual_backup_")) | "actual/" + .fileName' | sort -r | head -n1 || echo "")
+              
+              if [ -z "$BACKUP_TO_RESTORE" ] || [ "$BACKUP_TO_RESTORE" = "null" ]; then
+                log_info "No backups found in B2 - starting with fresh data"
+                mkdir -p /data/server-files /data/user-files
+                exit 0
+              fi
+              
+              log_info "Found backup for auto-restore: $BACKUP_TO_RESTORE"
+              
+              # Download and restore the backup
+              BACKUP_FILE="/tmp/$(basename $BACKUP_TO_RESTORE)"
+              
+              log_info "Downloading backup for auto-restore..."
+              if b2 download-file-by-name $B2_BUCKET_NAME "$BACKUP_TO_RESTORE" "$BACKUP_FILE" 2>/dev/null; then
+                
+                # Validate backup
+                if [ -f "$BACKUP_FILE" ] && [ -s "$BACKUP_FILE" ] && gzip -t "$BACKUP_FILE" 2>/dev/null; then
+                  log_info "Extracting backup to /data..."
+                  cd /data
+                  tar -xzf "$BACKUP_FILE" 2>/dev/null || true
+                  
+                  # Validate restoration
+                  RESTORED_FILES=$(find /data -type f 2>/dev/null | wc -l || echo "0")
+                  if [ "$RESTORED_FILES" -gt 0 ]; then
+                    log_info "✅ Auto-restore successful: $RESTORED_FILES files restored"
+                    
+                    # Set proper permissions
+                    chown -R 1001:1001 /data 2>/dev/null || true
+                    find /data -type d -exec chmod 755 {} \; 2>/dev/null || true
+                    find /data -type f -exec chmod 644 {} \; 2>/dev/null || true
+                  else
+                    log_info "Auto-restore extraction failed - starting with fresh data"
+                    mkdir -p /data/server-files /data/user-files
+                  fi
+                else
+                  log_info "Downloaded backup is invalid - starting with fresh data"
+                  mkdir -p /data/server-files /data/user-files
+                fi
+                
+                # Clean up
+                rm -f "$BACKUP_FILE" 2>/dev/null || true
+              else
+                log_info "Failed to download backup - starting with fresh data"
+                mkdir -p /data/server-files /data/user-files
+              fi
+          volumeMounts:
+            - name: data-storage
+              mountPath: /data
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
       containers:
         - name: actual
-          image: ghcr.io/actualbudget/actual-server:25.6.1
-          envFrom:
-            - configMapRef:
-                name: actual-cm
+          image: ghcr.io/actualbudget/actual-server:25.7.1
+          env:
+            - name: TZ
+              value: "America/Sao_Paulo"
+            - name: ACTUAL_PORT
+              value: "5006"
+            - name: ACTUAL_SERVER_FILES
+              value: "/data/server-files"
+            - name: ACTUAL_USER_FILES
+              value: "/data/user-files"
           ports:
             - name: web
               containerPort: 5006

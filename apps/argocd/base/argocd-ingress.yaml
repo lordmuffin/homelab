@@ -17,9 +17,6 @@ spec:
   routes:
     - match: Host(`argocd.labs.andrewpjackson.com`)
       kind: Rule
-      middlewares:
-        - name: traefik-forward-auth
-          namespace: traefik
       services:
         - name: argocd-server
           port: 80

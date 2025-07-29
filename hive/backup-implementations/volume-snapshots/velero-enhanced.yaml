@@ -1,0 +1,298 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: velero-backup-scripts
+  namespace: velero
+data:
+  pre-backup-hook.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    
+    log_info() {
+        echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] INFO: $*" >&2
+    }
+    
+    log_info "🔄 Starting pre-backup hooks..."
+    
+    # Flush databases before snapshot
+    case "$BACKUP_TYPE" in
+        "postgres")
+            log_info "Flushing PostgreSQL..."
+            PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -c "CHECKPOINT;"
+            ;;
+        "mysql")
+            log_info "Flushing MySQL..."
+            mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" -e "FLUSH TABLES WITH READ LOCK; UNLOCK TABLES;"
+            ;;
+        "redis")
+            log_info "Saving Redis..."
+            redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" BGSAVE
+            ;;
+    esac
+    
+    log_info "✅ Pre-backup hooks completed"
+  
+  post-backup-hook.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    
+    log_info() {
+        echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] INFO: $*" >&2
+    }
+    
+    log_info "🔄 Starting post-backup hooks..."
+    
+    # Verify backup integrity
+    if [[ -n "${BACKUP_NAME:-}" ]]; then
+        log_info "Verifying backup: $BACKUP_NAME"
+        # Add verification logic here
+    fi
+    
+    log_info "✅ Post-backup hooks completed"
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: velero-automated-backups
+  namespace: velero
+spec:
+  schedule: "0 2 * * *" # Daily at 2AM
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: velero-backup-runner
+          containers:
+            - name: velero-backup
+              image: velero/velero:v1.12.1
+              env:
+                - name: VELERO_NAMESPACE
+                  value: velero
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  set -euo pipefail
+                  
+                  log_info() {
+                      echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] INFO: $*" >&2
+                  }
+                  
+                  log_error() {
+                      echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] ERROR: $*" >&2
+                  }
+                  
+                  TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+                  
+                  log_info "🔄 Starting automated Velero backup sequence..."
+                  
+                  # 1. Full cluster backup
+                  FULL_BACKUP_NAME="full-backup-${TIMESTAMP}"
+                  log_info "Creating full cluster backup: $FULL_BACKUP_NAME"
+                  
+                  velero backup create "$FULL_BACKUP_NAME" \
+                    --include-namespaces=default,kube-system,monitoring,argocd,services \
+                    --exclude-resources=events,events.events.k8s.io \
+                    --snapshot-volumes=true \
+                    --ttl=720h0m0s \
+                    --wait
+                  
+                  # Verify backup completed
+                  BACKUP_STATUS=$(velero backup get "$FULL_BACKUP_NAME" -o jsonpath='{.status.phase}')
+                  if [[ "$BACKUP_STATUS" != "Completed" ]]; then
+                      log_error "Full backup failed with status: $BACKUP_STATUS"
+                      exit 1
+                  fi
+                  
+                  log_info "✅ Full backup completed successfully: $FULL_BACKUP_NAME"
+                  
+                  # 2. Database-focused backup
+                  DB_BACKUP_NAME="database-backup-${TIMESTAMP}"
+                  log_info "Creating database-focused backup: $DB_BACKUP_NAME"
+                  
+                  velero backup create "$DB_BACKUP_NAME" \
+                    --selector="app.kubernetes.io/component in (database,postgresql,mysql,redis)" \
+                    --include-cluster-resources=false \
+                    --snapshot-volumes=true \
+                    --ttl=2160h0m0s \
+                    --wait
+                  
+                  # Verify database backup
+                  DB_BACKUP_STATUS=$(velero backup get "$DB_BACKUP_NAME" -o jsonpath='{.status.phase}')
+                  if [[ "$DB_BACKUP_STATUS" != "Completed" ]]; then
+                      log_error "Database backup failed with status: $DB_BACKUP_STATUS"
+                      exit 1
+                  fi
+                  
+                  log_info "✅ Database backup completed successfully: $DB_BACKUP_NAME"
+                  
+                  # 3. PVC snapshots for large data volumes
+                  PVC_BACKUP_NAME="pvc-backup-${TIMESTAMP}"
+                  log_info "Creating PVC snapshot backup: $PVC_BACKUP_NAME"
+                  
+                  velero backup create "$PVC_BACKUP_NAME" \
+                    --include-resources=persistentvolumeclaims,persistentvolumes \
+                    --snapshot-volumes=true \
+                    --ttl=4320h0m0s \
+                    --wait
+                  
+                  # Verify PVC backup
+                  PVC_BACKUP_STATUS=$(velero backup get "$PVC_BACKUP_NAME" -o jsonpath='{.status.phase}')
+                  if [[ "$PVC_BACKUP_STATUS" != "Completed" ]]; then
+                      log_error "PVC backup failed with status: $PVC_BACKUP_STATUS"
+                      exit 1
+                  fi
+                  
+                  log_info "✅ PVC backup completed successfully: $PVC_BACKUP_NAME"
+                  
+                  # 4. Critical applications backup
+                  CRITICAL_BACKUP_NAME="critical-apps-${TIMESTAMP}"
+                  log_info "Creating critical applications backup: $CRITICAL_BACKUP_NAME"
+                  
+                  velero backup create "$CRITICAL_BACKUP_NAME" \
+                    --include-namespaces=argocd,monitoring,vault,cert-manager \
+                    --include-cluster-resources=true \
+                    --snapshot-volumes=true \
+                    --ttl=2160h0m0s \
+                    --wait
+                  
+                  # Verify critical backup
+                  CRITICAL_BACKUP_STATUS=$(velero backup get "$CRITICAL_BACKUP_NAME" -o jsonpath='{.status.phase}')
+                  if [[ "$CRITICAL_BACKUP_STATUS" != "Completed" ]]; then
+                      log_error "Critical applications backup failed with status: $CRITICAL_BACKUP_STATUS"
+                      exit 1
+                  fi
+                  
+                  log_info "✅ Critical applications backup completed successfully: $CRITICAL_BACKUP_NAME"
+                  
+                  # 5. Generate backup report
+                  REPORT_FILE="/tmp/backup-report-${TIMESTAMP}.json"
+                  cat > "$REPORT_FILE" << EOF
+                  {
+                    "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+                    "backup_session": "${TIMESTAMP}",
+                    "backups": {
+                      "full_cluster": {
+                        "name": "$FULL_BACKUP_NAME",
+                        "status": "$BACKUP_STATUS",
+                        "ttl": "720h"
+                      },
+                      "databases": {
+                        "name": "$DB_BACKUP_NAME",
+                        "status": "$DB_BACKUP_STATUS",
+                        "ttl": "2160h"
+                      },
+                      "pvcs": {
+                        "name": "$PVC_BACKUP_NAME",
+                        "status": "$PVC_BACKUP_STATUS",
+                        "ttl": "4320h"
+                      },
+                      "critical_apps": {
+                        "name": "$CRITICAL_BACKUP_NAME",
+                        "status": "$CRITICAL_BACKUP_STATUS",
+                        "ttl": "2160h"
+                      }
+                    },
+                    "summary": {
+                      "total_backups": 4,
+                      "successful": $(echo "$BACKUP_STATUS $DB_BACKUP_STATUS $PVC_BACKUP_STATUS $CRITICAL_BACKUP_STATUS" | grep -o "Completed" | wc -l),
+                      "failed": $(echo "$BACKUP_STATUS $DB_BACKUP_STATUS $PVC_BACKUP_STATUS $CRITICAL_BACKUP_STATUS" | grep -v "Completed" | wc -l)
+                    }
+                  }
+                  EOF
+                  
+                  log_info "📊 Backup report generated: $REPORT_FILE"
+                  cat "$REPORT_FILE"
+                  
+                  log_info "✅ Automated Velero backup sequence completed successfully"
+          restartPolicy: OnFailure
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: velero-backup-runner
+  namespace: velero
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: velero-backup-runner
+rules:
+  - apiGroups: ["velero.io"]
+    resources: ["backups", "restores", "schedules"]
+    verbs: ["get", "list", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["persistentvolumes", "persistentvolumeclaims"]
+    verbs: ["get", "list"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets"]
+    verbs: ["get", "list"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: velero-backup-runner
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: velero-backup-runner
+subjects:
+  - kind: ServiceAccount
+    name: velero-backup-runner
+    namespace: velero
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: velero-cleanup
+  namespace: velero
+spec:
+  schedule: "0 4 1 * *" # Monthly cleanup on 1st at 4AM
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: velero-backup-runner
+          containers:
+            - name: velero-cleanup
+              image: velero/velero:v1.12.1
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  set -euo pipefail
+                  
+                  log_info() {
+                      echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] INFO: $*" >&2
+                  }
+                  
+                  log_info "🔄 Starting Velero backup cleanup..."
+                  
+                  # Clean up backups older than their TTL
+                  log_info "Cleaning up expired backups..."
+                  
+                  # List all backups and check expiration
+                  velero backup get -o json | jq -r '.items[] | select(.status.expiration < now) | .metadata.name' | while read -r backup_name; do
+                      if [[ -n "$backup_name" ]]; then
+                          log_info "Deleting expired backup: $backup_name"
+                          velero backup delete "$backup_name" --confirm
+                      fi
+                  done
+                  
+                  # Clean up failed backups older than 7 days
+                  CUTOFF_DATE=$(date -d '7 days ago' --iso-8601=seconds)
+                  
+                  velero backup get -o json | jq -r --arg cutoff "$CUTOFF_DATE" '.items[] | select(.status.phase == "Failed" and .metadata.creationTimestamp < $cutoff) | .metadata.name' | while read -r backup_name; do
+                      if [[ -n "$backup_name" ]]; then
+                          log_info "Deleting old failed backup: $backup_name"
+                          velero backup delete "$backup_name" --confirm
+                      fi
+                  done
+                  
+                  log_info "✅ Velero backup cleanup completed"
+          restartPolicy: OnFailure

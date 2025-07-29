@@ -1,0 +1,673 @@
+# ServiceMonitor for Authentication Service
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: grill-stats-auth-service
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: auth
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: grill-stats
+      app.kubernetes.io/component: auth
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+    scheme: http
+    metricRelabelings:
+    - sourceLabels: [__name__]
+      regex: '(auth_.*|http_.*|flask_.*)'
+      action: keep
+  namespaceSelector:
+    matchNames:
+    - grill-stats
+    - grill-stats-dev
+---
+# ServiceMonitor for Device Service
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: grill-stats-device-service
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: device
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: grill-stats
+      app.kubernetes.io/component: device
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+    scheme: http
+    metricRelabelings:
+    - sourceLabels: [__name__]
+      regex: '(device_.*|thermoworks_.*|http_.*|flask_.*)'
+      action: keep
+  namespaceSelector:
+    matchNames:
+    - grill-stats
+    - grill-stats-dev
+---
+# ServiceMonitor for Temperature Service
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: grill-stats-temperature-service
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: temperature
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: grill-stats
+      app.kubernetes.io/component: temperature
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 15s  # More frequent for real-time temperature data
+    scrapeTimeout: 10s
+    scheme: http
+    metricRelabelings:
+    - sourceLabels: [__name__]
+      regex: '(temperature_.*|grill_stats_.*|http_.*|flask_.*)'
+      action: keep
+  namespaceSelector:
+    matchNames:
+    - grill-stats
+    - grill-stats-dev
+---
+# ServiceMonitor for Historical Data Service
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: grill-stats-historical-service
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: historical
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: grill-stats
+      app.kubernetes.io/component: historical
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+    scheme: http
+    metricRelabelings:
+    - sourceLabels: [__name__]
+      regex: '(historical_.*|timescale_.*|http_.*|flask_.*)'
+      action: keep
+  namespaceSelector:
+    matchNames:
+    - grill-stats
+    - grill-stats-dev
+---
+# ServiceMonitor for Encryption Service
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: grill-stats-encryption-service
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: encryption
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: grill-stats
+      app.kubernetes.io/component: encryption
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+    scheme: http
+    metricRelabelings:
+    - sourceLabels: [__name__]
+      regex: '(encryption_.*|vault_.*|http_.*|flask_.*)'
+      action: keep
+  namespaceSelector:
+    matchNames:
+    - grill-stats
+    - grill-stats-dev
+---
+# ServiceMonitor for Web UI Service
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: grill-stats-web-ui
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: web-ui
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: grill-stats
+      app.kubernetes.io/component: web-ui
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+    scheme: http
+    metricRelabelings:
+    - sourceLabels: [__name__]
+      regex: '(nginx_.*|react_.*|http_.*)'
+      action: keep
+  namespaceSelector:
+    matchNames:
+    - grill-stats
+    - grill-stats-dev
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: grill-stats-alerts
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  groups:
+  - name: grill-stats-availability
+    interval: 30s
+    rules:
+    - alert: GrillStatsServiceDown
+      expr: up{job=~"grill-stats-.*"} == 0
+      for: 5m
+      labels:
+        severity: critical
+        service: grill-stats
+        category: availability
+      annotations:
+        summary: "Grill Stats service {{ $labels.job }} is down"
+        description: "{{ $labels.job }} has been down for more than 5 minutes."
+        runbook_url: "https://homelab.local/runbooks/grill-stats/service-down"
+
+    - alert: GrillStatsHighErrorRate
+      expr: |
+        (
+          sum(rate(http_requests_total{job=~"grill-stats-.*",status=~"5.."}[5m])) by (job)
+          /
+          sum(rate(http_requests_total{job=~"grill-stats-.*"}[5m])) by (job)
+        ) > 0.05
+      for: 5m
+      labels:
+        severity: warning
+        service: grill-stats
+        category: availability
+      annotations:
+        summary: "High error rate for {{ $labels.job }}"
+        description: "Error rate is {{ $value | humanizePercentage }} for {{ $labels.job }}"
+        runbook_url: "https://homelab.local/runbooks/grill-stats/high-error-rate"
+
+    - alert: GrillStatsHighLatency
+      expr: |
+        histogram_quantile(0.95,
+          sum(rate(http_request_duration_seconds_bucket{job=~"grill-stats-.*"}[5m])) by (job, le)
+        ) > 1
+      for: 10m
+      labels:
+        severity: warning
+        service: grill-stats
+        category: performance
+      annotations:
+        summary: "High latency for {{ $labels.job }}"
+        description: "95th percentile latency is {{ $value }}s for {{ $labels.job }}"
+        runbook_url: "https://homelab.local/runbooks/grill-stats/high-latency"
+
+    - alert: GrillStatsHighMemoryUsage
+      expr: |
+        (
+          container_memory_usage_bytes{pod=~"grill-stats-.*"}
+          / container_spec_memory_limit_bytes{pod=~"grill-stats-.*"}
+        ) * 100 > 80
+      for: 10m
+      labels:
+        severity: warning
+        service: grill-stats
+        category: resources
+      annotations:
+        summary: "High memory usage for {{ $labels.pod }}"
+        description: "Memory usage is {{ $value }}% for {{ $labels.pod }}"
+        runbook_url: "https://homelab.local/runbooks/grill-stats/high-memory"
+
+    - alert: GrillStatsHighCPUUsage
+      expr: |
+        (
+          rate(container_cpu_usage_seconds_total{pod=~"grill-stats-.*"}[5m])
+        ) * 100 > 80
+      for: 10m
+      labels:
+        severity: warning
+        service: grill-stats
+        category: resources
+      annotations:
+        summary: "High CPU usage for {{ $labels.pod }}"
+        description: "CPU usage is {{ $value }}% for {{ $labels.pod }}"
+        runbook_url: "https://homelab.local/runbooks/grill-stats/high-cpu"
+
+  - name: grill-stats-business-metrics
+    interval: 30s
+    rules:
+    - alert: TemperatureReadingMissing
+      expr: |
+        time() - max(grill_stats_last_temperature_reading_timestamp) by (device_id) > 300
+      for: 5m
+      labels:
+        severity: warning
+        service: grill-stats
+        category: business
+      annotations:
+        summary: "No temperature readings from device {{ $labels.device_id }}"
+        description: "Device {{ $labels.device_id }} hasn't sent temperature data for over 5 minutes"
+        runbook_url: "https://homelab.local/runbooks/grill-stats/missing-temperature-data"
+
+    - alert: HighTemperatureAlert
+      expr: |
+        grill_stats_temperature_celsius > 120
+      for: 1m
+      labels:
+        severity: critical
+        service: grill-stats
+        category: business
+      annotations:
+        summary: "High temperature alert for device {{ $labels.device_id }}"
+        description: "Temperature is {{ $value }}°C for device {{ $labels.device_id }}, channel {{ $labels.channel_id }}"
+        runbook_url: "https://homelab.local/runbooks/grill-stats/high-temperature"
+
+    - alert: DeviceBatteryLow
+      expr: |
+        grill_stats_device_battery_level < 20
+      for: 10m
+      labels:
+        severity: warning
+        service: grill-stats
+        category: business
+      annotations:
+        summary: "Low battery for device {{ $labels.device_id }}"
+        description: "Battery level is {{ $value }}% for device {{ $labels.device_id }}"
+        runbook_url: "https://homelab.local/runbooks/grill-stats/low-battery"
+
+    - alert: DeviceOffline
+      expr: |
+        grill_stats_device_online_status == 0
+      for: 5m
+      labels:
+        severity: warning
+        service: grill-stats
+        category: business
+      annotations:
+        summary: "Device {{ $labels.device_id }} is offline"
+        description: "ThermoWorks device {{ $labels.device_id }} has been offline for more than 5 minutes"
+        runbook_url: "https://homelab.local/runbooks/grill-stats/device-offline"
+
+    - alert: AuthenticationFailureSpike
+      expr: |
+        rate(auth_failures_total[5m]) > 0.1
+      for: 5m
+      labels:
+        severity: warning
+        service: grill-stats
+        category: security
+      annotations:
+        summary: "High authentication failure rate"
+        description: "Authentication failure rate is {{ $value | humanizePercentage }} for more than 5 minutes"
+        runbook_url: "https://homelab.local/runbooks/grill-stats/auth-failures"
+
+    - alert: UnusualTemperatureSpike
+      expr: |
+        increase(grill_stats_temperature_celsius[5m]) > 50
+      for: 2m
+      labels:
+        severity: warning
+        service: grill-stats
+        category: business
+      annotations:
+        summary: "Unusual temperature spike detected"
+        description: "Temperature increased by {{ $value }}°C in 5 minutes for device {{ $labels.device_id }}"
+        runbook_url: "https://homelab.local/runbooks/grill-stats/temperature-spike"
+
+  - name: grill-stats-slo-alerts
+    interval: 30s
+    rules:
+    - alert: GrillStatsRequestsAvailabilitySLO
+      expr: |
+        (
+          1 - (
+            sum(rate(http_requests_total{job=~"grill-stats-.*",status=~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total{job=~"grill-stats-.*"}[5m]))
+          )
+        ) * 100 < 99.9
+      for: 5m
+      labels:
+        severity: critical
+        service: grill-stats
+        category: slo
+        slo_name: "requests-availability"
+      annotations:
+        summary: "SLO violation: Request availability below 99.9%"
+        description: "Current availability is {{ $value }}% which is below the 99.9% SLO target"
+        runbook_url: "https://homelab.local/runbooks/grill-stats/slo-violation"
+
+    - alert: GrillStatsTemperatureDataFreshnessSLO
+      expr: |
+        (
+          count(time() - grill_stats_last_temperature_reading_timestamp <= 60)
+          /
+          count(grill_stats_device_online_status == 1)
+        ) * 100 < 99.5
+      for: 5m
+      labels:
+        severity: warning
+        service: grill-stats
+        category: slo
+        slo_name: "temperature-data-freshness"
+      annotations:
+        summary: "SLO violation: Temperature data freshness below 99.5%"
+        description: "Current data freshness is {{ $value }}% which is below the 99.5% SLO target"
+        runbook_url: "https://homelab.local/runbooks/grill-stats/slo-violation"
+
+    - alert: GrillStatsResponseTimeSLO
+      expr: |
+        histogram_quantile(0.95,
+          sum(rate(http_request_duration_seconds_bucket{job=~"grill-stats-.*"}[5m])) by (le)
+        ) > 0.5
+      for: 5m
+      labels:
+        severity: warning
+        service: grill-stats
+        category: slo
+        slo_name: "response-time"
+      annotations:
+        summary: "SLO violation: 95th percentile response time above 500ms"
+        description: "Current 95th percentile response time is {{ $value }}s which exceeds the 500ms SLO target"
+        runbook_url: "https://homelab.local/runbooks/grill-stats/slo-violation"
+
+  - name: grill-stats-database-alerts
+    interval: 30s
+    rules:
+    - alert: PostgreSQLConnectionPoolExhausted
+      expr: |
+        sum(pg_stat_activity_count) by (instance) / sum(pg_settings_max_connections) by (instance) > 0.9
+      for: 5m
+      labels:
+        severity: critical
+        service: grill-stats
+        category: database
+        database: postgresql
+      annotations:
+        summary: "PostgreSQL connection pool nearly exhausted"
+        description: "PostgreSQL connection usage is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+        runbook_url: "https://homelab.local/runbooks/grill-stats/postgresql-connections"
+
+    - alert: InfluxDBHighMemoryUsage
+      expr: |
+        influxdb_system_memory_usage_percent > 85
+      for: 10m
+      labels:
+        severity: warning
+        service: grill-stats
+        category: database
+        database: influxdb
+      annotations:
+        summary: "InfluxDB high memory usage"
+        description: "InfluxDB memory usage is {{ $value }}% on {{ $labels.instance }}"
+        runbook_url: "https://homelab.local/runbooks/grill-stats/influxdb-memory"
+
+    - alert: RedisHighMemoryUsage
+      expr: |
+        redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+      for: 10m
+      labels:
+        severity: warning
+        service: grill-stats
+        category: database
+        database: redis
+      annotations:
+        summary: "Redis high memory usage"
+        description: "Redis memory usage is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+        runbook_url: "https://homelab.local/runbooks/grill-stats/redis-memory"
+
+    - alert: DatabaseBackupFailed
+      expr: |
+        time() - last_successful_backup_timestamp > 86400
+      for: 1m
+      labels:
+        severity: critical
+        service: grill-stats
+        category: database
+      annotations:
+        summary: "Database backup failed or overdue"
+        description: "No successful backup for {{ $labels.database }} in the last 24 hours"
+        runbook_url: "https://homelab.local/runbooks/grill-stats/backup-failed"
+---
+# Grill Stats Overview Dashboard
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-grill-stats-overview
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/part-of: grill-stats
+    grafana_dashboard: "1"
+data:
+  grill-stats-overview.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "Grill Stats Platform Overview",
+        "uid": "grill-stats-overview",
+        "tags": ["grill-stats", "overview"],
+        "style": "dark",
+        "timezone": "browser",
+        "editable": true,
+        "panels": [
+          {
+            "id": 1,
+            "title": "Service Health Status",
+            "type": "stat",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+            "targets": [
+              {
+                "expr": "up{job=~\"grill-stats-.*\"}",
+                "legendFormat": "{{ job }}",
+                "refId": "A"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "mappings": [
+                  {
+                    "options": {
+                      "0": {"text": "DOWN", "color": "red"},
+                      "1": {"text": "UP", "color": "green"}
+                    },
+                    "type": "value"
+                  }
+                ],
+                "thresholds": {
+                  "steps": [
+                    {"color": "red", "value": 0},
+                    {"color": "green", "value": 1}
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "id": 2,
+            "title": "Active Devices",
+            "type": "stat",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+            "targets": [
+              {
+                "expr": "count(grill_stats_device_online_status == 1)",
+                "legendFormat": "Active Devices",
+                "refId": "A"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "color": {"mode": "palette-classic"},
+                "unit": "short"
+              }
+            }
+          },
+          {
+            "id": 3,
+            "title": "Request Rate by Service",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+            "targets": [
+              {
+                "expr": "sum(rate(http_requests_total{job=~\"grill-stats-.*\"}[5m])) by (job)",
+                "legendFormat": "{{ job }}",
+                "refId": "A"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "color": {"mode": "palette-classic"},
+                "unit": "reqps"
+              }
+            }
+          },
+          {
+            "id": 4,
+            "title": "Error Rate by Service",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+            "targets": [
+              {
+                "expr": "sum(rate(http_requests_total{job=~\"grill-stats-.*\",status=~\"5..\"}[5m])) by (job)",
+                "legendFormat": "{{ job }} errors",
+                "refId": "A"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "color": {"mode": "palette-classic"},
+                "unit": "reqps"
+              }
+            }
+          },
+          {
+            "id": 5,
+            "title": "Current Temperature Readings",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16},
+            "targets": [
+              {
+                "expr": "grill_stats_temperature_celsius",
+                "legendFormat": "Device: {{ device_id }} - Channel: {{ channel_id }}",
+                "refId": "A"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "color": {"mode": "palette-classic"},
+                "unit": "celsius",
+                "min": 0,
+                "max": 300
+              }
+            }
+          },
+          {
+            "id": 6,
+            "title": "Response Time P95",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=~\"grill-stats-.*\"}[5m])) by (job, le))",
+                "legendFormat": "{{ job }} P95",
+                "refId": "A"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "color": {"mode": "palette-classic"},
+                "unit": "s"
+              }
+            }
+          },
+          {
+            "id": 7,
+            "title": "Memory Usage by Service",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
+            "targets": [
+              {
+                "expr": "(container_memory_usage_bytes{pod=~\"grill-stats-.*\"} / container_spec_memory_limit_bytes{pod=~\"grill-stats-.*\"}) * 100",
+                "legendFormat": "{{ pod }}",
+                "refId": "A"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "color": {"mode": "palette-classic"},
+                "unit": "percent",
+                "min": 0,
+                "max": 100
+              }
+            }
+          },
+          {
+            "id": 8,
+            "title": "SLO Compliance",
+            "type": "stat",
+            "gridPos": {"h": 8, "w": 24, "x": 0, "y": 32},
+            "targets": [
+              {
+                "expr": "(1 - (sum(rate(http_requests_total{job=~\"grill-stats-.*\",status=~\"5..\"}[5m])) / sum(rate(http_requests_total{job=~\"grill-stats-.*\"}[5m])))) * 100",
+                "legendFormat": "Availability SLO",
+                "refId": "A"
+              },
+              {
+                "expr": "(count(time() - grill_stats_last_temperature_reading_timestamp <= 60) / count(grill_stats_device_online_status == 1)) * 100",
+                "legendFormat": "Data Freshness SLO",
+                "refId": "B"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "percent",
+                "thresholds": {
+                  "steps": [
+                    {"color": "red", "value": 0},
+                    {"color": "yellow", "value": 99},
+                    {"color": "green", "value": 99.5}
+                  ]
+                }
+              }
+            }
+          }
+        ],
+        "time": {"from": "now-1h", "to": "now"},
+        "refresh": "30s",
+        "schemaVersion": 27,
+        "version": 1
+      }
+    }

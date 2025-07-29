@@ -1,0 +1,39 @@
+# Azure DevOps Pipeline: Main Entry Point
+# This pipeline routes to the appropriate sub-pipeline based on trigger conditions
+
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+      - feature/*
+  paths:
+    include:
+      - terraform/**
+      - .azure-pipelines/**
+
+pr:
+  branches:
+    include:
+      - main
+      - develop
+  paths:
+    include:
+      - terraform/**
+      - .azure-pipelines/**
+
+variables:
+  - name: isMainBranch
+    value: $[eq(variables['Build.SourceBranch'], 'refs/heads/main')]
+  - name: isPullRequest
+    value: $[eq(variables['Build.Reason'], 'PullRequest')]
+  - name: isFeatureBranch
+    value: $[startsWith(variables['Build.SourceBranch'], 'refs/heads/feature/')]
+
+stages:
+  # Always run plan for validation
+  - template: pipelines/terraform-plan.yml
+
+  # Only run apply for main branch (automatic) or manual dispatch
+  - ${{ if or(eq(variables['Build.SourceBranch'], 'refs/heads/main'), eq(variables['Build.Reason'], 'Manual')) }}:
+    - template: pipelines/terraform-apply.yml

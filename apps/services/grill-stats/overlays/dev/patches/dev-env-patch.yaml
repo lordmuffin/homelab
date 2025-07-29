@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grill-stats
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+      - name: grill-stats
+        env:
+        - name: DATABASE_URL
+          value: postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@grill-stats-db-rw.grill-stats-dev.svc.cluster.local:5432/$(POSTGRES_DB)
+        # Mock mode for development - uses fake ThermoWorks data
+        - name: MOCK_MODE
+          value: "true"
+        - name: FLASK_ENV
+          value: development
+        - name: DEBUG
+          value: "true"
+        - name: LOG_LEVEL
+          value: DEBUG
+        - name: SECRET_KEY
+          value: "dev-flask-secret-key-not-for-production"
+        - name: ADMIN_EMAIL
+          value: "dev@localhost"
+        - name: ADMIN_PASSWORD
+          value: "dev123"
+        - name: ADMIN_NAME
+          value: "Development Admin"
+        - name: DEVELOPMENT_MODE
+          value: "true"
+        - name: AUTO_RELOAD
+          value: "true"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+
+

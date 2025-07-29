@@ -1,0 +1,51 @@
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: kubernetes-mcp
+  namespace: mcp-servers
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    external-dns.alpha.kubernetes.io/hostname: k8s-mcp.home.andrewpjackson.com
+    external-dns.alpha.kubernetes.io/target: home.andrewpjackson.com
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`k8s-mcp.home.andrewpjackson.com`)
+      kind: Rule
+      services:
+        - name: kubernetes-mcp-internal
+          port: 3000
+          scheme: http
+      middlewares:
+        - name: traefik-forward-auth
+          namespace: traefik
+  tls:
+    - hosts:
+        - k8s-mcp.home.andrewpjackson.com
+      secretName: kubernetes-mcp-tls
+
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: kubernetes-mcp-internal
+  namespace: mcp-servers
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`k8s-mcp.home.andrewpjackson.com`) && PathPrefix(`/internal`)
+      kind: Rule
+      services:
+        - name: kubernetes-mcp-internal
+          port: 3000
+          scheme: http
+      middlewares:
+        - name: strip-prefix-internal
+          namespace: mcp-servers

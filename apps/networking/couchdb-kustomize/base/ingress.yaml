@@ -1,0 +1,28 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: couchdb-internal
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: couchdb.lab.apj.dev
+    external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
+    external-dns.alpha.kubernetes.io/ttl: "120"
+    cert-manager.io/cluster-issuer: letsencrypt-production
+    acme.cert-manager.io/http01-edit-in-place: "true"
+    kubernetes.io/ingress.class: traefik-external
+  labels:
+    app: couchdb
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`couchdb.lab.apj.dev`)
+      kind: Rule
+      services:
+        - name: couchdb-svc-couchdb
+          port: 5984
+      middlewares:
+        - name: traefik-forward-auth-chain
+          namespace: traefik
+      priority: 1
+  tls:
+    secretName: lab-apj-dev-tls

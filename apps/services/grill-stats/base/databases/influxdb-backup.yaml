@@ -1,0 +1,338 @@
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: influxdb-backup
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: influxdb-backup
+            app.kubernetes.io/part-of: grill-stats
+            app.kubernetes.io/component: database
+        spec:
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            fsGroup: 1000
+          containers:
+          - name: backup
+            image: influxdb:2.7-alpine
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              echo "🔄 Starting InfluxDB backup..."
+
+              # Create backup directory with timestamp
+              BACKUP_DIR="/backup/$(date +%Y%m%d_%H%M%S)"
+              mkdir -p "$BACKUP_DIR"
+
+              # Backup all buckets
+              influx backup \
+                --host "$INFLUXDB_HOST" \
+                --token "$INFLUXDB_TOKEN" \
+                --org "$INFLUXDB_ORG" \
+                "$BACKUP_DIR"
+
+              # Compress backup
+              cd /backup
+              tar -czf "influxdb_backup_$(date +%Y%m%d_%H%M%S).tar.gz" "$(basename "$BACKUP_DIR")"
+              rm -rf "$BACKUP_DIR"
+
+              # Cleanup old backups (keep last 7 days)
+              find /backup -name "influxdb_backup_*.tar.gz" -mtime +7 -delete
+
+              echo "✅ Backup completed successfully!"
+
+              # Optional: Upload to S3 or other cloud storage
+              if [ "$BACKUP_UPLOAD_ENABLED" = "true" ]; then
+                echo "📤 Uploading backup to cloud storage..."
+                # Add your cloud storage upload logic here
+              fi
+            env:
+            - name: INFLUXDB_HOST
+              value: "http://influxdb-service:8086"
+            - name: INFLUXDB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: influxdb-secrets
+                  key: influxdb-admin-token
+            - name: INFLUXDB_ORG
+              valueFrom:
+                secretKeyRef:
+                  name: influxdb-secrets
+                  key: influxdb-org
+            - name: BACKUP_UPLOAD_ENABLED
+              value: "false"
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backup
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop:
+                - ALL
+            resources:
+              requests:
+                cpu: 100m
+                memory: 256Mi
+              limits:
+                cpu: 500m
+                memory: 512Mi
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: influxdb-backup-pvc
+          restartPolicy: OnFailure
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: influxdb-backup-pvc
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: standard
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: influxdb-restore-script
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+data:
+  restore.sh: |
+    #!/bin/bash
+    set -e
+
+    # InfluxDB Restore Script
+    # Usage: ./restore.sh <backup-file>
+
+    if [ $# -ne 1 ]; then
+        echo "Usage: $0 <backup-file>"
+        exit 1
+    fi
+
+    BACKUP_FILE="$1"
+
+    if [ ! -f "$BACKUP_FILE" ]; then
+        echo "Error: Backup file $BACKUP_FILE not found!"
+        exit 1
+    fi
+
+    echo "🔄 Starting InfluxDB restore from $BACKUP_FILE..."
+
+    # Extract backup if it's compressed
+    if [[ "$BACKUP_FILE" == *.tar.gz ]]; then
+        echo "📦 Extracting compressed backup..."
+        BACKUP_DIR=$(basename "$BACKUP_FILE" .tar.gz)
+        tar -xzf "$BACKUP_FILE"
+        BACKUP_PATH="$BACKUP_DIR"
+    else
+        BACKUP_PATH="$BACKUP_FILE"
+    fi
+
+    # Restore data
+    echo "🔄 Restoring InfluxDB data..."
+    influx restore \
+        --host "$INFLUXDB_HOST" \
+        --token "$INFLUXDB_TOKEN" \
+        --org "$INFLUXDB_ORG" \
+        --full \
+        "$BACKUP_PATH"
+
+    echo "✅ Restore completed successfully!"
+
+    # Cleanup extracted files
+    if [[ "$BACKUP_FILE" == *.tar.gz ]]; then
+        rm -rf "$BACKUP_DIR"
+    fi
+
+  disaster-recovery.md: |
+    # InfluxDB Disaster Recovery Guide
+
+    ## Overview
+    This document outlines the disaster recovery procedures for InfluxDB in the grill-stats system.
+
+    ## Backup Strategy
+    - **Frequency**: Daily automated backups at 2 AM
+    - **Retention**: 7 days of local backups
+    - **Location**: Local PVC storage (`influxdb-backup-pvc`)
+    - **Optional**: Cloud storage upload (configurable)
+
+    ## Recovery Procedures
+
+    ### 1. Complete Database Loss
+    If the entire InfluxDB instance is lost:
+
+    ```bash
+    # 1. Deploy a new InfluxDB instance
+    kubectl apply -k kustomize/overlays/prod-lab
+
+    # 2. Wait for the database to be ready
+    kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=influxdb -n grill-stats
+
+    # 3. Restore from backup
+    kubectl exec -it influxdb-0 -n grill-stats -- /bin/sh
+    cd /backup
+    ./restore.sh influxdb_backup_YYYYMMDD_HHMMSS.tar.gz
+    ```
+
+    ### 2. Partial Data Loss
+    If only certain buckets are affected:
+
+    ```bash
+    # Restore specific buckets
+    influx restore \
+        --host http://influxdb-service:8086 \
+        --token $INFLUXDB_TOKEN \
+        --org $INFLUXDB_ORG \
+        --bucket grill-stats-realtime \
+        /backup/backup_directory
+    ```
+
+    ### 3. Point-in-Time Recovery
+    For recovering to a specific point in time:
+
+    ```bash
+    # Find the appropriate backup
+    ls -la /backup/
+
+    # Restore using the closest backup to the desired time
+    ./restore.sh influxdb_backup_YYYYMMDD_HHMMSS.tar.gz
+    ```
+
+    ## Monitoring Backup Health
+    - Check CronJob status: `kubectl get cronjob influxdb-backup -n grill-stats`
+    - View backup logs: `kubectl logs job/influxdb-backup-xxxxx -n grill-stats`
+    - Monitor backup storage usage: Check PVC usage in monitoring dashboards
+
+    ## Testing Recovery
+    It's recommended to test recovery procedures monthly:
+
+    1. Deploy a test InfluxDB instance
+    2. Restore from a recent backup
+    3. Verify data integrity
+    4. Document any issues found
+
+    ## Emergency Contacts
+    - Database Administrator: [contact info]
+    - System Administrator: [contact info]
+    - On-call Engineer: [contact info]
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: influxdb-maintenance
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+spec:
+  schedule: "0 3 * * 0"  # Weekly on Sunday at 3 AM
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: influxdb-maintenance
+            app.kubernetes.io/part-of: grill-stats
+            app.kubernetes.io/component: database
+        spec:
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            fsGroup: 1000
+          containers:
+          - name: maintenance
+            image: influxdb:2.7-alpine
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              echo "🔧 Starting InfluxDB maintenance..."
+
+              # Check database health
+              echo "🏥 Checking database health..."
+              influx ping --host "$INFLUXDB_HOST"
+
+              # Compact database
+              echo "🗜️ Compacting database..."
+              influx bucket list --host "$INFLUXDB_HOST" --token "$INFLUXDB_TOKEN" --org "$INFLUXDB_ORG" | \
+              while read -r bucket; do
+                if [ "$bucket" != "Name" ] && [ -n "$bucket" ]; then
+                  echo "Compacting bucket: $bucket"
+                  # Note: InfluxDB 2.x handles compaction automatically
+                  # This is a placeholder for future maintenance tasks
+                fi
+              done
+
+              # Cleanup old task logs
+              echo "🧹 Cleaning up old task logs..."
+              # Add task log cleanup logic here
+
+              # Verify data integrity
+              echo "🔍 Verifying data integrity..."
+              influx query --host "$INFLUXDB_HOST" --token "$INFLUXDB_TOKEN" --org "$INFLUXDB_ORG" \
+                'from(bucket: "grill-stats-realtime") |> range(start: -1h) |> count()'
+
+              echo "✅ Maintenance completed successfully!"
+            env:
+            - name: INFLUXDB_HOST
+              value: "http://influxdb-service:8086"
+            - name: INFLUXDB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: influxdb-secrets
+                  key: influxdb-admin-token
+            - name: INFLUXDB_ORG
+              valueFrom:
+                secretKeyRef:
+                  name: influxdb-secrets
+                  key: influxdb-org
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop:
+                - ALL
+            resources:
+              requests:
+                cpu: 100m
+                memory: 256Mi
+              limits:
+                cpu: 500m
+                memory: 512Mi
+          restartPolicy: OnFailure

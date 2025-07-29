@@ -1,0 +1,311 @@
+# Azure DevOps Template: Terraform Setup
+# Common setup steps for Terraform operations
+
+parameters:
+- name: azureServiceConnection
+  type: string
+  default: 'azure-terraform-backend'
+- name: terraformVersion
+  type: string
+  default: '1.8.0'
+- name: workingDirectory
+  type: string
+  default: 'terraform'
+- name: environment
+  type: string
+- name: module
+  type: string
+- name: stateKey
+  type: string
+
+steps:
+- task: AzureCLI@2
+  displayName: 'Azure CLI Login'
+  inputs:
+    azureSubscription: ${{ parameters.azureServiceConnection }}
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      echo "✅ Azure CLI authenticated successfully"
+      az account show --output table
+
+- task: Cache@2
+  displayName: 'Cache Terraform Plugins'
+  inputs:
+    key: '$(TerraformCacheKey)'
+    path: '$(Agent.TempDirectory)/terraform-plugins'
+    cacheHitVar: 'TERRAFORM_CACHE_RESTORED'
+    restoreKeys: |
+      terraform-$(Agent.OS)-${{ parameters.terraformVersion }}
+      terraform-$(Agent.OS)
+
+- task: Cache@2
+  displayName: 'Cache Terraform Providers'
+  inputs:
+    key: 'terraform-providers | "${{ parameters.environment }}" | "${{ parameters.module }}" | "$(Build.SourcesDirectory)/.terraform.lock.hcl"'
+    path: '${{ parameters.workingDirectory }}/.terraform'
+    cacheHitVar: 'TERRAFORM_PROVIDERS_RESTORED'
+    restoreKeys: |
+      terraform-providers | "${{ parameters.environment }}" | "${{ parameters.module }}"
+      terraform-providers | "${{ parameters.environment }}"
+
+- task: TerraformInstaller@0
+  displayName: 'Install Terraform'
+  inputs:
+    terraformVersion: ${{ parameters.terraformVersion }}
+
+- task: PowerShell@2
+  displayName: 'Verify Terraform Installation & Setup'
+  inputs:
+    targetType: 'inline'
+    script: |
+      Write-Host "🔧 Terraform Setup Verification"
+      Write-Host "=============================="
+      
+      # Verify Terraform installation
+      try {
+        $tfVersion = terraform version -json | ConvertFrom-Json
+        Write-Host "✅ Terraform Core: $($tfVersion.terraform_version)"
+        
+        # Check for required providers
+        if ($tfVersion.provider_selections) {
+          Write-Host "📦 Providers:"
+          $tfVersion.provider_selections.PSObject.Properties | ForEach-Object {
+            Write-Host "  - $($_.Name): $($_.Value)"
+          }
+        }
+      } catch {
+        Write-Host "❌ Terraform installation verification failed: $($_.Exception.Message)"
+        exit 1
+      }
+      
+      # Setup Terraform CLI configuration with enhanced optimizations
+      $pluginCacheDir = "$(Agent.TempDirectory)/terraform-plugins"
+      $terraformDir = "$(Agent.TempDirectory)/terraform"
+      $configDir = "$env:HOME/.terraform.d"
+      
+      # Create required directories
+      New-Item -ItemType Directory -Force -Path $pluginCacheDir | Out-Null
+      New-Item -ItemType Directory -Force -Path $terraformDir | Out-Null
+      New-Item -ItemType Directory -Force -Path $configDir | Out-Null
+      
+      # Enhanced terraformrc configuration
+      $environment = "${{ parameters.environment }}"
+      $module = "${{ parameters.module }}"
+      $currentTime = Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ"
+      
+      $terraformrc = "# Terraform CLI Configuration - Auto-generated`n" +
+        "# Environment: $environment`n" +
+        "# Module: $module`n" +
+        "# Generated: $currentTime`n`n" +
+        "plugin_cache_dir = `"$pluginCacheDir`"`n" +
+        "disable_checkpoint = true`n" +
+        "disable_checkpoint_signature = true`n`n" +
+        "# Performance optimizations`n" +
+        "plugin_cache_may_break_dependency_lock_file = true`n`n" +
+        "# Logging configuration`n" +
+        "log_level = `"INFO`"`n`n" +
+        "# Provider installation configuration`n" +
+        "provider_installation {`n" +
+        "  filesystem_mirror {`n" +
+        "    path = `"$pluginCacheDir/registry.terraform.io`"`n" +
+        "    include = [`"*/*`"]`n" +
+        "  }`n" +
+        "  direct {`n" +
+        "    exclude = [`"*/*`"]`n" +
+        "  }`n" +
+        "}"
+      
+      $configFile = "$configDir/terraformrc"
+      $terraformrc | Out-File -FilePath $configFile -Encoding UTF8
+      
+      # Set environment variables for enhanced performance
+      Write-Host "##vso[task.setvariable variable=TF_PLUGIN_CACHE_DIR]$pluginCacheDir"
+      Write-Host "##vso[task.setvariable variable=TF_CLI_CONFIG_FILE]$configFile"
+      Write-Host "##vso[task.setvariable variable=TF_DATA_DIR]$terraformDir"
+      Write-Host "##vso[task.setvariable variable=TF_LOG]INFO"
+      Write-Host "##vso[task.setvariable variable=TF_LOG_PATH]$(Agent.TempDirectory)/terraform.log"
+      
+      # Cache status reporting
+      if ($env:TERRAFORM_CACHE_RESTORED -eq "true") {
+        Write-Host "✅ Plugin cache restored from previous build"
+        $cacheSize = (Get-ChildItem $pluginCacheDir -Recurse | Measure-Object Length -Sum).Sum
+        Write-Host "  Cache size: $([math]::Round($cacheSize/1MB, 2)) MB"
+      } else {
+        Write-Host "💫 First run or cache miss - plugins will be downloaded"
+      }
+      
+      Write-Host "📋 Configuration Summary:"
+      Write-Host "  Environment: ${{ parameters.environment }}"
+      Write-Host "  Module: ${{ parameters.module }}"
+      Write-Host "  Working Directory: ${{ parameters.workingDirectory }}"
+      Write-Host "  State Key: ${{ parameters.stateKey }}"
+      Write-Host "  Plugin Cache: $pluginCacheDir"
+      Write-Host "  CLI Config: $configFile"
+      Write-Host "  Cache Restored: $(if ($env:TERRAFORM_CACHE_RESTORED -eq ""true"") { ""Yes"" } else { ""No"" })"
+      Write-Host "  Providers Cached: $(if ($env:TERRAFORM_PROVIDERS_RESTORED -eq ""true"") { ""Yes"" } else { ""No"" })"
+
+- task: PowerShell@2
+  displayName: 'Configure Terraform Backend & Validation'
+  inputs:
+    targetType: 'inline'
+    workingDirectory: ${{ parameters.workingDirectory }}
+    script: |
+      Write-Host "🔧 Configuring Terraform Backend"
+      
+      # Enhanced backend variable validation
+      $requiredVars = @{
+        "AZURE_BACKEND_RESOURCE_GROUP" = $env:AZURE_BACKEND_RESOURCE_GROUP
+        "AZURE_BACKEND_STORAGE_ACCOUNT" = $env:AZURE_BACKEND_STORAGE_ACCOUNT
+        "AZURE_BACKEND_CONTAINER_NAME" = $env:AZURE_BACKEND_CONTAINER_NAME
+      }
+      
+      $securityVars = @{
+        "ARM_SUBSCRIPTION_ID" = $env:ARM_SUBSCRIPTION_ID
+        "ARM_TENANT_ID" = $env:ARM_TENANT_ID
+        "ARM_USE_AZUREAD" = $env:ARM_USE_AZUREAD
+      }
+      
+      $missingVars = @()
+      $missingSecurityVars = @()
+      
+      # Validate required variables
+      foreach ($var in $requiredVars.GetEnumerator()) {
+        if ([string]::IsNullOrEmpty($var.Value)) {
+          $missingVars += $var.Key
+        } else {
+          Write-Host "✅ $($var.Key): $($var.Value)"
+        }
+      }
+      
+      # Validate security variables (show as masked)
+      foreach ($var in $securityVars.GetEnumerator()) {
+        if ([string]::IsNullOrEmpty($var.Value)) {
+          $missingSecurityVars += $var.Key
+        } else {
+          $maskedValue = if ($var.Value.Length -gt 8) { $var.Value.Substring(0, 4) + "***" + $var.Value.Substring($var.Value.Length - 4) } else { "***" }
+          Write-Host "✅ $($var.Key): $maskedValue"
+        }
+      }
+      
+      # Report any missing variables
+      if ($missingVars.Count -gt 0) {
+        Write-Host "❌ Missing required backend variables: $($missingVars -join ", ")"
+        Write-Host "Please ensure these variables are defined in your pipeline variables or variable groups."
+        exit 1
+      }
+      
+      if ($missingSecurityVars.Count -gt 0) {
+        Write-Host "⚠️ Missing security variables: $($missingSecurityVars -join ", ")"
+        Write-Host "These are recommended for enhanced security but not required for basic functionality."
+      }
+      
+      # Validate Azure authentication
+      try {
+        Write-Host "🔐 Validating Azure authentication..."
+        az account show --output table
+        Write-Host "✅ Azure authentication validated"
+      } catch {
+        Write-Host "⚠️ Azure authentication validation failed: $($_.Exception.Message)"
+        Write-Host "This may impact backend access but will be retried during init."
+      }
+      
+      # Create enhanced backend configuration with security
+      $stateKey = "${{ parameters.stateKey }}"
+      $terraformVersion = "${{ parameters.terraformVersion }}"
+      $currentTime2 = Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ"
+      
+      $backendConfig = "# Auto-generated Terraform backend configuration`n" +
+        "# Environment: $environment`n" +
+        "# Module: $module`n" +
+        "# Generated: $currentTime2`n" +
+        "# State Key: $stateKey`n`n" +
+        "terraform {`n" +
+        "  required_version = `">= $terraformVersion`"`n`n" +
+        "  # Required providers with version constraints`n" +
+        "  required_providers {`n" +
+        "    azurerm = {`n" +
+        "      source  = `"hashicorp/azurerm`"`n" +
+        "      version = `"~> 3.0`"`n" +
+        "    }`n" +
+        "    random = {`n" +
+        "      source  = `"hashicorp/random`"`n" +
+        "      version = `"~> 3.1`"`n" +
+        "    }`n" +
+        "  }`n`n" +
+        "  backend `"azurerm`" {`n" +
+        "    resource_group_name   = `"`$(AZURE_BACKEND_RESOURCE_GROUP)`"`n" +
+        "    storage_account_name  = `"`$(AZURE_BACKEND_STORAGE_ACCOUNT)`"`n" +
+        "    container_name        = `"`$(AZURE_BACKEND_CONTAINER_NAME)`"`n" +
+        "    key                   = `"$stateKey`"`n" +
+        "    use_azuread_auth      = true`n" +
+        "    use_oidc              = false`n" +
+        "    snapshot              = true`n" +
+        "  }`n" +
+        "}`n`n" +
+        "# Provider configuration`n" +
+        "provider `"azurerm`" {`n" +
+        "  features {`n" +
+        "    key_vault {`n" +
+        "      purge_soft_delete_on_destroy    = true`n" +
+        "      recover_soft_deleted_key_vaults = true`n" +
+        "    }`n" +
+        "    resource_group {`n" +
+        "      prevent_deletion_if_contains_resources = false`n" +
+        "    }`n" +
+        "  }`n`n" +
+        "  # Use Azure AD authentication`n" +
+        "  use_oidc = false`n" +
+        "  use_cli  = true`n" +
+        "}"
+      
+      # Write backend configuration
+      $backendConfig | Out-File -FilePath "backend.tf" -Encoding UTF8
+      
+      Write-Host "✅ Backend configuration created for ${{ parameters.environment }}/${{ parameters.module }}"
+      Write-Host "📄 Backend configuration:"
+      Get-Content "backend.tf" | ForEach-Object { Write-Host "  $_" }
+      
+      # Validate and secure configuration
+      try {
+        # Format check
+        terraform fmt -check -diff backend.tf
+        Write-Host "✅ Backend configuration syntax is valid"
+      } catch {
+        Write-Host "⚠️ Backend configuration formatting issues detected, fixing..."
+        terraform fmt backend.tf
+        Write-Host "✅ Backend configuration formatted"
+      }
+      
+      # Security validation
+      try {
+        # Check for potential security issues in the configuration
+        $configContent = Get-Content "backend.tf" -Raw
+        $securityChecks = @(
+          @{ Pattern = "password\s*=\s*[\""'][^\""']*[\""']"; Message = "Hardcoded password detected" },
+          @{ Pattern = "secret\s*=\s*[\""'][^\""']*[\""']"; Message = "Hardcoded secret detected" },
+          @{ Pattern = "token\s*=\s*[\""'][^\""']*[\""']"; Message = "Hardcoded token detected" }
+        )
+        
+        $securityIssues = @()
+        foreach ($check in $securityChecks) {
+          if ($configContent -match $check.Pattern) {
+            $securityIssues += $check.Message
+          }
+        }
+        
+        if ($securityIssues.Count -gt 0) {
+          Write-Host "⚠️ Security issues found in backend configuration:"
+          $securityIssues | ForEach-Object { Write-Host "  - $_" }
+          Write-Host "##vso[task.logissue type=warning]Security issues found in backend configuration"
+        } else {
+          Write-Host "✅ Backend configuration security check passed"
+        }
+        
+        # Set configuration status
+        Write-Host "##vso[task.setvariable variable=BACKEND_CONFIG_STATUS]Valid"
+        
+      } catch {
+        Write-Host "⚠️ Backend configuration validation failed: $($_.Exception.Message)"
+        Write-Host "##vso[task.setvariable variable=BACKEND_CONFIG_STATUS]Warning"
+      }

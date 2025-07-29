@@ -1,0 +1,368 @@
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: gitea-full-backup
+  namespace: gitea
+spec:
+  schedule: "0 1 * * *" # Daily at 1AM
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: gitea-backup
+              image: gitea/gitea:latest
+              env:
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: gitea-db-postgres-creds-1password
+                      key: password
+                - name: POSTGRES_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: gitea-db-postgres-creds-1password
+                      key: username
+                - name: POSTGRES_HOST
+                  value: gitea-database-rw.gitea.svc.cluster.local
+                - name: POSTGRES_DB
+                  value: gitea
+                - name: GITEA_WORK_DIR
+                  value: /data/gitea
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  set -euo pipefail
+                  
+                  # Install PostgreSQL client
+                  apk add --no-cache postgresql-client
+                  
+                  MAX_RETRIES=5
+                  RETRY_DELAYS=(10 20 40 80 160)
+                  
+                  log_info() {
+                      echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] INFO: $*" >&2
+                  }
+                  
+                  log_error() {
+                      echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] ERROR: $*" >&2
+                  }
+                  
+                  error_trap() {
+                      local exit_code=$?
+                      local line_number=$1
+                      log_error "Gitea backup failed at line $line_number with exit code $exit_code"
+                      exit $exit_code
+                  }
+                  
+                  trap 'error_trap $LINENO' ERR
+                  
+                  retry_with_backoff() {
+                      local cmd="$1"
+                      local attempt=1
+                      
+                      while [[ $attempt -le $MAX_RETRIES ]]; do
+                          log_info "Attempt $attempt/$MAX_RETRIES: $cmd"
+                          
+                          if eval "$cmd"; then
+                              log_info "Command succeeded on attempt $attempt"
+                              return 0
+                          else
+                              local exit_code=$?
+                              log_error "Command failed on attempt $attempt with exit code $exit_code"
+                              
+                              if [[ $attempt -eq $MAX_RETRIES ]]; then
+                                  log_error "All $MAX_RETRIES attempts failed"
+                                  return $exit_code
+                              fi
+                              
+                              local delay=${RETRY_DELAYS[$((attempt-1))]}
+                              log_info "Waiting $delay seconds before next attempt..."
+                              sleep "$delay"
+                              ((attempt++))
+                          fi
+                      done
+                  }
+                  
+                  TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+                  DB_BACKUP_FILE="gitea_db_backup_${TIMESTAMP}.sql.gz"
+                  REPOS_BACKUP_FILE="gitea_repos_backup_${TIMESTAMP}.tar.gz"
+                  
+                  log_info "🔄 Starting Gitea comprehensive backup..."
+                  
+                  # 1. Backup PostgreSQL database
+                  log_info "📊 Creating database backup: $DB_BACKUP_FILE"
+                  retry_with_backoff "pg_dump -h '$POSTGRES_HOST' -U '$POSTGRES_USER' -d '$POSTGRES_DB' --verbose --no-owner --no-privileges | gzip > /mnt/backup/$DB_BACKUP_FILE"
+                  
+                  # Validate DB backup
+                  if [[ ! -f "/mnt/backup/$DB_BACKUP_FILE" ]] || [[ ! -s "/mnt/backup/$DB_BACKUP_FILE" ]]; then
+                      log_error "Database backup failed or is empty"
+                      exit 1
+                  fi
+                  
+                  if ! gzip -t "/mnt/backup/$DB_BACKUP_FILE"; then
+                      log_error "Database backup file is corrupted"
+                      exit 1
+                  fi
+                  
+                  DB_SIZE=$(du -h "/mnt/backup/$DB_BACKUP_FILE" | cut -f1)
+                  log_info "✅ Database backup completed: $DB_BACKUP_FILE ($DB_SIZE)"
+                  
+                  # 2. Backup Git repositories and data
+                  log_info "📁 Creating repositories backup: $REPOS_BACKUP_FILE"
+                  
+                  # Create comprehensive backup including:
+                  # - Git repositories
+                  # - Gitea configuration
+                  # - LFS data
+                  # - Avatars and attachments
+                  cd /data
+                  
+                  # Exclude cache and temporary files but include all important data
+                  tar --exclude='./gitea/log/*' \
+                      --exclude='./gitea/indexers/*' \
+                      --exclude='./gitea/queues/*' \
+                      --exclude='./gitea/tmp/*' \
+                      -czf "/mnt/backup/$REPOS_BACKUP_FILE" \
+                      ./git/ \
+                      ./gitea/conf/ \
+                      ./gitea/custom/ \
+                      ./gitea/data/ \
+                      ./gitea/lfs/ 2>/dev/null || true
+                  
+                  # Validate repositories backup
+                  if [[ ! -f "/mnt/backup/$REPOS_BACKUP_FILE" ]] || [[ ! -s "/mnt/backup/$REPOS_BACKUP_FILE" ]]; then
+                      log_error "Repositories backup failed or is empty"
+                      exit 1
+                  fi
+                  
+                  # Test tar file integrity
+                  if ! tar -tzf "/mnt/backup/$REPOS_BACKUP_FILE" >/dev/null; then
+                      log_error "Repositories backup file is corrupted"
+                      exit 1
+                  fi
+                  
+                  REPOS_SIZE=$(du -h "/mnt/backup/$REPOS_BACKUP_FILE" | cut -f1)
+                  log_info "✅ Repositories backup completed: $REPOS_BACKUP_FILE ($REPOS_SIZE)"
+                  
+                  # 3. Create backup metadata
+                  METADATA_FILE="gitea_backup_metadata_${TIMESTAMP}.json"
+                  cat > "/mnt/backup/$METADATA_FILE" << EOF
+                  {
+                    "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+                    "backup_type": "full",
+                    "database_backup": "$DB_BACKUP_FILE",
+                    "repositories_backup": "$REPOS_BACKUP_FILE",
+                    "database_size": "$DB_SIZE",
+                    "repositories_size": "$REPOS_SIZE",
+                    "gitea_version": "$(gitea --version | head -1)",
+                    "postgres_version": "$(pg_dump --version)"
+                  }
+                  EOF
+                  
+                  log_info "📝 Backup metadata created: $METADATA_FILE"
+                  
+                  # Signal completion to B2 uploader
+                  touch /mnt/backup/.gitea_done
+                  
+                  log_info "✅ Gitea backup completed successfully"
+              volumeMounts:
+                - name: backup-storage
+                  mountPath: /mnt/backup
+                - name: gitea-data
+                  mountPath: /data
+            - name: b2-uploader
+              image: backblazeit/b2:latest
+              env:
+                - name: B2_APPLICATION_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: backblaze-cloud-homelab-creds-1password
+                      key: keyID
+                - name: B2_APPLICATION_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: backblaze-cloud-homelab-creds-1password
+                      key: applicationKey
+                - name: B2_BUCKET_NAME
+                  value: "cloud-homelab-backups"
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  set -euo pipefail
+                  
+                  MAX_RETRIES=5
+                  RETRY_DELAYS=(10 20 40 80 160)
+                  
+                  log_info() {
+                      echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] INFO: $*" >&2
+                  }
+                  
+                  log_error() {
+                      echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] ERROR: $*" >&2
+                  }
+                  
+                  retry_with_backoff() {
+                      local cmd="$1"
+                      local attempt=1
+                      
+                      while [[ $attempt -le $MAX_RETRIES ]]; do
+                          log_info "Attempt $attempt/$MAX_RETRIES: $cmd"
+                          
+                          if eval "$cmd"; then
+                              log_info "Command succeeded on attempt $attempt"
+                              return 0
+                          else
+                              local exit_code=$?
+                              log_error "Command failed on attempt $attempt with exit code $exit_code"
+                              
+                              if [[ $attempt -eq $MAX_RETRIES ]]; then
+                                  log_error "All $MAX_RETRIES attempts failed"
+                                  return $exit_code
+                              fi
+                              
+                              local delay=${RETRY_DELAYS[$((attempt-1))]}
+                              log_info "Waiting $delay seconds before next attempt..."
+                              sleep "$delay"
+                              ((attempt++))
+                          fi
+                      done
+                  }
+                  
+                  log_info "🔄 Starting B2 upload process for Gitea backups..."
+                  
+                  # Wait for Gitea backup completion
+                  timeout=3600  # 60 minutes for large repos
+                  elapsed=0
+                  while [[ ! -f /mnt/backup/.gitea_done ]]; do
+                      if [[ $elapsed -ge $timeout ]]; then
+                          log_error "Timeout waiting for Gitea backup completion"
+                          exit 1
+                      fi
+                      log_info "Waiting for Gitea backup completion... (${elapsed}s elapsed)"
+                      sleep 10
+                      ((elapsed+=10))
+                  done
+                  
+                  # Get timestamp from any backup file
+                  TIMESTAMP=$(ls /mnt/backup/gitea_*_backup_*.* | head -1 | sed -n 's/.*_\([0-9]\{8\}_[0-9]\{6\}\).*/\1/p')
+                  if [[ -z "$TIMESTAMP" ]]; then
+                      log_error "Could not determine backup timestamp"
+                      exit 1
+                  fi
+                  
+                  # Upload database backup
+                  DB_BACKUP="gitea_db_backup_${TIMESTAMP}.sql.gz"
+                  if [[ -f "/mnt/backup/$DB_BACKUP" ]] && [[ -s "/mnt/backup/$DB_BACKUP" ]]; then
+                      UPLOAD_PATH="gitea/database/$DB_BACKUP"
+                      log_info "Uploading database backup to B2: $UPLOAD_PATH"
+                      retry_with_backoff "b2v4 file upload '$B2_BUCKET_NAME' '/mnt/backup/$DB_BACKUP' '$UPLOAD_PATH'"
+                  else
+                      log_error "Database backup file not found or empty: $DB_BACKUP"
+                      exit 1
+                  fi
+                  
+                  # Upload repositories backup
+                  REPOS_BACKUP="gitea_repos_backup_${TIMESTAMP}.tar.gz"
+                  if [[ -f "/mnt/backup/$REPOS_BACKUP" ]] && [[ -s "/mnt/backup/$REPOS_BACKUP" ]]; then
+                      UPLOAD_PATH="gitea/repositories/$REPOS_BACKUP"
+                      log_info "Uploading repositories backup to B2: $UPLOAD_PATH"
+                      retry_with_backoff "b2v4 file upload '$B2_BUCKET_NAME' '/mnt/backup/$REPOS_BACKUP' '$UPLOAD_PATH'"
+                  else
+                      log_error "Repositories backup file not found or empty: $REPOS_BACKUP"
+                      exit 1
+                  fi
+                  
+                  # Upload metadata
+                  METADATA_FILE="gitea_backup_metadata_${TIMESTAMP}.json"
+                  if [[ -f "/mnt/backup/$METADATA_FILE" ]]; then
+                      UPLOAD_PATH="gitea/metadata/$METADATA_FILE"
+                      log_info "Uploading metadata to B2: $UPLOAD_PATH"
+                      retry_with_backoff "b2v4 file upload '$B2_BUCKET_NAME' '/mnt/backup/$METADATA_FILE' '$UPLOAD_PATH'"
+                  fi
+                  
+                  log_info "✅ B2 upload completed successfully for all Gitea backup components"
+              volumeMounts:
+                - name: backup-storage
+                  mountPath: /mnt/backup
+          restartPolicy: OnFailure
+          volumes:
+            - name: backup-storage
+              emptyDir: {}
+            - name: gitea-data
+              persistentVolumeClaim:
+                claimName: gitea-shared-storage
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: gitea-cleanup
+  namespace: gitea
+spec:
+  schedule: "0 5 1 * *" # Monthly cleanup on 1st at 5AM
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: b2-cleanup
+              image: backblazeit/b2:latest
+              env:
+                - name: B2_APPLICATION_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: backblaze-cloud-homelab-creds-1password
+                      key: keyID
+                - name: B2_APPLICATION_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: backblaze-cloud-homelab-creds-1password
+                      key: applicationKey
+                - name: B2_BUCKET_NAME
+                  value: "cloud-homelab-backups"
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  set -euo pipefail
+                  
+                  log_info() {
+                      echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] INFO: $*" >&2
+                  }
+                  
+                  log_info "🔄 Starting Gitea backup cleanup (keeping last 30 days)..."
+                  
+                  CUTOFF_DATE=$(date -d '30 days ago' +%Y%m%d)
+                  
+                  # Function to clean backup files in a specific path
+                  cleanup_path() {
+                      local path=$1
+                      local pattern=$2
+                      
+                      b2v4 file ls "$B2_BUCKET_NAME" "$path" | while read -r file_info; do
+                          filename=$(echo "$file_info" | awk '{print $2}')
+                          
+                          if [[ $filename =~ $pattern ]]; then
+                              file_date=${BASH_REMATCH[1]}
+                              
+                              if [[ $file_date < $CUTOFF_DATE ]]; then
+                                  log_info "Deleting old backup: $filename (date: $file_date)"
+                                  file_id=$(echo "$file_info" | awk '{print $1}')
+                                  b2v4 file delete "$file_id" "$filename"
+                              fi
+                          fi
+                      done
+                  }
+                  
+                  # Clean database backups
+                  cleanup_path "gitea/database/" "gitea_db_backup_([0-9]{8})_[0-9]{6}\.sql\.gz$"
+                  
+                  # Clean repository backups
+                  cleanup_path "gitea/repositories/" "gitea_repos_backup_([0-9]{8})_[0-9]{6}\.tar\.gz$"
+                  
+                  # Clean metadata files
+                  cleanup_path "gitea/metadata/" "gitea_backup_metadata_([0-9]{8})_[0-9]{6}\.json$"
+                  
+                  log_info "✅ Gitea backup cleanup completed"
+          restartPolicy: OnFailure

@@ -1,0 +1,145 @@
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: default-quota
+  namespace: default
+spec:
+  hard:
+    requests.cpu: "10"
+    requests.memory: 20Gi
+    limits.cpu: "20"
+    limits.memory: 40Gi
+    persistentvolumeclaims: "10"
+    pods: "20"
+    services: "10"
+
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: services-quota
+  namespace: services
+spec:
+  hard:
+    requests.cpu: "30"
+    requests.memory: 60Gi
+    limits.cpu: "50"
+    limits.memory: 100Gi
+    persistentvolumeclaims: "50"
+    pods: "100"
+    services: "50"
+
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: monitoring-quota
+  namespace: monitoring
+spec:
+  hard:
+    requests.cpu: "20"
+    requests.memory: 40Gi
+    limits.cpu: "40"
+    limits.memory: 80Gi
+    persistentvolumeclaims: "20"
+    pods: "50"
+    services: "20"
+
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: mlops-quota
+  namespace: mlops
+spec:
+  hard:
+    requests.cpu: "50"
+    requests.memory: 100Gi
+    limits.cpu: "100"
+    limits.memory: 200Gi
+    requests.nvidia.com/gpu: "4"
+    limits.nvidia.com/gpu: "4"
+    persistentvolumeclaims: "30"
+    pods: "20"
+    services: "15"
+
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: default-limits
+  namespace: default
+spec:
+  limits:
+  - default:
+      cpu: 500m
+      memory: 512Mi
+    defaultRequest:
+      cpu: 100m
+      memory: 128Mi
+    type: Container
+
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: services-limits
+  namespace: services
+spec:
+  limits:
+  - default:
+      cpu: 1000m
+      memory: 1Gi
+    defaultRequest:
+      cpu: 200m
+      memory: 256Mi
+    type: Container
+  - max:
+      cpu: 8000m
+      memory: 16Gi
+    min:
+      cpu: 50m
+      memory: 64Mi
+    type: Container
+
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: monitoring-limits
+  namespace: monitoring
+spec:
+  limits:
+  - default:
+      cpu: 2000m
+      memory: 2Gi
+    defaultRequest:
+      cpu: 500m
+      memory: 512Mi
+    type: Container
+  - max:
+      cpu: 16000m
+      memory: 32Gi
+    type: Container
+
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: mlops-limits
+  namespace: mlops
+spec:
+  limits:
+  - default:
+      cpu: 4000m
+      memory: 8Gi
+    defaultRequest:
+      cpu: 1000m
+      memory: 2Gi
+    type: Container
+  - max:
+      cpu: 32000m
+      memory: 128Gi
+      nvidia.com/gpu: "2"
+    type: Container

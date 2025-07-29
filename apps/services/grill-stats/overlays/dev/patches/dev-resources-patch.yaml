@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grill-stats
+  namespace: grill-stats
+spec:
+  template:
+    spec:
+      containers:
+      - name: grill-stats
+        # Reduced resource requirements for development
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        # Enable development features
+        ports:
+        - containerPort: 5000
+          name: http
+        - containerPort: 5678
+          name: debug
+        # Development readiness/liveness probes (more permissive)
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3

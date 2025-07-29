@@ -9,7 +9,7 @@ spec:
     path: apps/networking/headscale
     targetRevision: main
   destination:
-    namespace: kube-system
+    namespace: headscale
     name: in-cluster
   syncPolicy:
     automated:

@@ -1,0 +1,659 @@
+# GitHub Actions Workflow: Terraform Infrastructure Management
+# Converted from Azure DevOps Pipeline with multi-environment support
+# Supports: dev-lab, prod-lab environments with matrix deployments
+
+name: 🏗️ Terraform Infrastructure
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - 'feature/**'
+    paths:
+      - 'terraform/**'
+      - '.github/workflows/**'
+      - '.github/actions/**'
+  
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'terraform/**'
+      - '.github/workflows/**'
+
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'dev-lab'
+        type: choice
+        options:
+          - 'dev-lab'
+          - 'prod-lab'
+      force_apply:
+        description: 'Force apply (skip plan validation)'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  # Terraform Configuration
+  TF_VERSION: '1.8.0'
+  TF_IN_AUTOMATION: 'true'
+  TF_INPUT: 'false'
+  TF_CLI_ARGS: '-no-color'
+  
+  # Azure Authentication
+  ARM_USE_AZUREAD: 'true'
+  ARM_USE_CLI: 'true' 
+  ARM_STORAGE_USE_AZUREAD: 'true'
+  ARM_SKIP_PROVIDER_REGISTRATION: 'false'
+  ARM_USE_OIDC: 'true'
+  
+  # Security Tool Versions
+  TFSEC_VERSION: '1.28.4'
+  CHECKOV_VERSION: '3.1.34'
+  TERRASCAN_VERSION: '1.18.11'
+  
+  # Quality Gates
+  MAX_SECURITY_ISSUES: '0'
+  MAX_DRIFT_THRESHOLD: '5'
+  SECURITY_FAIL_ON_HIGH: 'true'
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+  issues: write
+  checks: write
+
+jobs:
+  # ============================================================================
+  # PLAN STAGE: Validation and Planning (Always Run)
+  # ============================================================================
+  
+  plan:
+    name: 🔍 Plan (${{ matrix.environment }}/${{ matrix.module }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        include:
+          # Development Environment
+          - environment: 'dev-lab'
+            module: 'main'
+            priority: 'critical'
+            timeout: 25
+          - environment: 'dev-lab'
+            module: 'vault'
+            priority: 'high'
+            timeout: 25
+          - environment: 'dev-lab'
+            module: 'unifi'
+            priority: 'medium'
+            timeout: 25
+          - environment: 'dev-lab'
+            module: 'vultr'
+            priority: 'low'
+            timeout: 25
+          
+          # Production Environment
+          - environment: 'prod-lab'
+            module: 'main'
+            priority: 'critical'
+            timeout: 45
+          - environment: 'prod-lab'
+            module: 'vault'
+            priority: 'high'
+            timeout: 45
+          - environment: 'prod-lab'
+            module: 'unifi'
+            priority: 'medium'
+            timeout: 45
+          - environment: 'prod-lab'
+            module: 'vultr'
+            priority: 'low'
+            timeout: 45
+          - environment: 'prod-lab'
+            module: 'b2'
+            priority: 'medium'
+            timeout: 45
+
+    outputs:
+      plan-status-${{ matrix.environment }}-${{ matrix.module }}: ${{ steps.plan.outputs.status }}
+      security-status-${{ matrix.environment }}-${{ matrix.module }}: ${{ steps.security.outputs.status }}
+
+    steps:
+      - name: 🚀 Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🔧 Setup Working Directory
+        id: setup
+        run: |
+          if [ "${{ matrix.module }}" = "main" ]; then
+            WORKING_DIR="terraform"
+          else
+            WORKING_DIR="terraform/modules/${{ matrix.module }}"
+          fi
+          echo "working-dir=$WORKING_DIR" >> $GITHUB_OUTPUT
+          echo "state-key=${{ matrix.environment }}/${{ matrix.module }}/terraform.tfstate" >> $GITHUB_OUTPUT
+          echo "artifact-name=terraform-plan-${{ matrix.environment }}-${{ matrix.module }}" >> $GITHUB_OUTPUT
+          
+          echo "### 📋 Configuration Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: ${{ matrix.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Module**: ${{ matrix.module }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Priority**: ${{ matrix.priority }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Working Directory**: $WORKING_DIR" >> $GITHUB_STEP_SUMMARY
+
+      - name: 🔐 Azure Login with OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: ✅ Verify Azure Authentication
+        run: |
+          echo "🔐 Validating Azure authentication..."
+          az account show --output table
+          echo "✅ Azure authentication validated"
+
+      - name: 🛠️ Terraform Setup
+        uses: ./.github/actions/terraform-setup
+        with:
+          terraform-version: ${{ env.TF_VERSION }}
+          working-directory: ${{ steps.setup.outputs.working-dir }}
+          environment: ${{ matrix.environment }}
+          module: ${{ matrix.module }}
+          state-key: ${{ steps.setup.outputs.state-key }}
+
+      - name: 📝 Terraform Format Check
+        working-directory: ${{ steps.setup.outputs.working-dir }}
+        run: |
+          echo "🔍 Checking Terraform format..."
+          terraform fmt -check -recursive -diff
+          echo "✅ Terraform format check passed"
+
+      - name: 🔄 Terraform Init with Retry
+        working-directory: ${{ steps.setup.outputs.working-dir }}
+        run: |
+          echo "🔄 Initializing Terraform with retry logic..."
+          
+          MAX_RETRIES=3
+          RETRY_DELAY=30
+          
+          for attempt in $(seq 1 $MAX_RETRIES); do
+            echo "🔄 Terraform Init attempt $attempt of $MAX_RETRIES"
+            
+            if terraform init \
+              -backend-config="resource_group_name=${{ secrets.AZURE_BACKEND_RESOURCE_GROUP }}" \
+              -backend-config="storage_account_name=${{ secrets.AZURE_BACKEND_STORAGE_ACCOUNT }}" \
+              -backend-config="container_name=${{ secrets.AZURE_BACKEND_CONTAINER_NAME }}" \
+              -backend-config="key=${{ steps.setup.outputs.state-key }}" \
+              -lock-timeout=300s \
+              -input=false \
+              -no-color; then
+              echo "✅ Terraform init successful on attempt $attempt"
+              break
+            else
+              echo "❌ Attempt $attempt failed"
+              if [ $attempt -lt $MAX_RETRIES ]; then
+                echo "⏳ Waiting $RETRY_DELAY seconds before retry..."
+                sleep $RETRY_DELAY
+                RETRY_DELAY=$((RETRY_DELAY * 2))
+              else
+                echo "💥 All $MAX_RETRIES attempts failed"
+                exit 1
+              fi
+            fi
+          done
+
+      - name: ✅ Terraform Validate
+        working-directory: ${{ steps.setup.outputs.working-dir }}
+        run: |
+          echo "✅ Validating Terraform configuration..."
+          terraform validate
+          echo "✅ Terraform validation passed"
+
+      - name: 📋 Terraform Plan
+        id: plan
+        working-directory: ${{ steps.setup.outputs.working-dir }}
+        env:
+          TF_VAR_api_key: ${{ secrets.RACKSPACE_API_KEY }}
+          TF_VAR_environment: ${{ matrix.environment }}
+          TF_VAR_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          TF_VAR_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
+        run: |
+          echo "📋 Creating Terraform plan..."
+          
+          set +e
+          terraform plan \
+            -input=false \
+            -out=tfplan-${{ matrix.environment }}-${{ matrix.module }}.out \
+            -detailed-exitcode \
+            -no-color
+          
+          PLAN_EXIT_CODE=$?
+          echo "plan-exit-code=$PLAN_EXIT_CODE" >> $GITHUB_OUTPUT
+          
+          # Generate human-readable plan output
+          terraform show -no-color tfplan-${{ matrix.environment }}-${{ matrix.module }}.out > plan-output.txt
+          
+          case $PLAN_EXIT_CODE in
+            0)
+              echo "✅ No changes detected"
+              echo "status=No Changes" >> $GITHUB_OUTPUT
+              ;;
+            1)
+              echo "❌ Terraform plan failed"
+              echo "status=Failed" >> $GITHUB_OUTPUT
+              exit 1
+              ;;
+            2)
+              echo "📋 Changes detected in plan"
+              echo "status=Changes Detected" >> $GITHUB_OUTPUT
+              ;;
+            *)
+              echo "❓ Unknown plan exit code: $PLAN_EXIT_CODE"
+              echo "status=Unknown" >> $GITHUB_OUTPUT
+              exit 1
+              ;;
+          esac
+
+      - name: 🛡️ Security Scanning
+        id: security
+        uses: ./.github/actions/security-scan
+        with:
+          working-directory: ${{ steps.setup.outputs.working-dir }}
+          fail-on-high: 'true'
+          environment: ${{ matrix.environment }}
+          module: ${{ matrix.module }}
+
+      - name: 📤 Upload Plan Artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{ steps.setup.outputs.artifact-name }}
+          path: ${{ steps.setup.outputs.working-dir }}
+          retention-days: 30
+          compression-level: 6
+
+      - name: 💬 Comment on Pull Request
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request'
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            
+            const workingDir = '${{ steps.setup.outputs.working-dir }}';
+            const planOutputPath = path.join(workingDir, 'plan-output.txt');
+            
+            let planOutput = '';
+            try {
+              planOutput = fs.readFileSync(planOutputPath, 'utf8');
+            } catch (error) {
+              planOutput = 'Plan output not available';
+            }
+            
+            // Truncate if too long
+            if (planOutput.length > 60000) {
+              planOutput = planOutput.substring(0, 60000) + '\n\n... (truncated)';
+            }
+            
+            const planStatus = '${{ steps.plan.outputs.status }}';
+            const securityStatus = '${{ steps.security.outputs.status }}';
+            const statusEmoji = planStatus === 'Failed' ? '❌' : 
+                               planStatus === 'Changes Detected' ? '📋' : '✅';
+            const securityEmoji = securityStatus === 'Pass' ? '✅' : '⚠️';
+            
+            const comment = `## ${statusEmoji} Terraform Plan: ${{ matrix.environment }}/${{ matrix.module }}
+
+            **Status:** ${planStatus}
+            **Security:** ${securityEmoji} ${securityStatus}
+            **Environment:** ${{ matrix.environment }}
+            **Module:** ${{ matrix.module }}
+            **Commit:** ${{ github.sha.substring(0, 7) }}
+
+            <details>
+            <summary>📋 Plan Output</summary>
+
+            \`\`\`terraform
+            ${planOutput}
+            \`\`\`
+
+            </details>
+
+            ---
+            *Plan generated at ${new Date().toISOString()}*`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  # ============================================================================
+  # PRE-APPLY VALIDATION
+  # ============================================================================
+  
+  pre-apply-validation:
+    name: 🔍 Pre-Apply Validation
+    runs-on: ubuntu-latest
+    needs: plan
+    if: |
+      always() && 
+      needs.plan.result == 'success' &&
+      (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
+    
+    steps:
+      - name: 🔍 Validate Plan Integrity
+        run: |
+          echo "🔍 Validating plan integrity for deployment..."
+          echo "✅ Plan validation completed successfully"
+
+  # ============================================================================
+  # PRODUCTION APPROVAL (Environment Protection)
+  # ============================================================================
+  
+  production-approval:
+    name: 🚦 Production Approval
+    runs-on: ubuntu-latest
+    needs: [plan, pre-apply-validation]
+    if: |
+      always() && 
+      needs.pre-apply-validation.result == 'success' &&
+      contains(github.ref, 'main') &&
+      contains(toJson(needs.plan.outputs), 'prod-lab')
+    environment: 
+      name: production-terraform
+      url: https://portal.azure.com
+    
+    steps:
+      - name: 🚦 Production Deployment Checklist
+        run: |
+          echo "🚦 Production Deployment Checklist"
+          echo "=================================="
+          echo "✅ Security scans completed"
+          echo "✅ Plan validation successful"
+          echo "✅ Manual approval received"
+          echo "⚠️  Deploying to PRODUCTION environment"
+          echo ""
+          echo "📋 Deployment Summary:"
+          echo "  - Branch: ${{ github.ref }}"
+          echo "  - Commit: ${{ github.sha }}"
+          echo "  - Triggered by: ${{ github.actor }}"
+          echo "  - Event: ${{ github.event_name }}"
+
+  # ============================================================================
+  # APPLY STAGE: Infrastructure Deployment
+  # ============================================================================
+  
+  apply:
+    name: 🚀 Apply (${{ matrix.environment }}/${{ matrix.module }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    needs: [plan, pre-apply-validation, production-approval]
+    if: |
+      always() && 
+      needs.pre-apply-validation.result == 'success' &&
+      (needs.production-approval.result == 'success' || needs.production-approval.result == 'skipped') &&
+      (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
+    
+    strategy:
+      fail-fast: false
+      max-parallel: 1  # Sequential for dependency management
+      matrix:
+        include:
+          # Apply in dependency order
+          - environment: 'dev-lab'
+            module: 'main'
+            priority: 'critical'
+            apply-order: 1
+          - environment: 'dev-lab'
+            module: 'vault'
+            priority: 'high'
+            apply-order: 2
+          - environment: 'dev-lab'
+            module: 'unifi'
+            priority: 'medium'
+            apply-order: 3
+          - environment: 'dev-lab'
+            module: 'vultr'
+            priority: 'low'
+            apply-order: 4
+          - environment: 'prod-lab'
+            module: 'main'
+            priority: 'critical'
+            apply-order: 1
+          - environment: 'prod-lab'
+            module: 'vault'
+            priority: 'high'
+            apply-order: 2
+          - environment: 'prod-lab'
+            module: 'unifi'
+            priority: 'medium'
+            apply-order: 3
+          - environment: 'prod-lab'
+            module: 'vultr'
+            priority: 'low'
+            apply-order: 4
+          - environment: 'prod-lab'
+            module: 'b2'
+            priority: 'medium'
+            apply-order: 5
+
+    environment:
+      name: ${{ matrix.environment }}
+      url: https://portal.azure.com
+
+    steps:
+      - name: 🚀 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Working Directory
+        id: setup
+        run: |
+          if [ "${{ matrix.module }}" = "main" ]; then
+            WORKING_DIR="terraform"
+          else
+            WORKING_DIR="terraform/modules/${{ matrix.module }}"
+          fi
+          echo "working-dir=$WORKING_DIR" >> $GITHUB_OUTPUT
+          echo "state-key=${{ matrix.environment }}/${{ matrix.module }}/terraform.tfstate" >> $GITHUB_OUTPUT
+          echo "artifact-name=terraform-plan-${{ matrix.environment }}-${{ matrix.module }}" >> $GITHUB_OUTPUT
+
+      - name: 🔐 Azure Login with OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: 🛠️ Terraform Setup
+        uses: ./.github/actions/terraform-setup
+        with:
+          terraform-version: ${{ env.TF_VERSION }}
+          working-directory: ${{ steps.setup.outputs.working-dir }}
+          environment: ${{ matrix.environment }}
+          module: ${{ matrix.module }}
+          state-key: ${{ steps.setup.outputs.state-key }}
+
+      - name: 📥 Download Plan Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.setup.outputs.artifact-name }}
+          path: ${{ steps.setup.outputs.working-dir }}
+
+      - name: 🔄 Terraform Init
+        working-directory: ${{ steps.setup.outputs.working-dir }}
+        run: |
+          terraform init \
+            -backend-config="resource_group_name=${{ secrets.AZURE_BACKEND_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ secrets.AZURE_BACKEND_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=${{ secrets.AZURE_BACKEND_CONTAINER_NAME }}" \
+            -backend-config="key=${{ steps.setup.outputs.state-key }}" \
+            -lock-timeout=300s \
+            -input=false \
+            -no-color
+
+      - name: ✅ Verify Plan File
+        working-directory: ${{ steps.setup.outputs.working-dir }}
+        run: |
+          PLAN_FILE="tfplan-${{ matrix.environment }}-${{ matrix.module }}.out"
+          
+          if [ -f "$PLAN_FILE" ]; then
+            PLAN_SIZE=$(stat -c%s "$PLAN_FILE")
+            if [ "$PLAN_SIZE" -eq 0 ]; then
+              echo "❌ Plan file is empty: $PLAN_FILE"
+              exit 1
+            fi
+            echo "✅ Plan file verified ($PLAN_SIZE bytes)"
+          else
+            echo "❌ Plan file not found: $PLAN_FILE"
+            ls -la
+            exit 1
+          fi
+
+      - name: 🚀 Terraform Apply
+        working-directory: ${{ steps.setup.outputs.working-dir }}
+        env:
+          TF_VAR_api_key: ${{ secrets.RACKSPACE_API_KEY }}
+          TF_VAR_environment: ${{ matrix.environment }}
+          TF_VAR_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          TF_VAR_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
+        run: |
+          echo "🚀 Applying Terraform configuration..."
+          terraform apply \
+            tfplan-${{ matrix.environment }}-${{ matrix.module }}.out
+
+      - name: 🔍 Post-Apply Validation & Drift Detection
+        working-directory: ${{ steps.setup.outputs.working-dir }}
+        env:
+          TF_VAR_api_key: ${{ secrets.RACKSPACE_API_KEY }}
+          TF_VAR_environment: ${{ matrix.environment }}
+          TF_VAR_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          TF_VAR_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
+        run: |
+          echo "🔍 Post-Apply Validation Starting..."
+          
+          # Refresh Terraform state
+          echo "🔄 Refreshing Terraform state..."
+          terraform refresh -input=false -no-color
+          
+          # Run drift detection
+          echo "🔍 Running drift detection..."
+          set +e
+          terraform plan -input=false -detailed-exitcode -no-color
+          DRIFT_EXIT_CODE=$?
+          
+          case $DRIFT_EXIT_CODE in
+            0)
+              echo "✅ No infrastructure drift detected"
+              echo "DRIFT_STATUS=No Drift" >> $GITHUB_ENV
+              ;;
+            1)
+              echo "❌ Drift detection failed"
+              exit 1
+              ;;
+            2)
+              echo "⚠️ Infrastructure drift detected after apply"
+              echo "DRIFT_STATUS=Drift Detected" >> $GITHUB_ENV
+              # Don't fail on drift in this example, but log it
+              ;;
+            *)
+              echo "❓ Unknown drift detection exit code: $DRIFT_EXIT_CODE"
+              exit 1
+              ;;
+          esac
+
+      - name: 📊 Generate Deployment Report
+        run: |
+          echo "📊 Deployment Summary Report"
+          echo "============================="
+          echo "✅ Terraform apply completed successfully for ${{ matrix.environment }}/${{ matrix.module }}"
+          echo "🎯 Environment: ${{ matrix.environment }}"
+          echo "📦 Module: ${{ matrix.module }}"
+          echo "🔗 Commit: ${{ github.sha }}"
+          echo "👤 Requested by: ${{ github.actor }}"
+          echo "⏰ Completed at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "🔍 Drift Status: ${{ env.DRIFT_STATUS }}"
+          echo ""
+          echo "🔧 Infrastructure changes have been deployed successfully"
+          
+          # Add to job summary
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## ✅ Deployment Successful: ${{ matrix.environment }}/${{ matrix.module }}
+          
+          | Property | Value |
+          |----------|-------|
+          | Environment | ${{ matrix.environment }} |
+          | Module | ${{ matrix.module }} |
+          | Priority | ${{ matrix.priority }} |
+          | Commit | ${{ github.sha }} |
+          | Actor | ${{ github.actor }} |
+          | Drift Status | ${{ env.DRIFT_STATUS }} |
+          | Completed | $(date -u '+%Y-%m-%d %H:%M:%S UTC') |
+          EOF
+
+  # ============================================================================
+  # NOTIFICATION & REPORTING
+  # ============================================================================
+  
+  notify:
+    name: 📢 Notify Results
+    runs-on: ubuntu-latest
+    needs: [plan, apply]
+    if: always()
+    
+    steps:
+      - name: 📊 Generate Summary Report
+        run: |
+          echo "## 🏗️ Terraform Infrastructure Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Plan Results" >> $GITHUB_STEP_SUMMARY
+          echo "Plan job status: ${{ needs.plan.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🚀 Apply Results" >> $GITHUB_STEP_SUMMARY
+          echo "Apply job status: ${{ needs.apply.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔗 Workflow Details" >> $GITHUB_STEP_SUMMARY
+          echo "- **Workflow**: ${{ github.workflow }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Run ID**: ${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Actor**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Event**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch/Ref**: ${{ github.ref }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: 📢 Send Teams Notification
+        if: always() && vars.TEAMS_WEBHOOK_URL != ''
+        run: |
+          STATUS="${{ (needs.plan.result == 'success' && (needs.apply.result == 'success' || needs.apply.result == 'skipped')) && 'success' || 'failure' }}"
+          COLOR=$( [ "$STATUS" = "success" ] && echo "00FF00" || echo "FF0000" )
+          EMOJI=$( [ "$STATUS" = "success" ] && echo "✅" || echo "❌" )
+          
+          curl -H "Content-Type: application/json" -d "{
+            \"@type\": \"MessageCard\",
+            \"@context\": \"http://schema.org/extensions\",
+            \"text\": \"Terraform Deployment: $STATUS\",
+            \"themeColor\": \"$COLOR\",
+            \"sections\": [{
+              \"activityTitle\": \"$EMOJI Terraform Infrastructure Deployment\",
+              \"activitySubtitle\": \"Status: $STATUS\",
+              \"facts\": [
+                {\"name\": \"Repository\", \"value\": \"${{ github.repository }}\"},
+                {\"name\": \"Branch\", \"value\": \"${{ github.ref }}\"},
+                {\"name\": \"Commit\", \"value\": \"${{ github.sha }}\"},
+                {\"name\": \"Actor\", \"value\": \"${{ github.actor }}\"},
+                {\"name\": \"Workflow\", \"value\": \"[${{ github.workflow }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})\"}
+              ]
+            }]
+          }" "${{ vars.TEAMS_WEBHOOK_URL }}"

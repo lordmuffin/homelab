@@ -1,0 +1,326 @@
+# Business Metrics Dashboard
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-grill-stats-business
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/part-of: grill-stats
+    grafana_dashboard: "1"
+data:
+  grill-stats-business.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "Grill Stats Business Metrics",
+        "uid": "grill-stats-business",
+        "tags": ["grill-stats", "business"],
+        "style": "dark",
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Active Users (24h)",
+            "type": "stat",
+            "gridPos": {"h": 8, "w": 8, "x": 0, "y": 0},
+            "targets": [
+              {
+                "expr": "count(increase(grill_stats_user_login_total[24h]) > 0)",
+                "legendFormat": "Active Users",
+                "refId": "A"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "color": {"mode": "palette-classic"},
+                "unit": "short"
+              }
+            }
+          },
+          {
+            "id": 2,
+            "title": "Temperature Readings (1h)",
+            "type": "stat",
+            "gridPos": {"h": 8, "w": 8, "x": 8, "y": 0},
+            "targets": [
+              {
+                "expr": "sum(increase(grill_stats_temperature_readings_total[1h]))",
+                "legendFormat": "Readings",
+                "refId": "A"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "color": {"mode": "palette-classic"},
+                "unit": "short"
+              }
+            }
+          },
+          {
+            "id": 3,
+            "title": "Average Cook Time",
+            "type": "gauge",
+            "gridPos": {"h": 8, "w": 8, "x": 16, "y": 0},
+            "targets": [
+              {
+                "expr": "avg(grill_stats_cook_duration_seconds / 3600)",
+                "legendFormat": "Hours",
+                "refId": "A"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "h",
+                "min": 0,
+                "max": 12
+              }
+            }
+          },
+          {
+            "id": 4,
+            "title": "Device Battery Levels",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+            "targets": [
+              {
+                "expr": "grill_stats_device_battery_level",
+                "legendFormat": "Device {{ device_id }}",
+                "refId": "A"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "percent",
+                "min": 0,
+                "max": 100
+              }
+            }
+          },
+          {
+            "id": 5,
+            "title": "Cook Sessions by Duration",
+            "type": "histogram",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.5, sum(rate(grill_stats_cook_duration_seconds_bucket[24h])) by (le))",
+                "legendFormat": "Median",
+                "refId": "A"
+              },
+              {
+                "expr": "histogram_quantile(0.95, sum(rate(grill_stats_cook_duration_seconds_bucket[24h])) by (le))",
+                "legendFormat": "95th Percentile",
+                "refId": "B"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "s"
+              }
+            }
+          },
+          {
+            "id": 6,
+            "title": "Temperature Alerts (24h)",
+            "type": "stat",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+            "targets": [
+              {
+                "expr": "sum(increase(grill_stats_temperature_alerts_total[24h]))",
+                "legendFormat": "Total Alerts",
+                "refId": "A"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "color": {"mode": "palette-classic"},
+                "unit": "short"
+              }
+            }
+          },
+          {
+            "id": 7,
+            "title": "Top Cooking Temperatures",
+            "type": "table",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+            "targets": [
+              {
+                "expr": "topk(10, max(grill_stats_temperature_celsius) by (device_id, channel_id))",
+                "legendFormat": "{{ device_id }} - {{ channel_id }}",
+                "refId": "A",
+                "format": "table"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "celsius"
+              }
+            }
+          }
+        ],
+        "time": {"from": "now-24h", "to": "now"},
+        "refresh": "5m",
+        "schemaVersion": 27,
+        "version": 1
+      }
+    }
+---
+# SLO Dashboard
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-grill-stats-slo
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/part-of: grill-stats
+    grafana_dashboard: "1"
+data:
+  grill-stats-slo.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "Grill Stats SLO/SLI Dashboard",
+        "uid": "grill-stats-slo",
+        "tags": ["grill-stats", "slo", "reliability"],
+        "style": "dark",
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Availability SLO (99.9%)",
+            "type": "stat",
+            "gridPos": {"h": 8, "w": 8, "x": 0, "y": 0},
+            "targets": [
+              {
+                "expr": "(1 - (sum(rate(http_requests_total{job=~\"grill-stats-.*\",status=~\"5..\"}[30d])) / sum(rate(http_requests_total{job=~\"grill-stats-.*\"}[30d])))) * 100",
+                "legendFormat": "30-day Availability",
+                "refId": "A"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "percent",
+                "thresholds": {
+                  "steps": [
+                    {"color": "red", "value": 0},
+                    {"color": "yellow", "value": 99.8},
+                    {"color": "green", "value": 99.9}
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "id": 2,
+            "title": "Data Freshness SLO (99.5%)",
+            "type": "stat",
+            "gridPos": {"h": 8, "w": 8, "x": 8, "y": 0},
+            "targets": [
+              {
+                "expr": "(count(time() - grill_stats_last_temperature_reading_timestamp <= 60) / count(grill_stats_device_online_status == 1)) * 100",
+                "legendFormat": "Current Data Freshness",
+                "refId": "A"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "percent",
+                "thresholds": {
+                  "steps": [
+                    {"color": "red", "value": 0},
+                    {"color": "yellow", "value": 99.0},
+                    {"color": "green", "value": 99.5}
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "id": 3,
+            "title": "Response Time SLO (P95 < 500ms)",
+            "type": "stat",
+            "gridPos": {"h": 8, "w": 8, "x": 16, "y": 0},
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=~\"grill-stats-.*\"}[30d])) by (le)) * 1000",
+                "legendFormat": "30-day P95",
+                "refId": "A"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "ms",
+                "thresholds": {
+                  "steps": [
+                    {"color": "green", "value": 0},
+                    {"color": "yellow", "value": 400},
+                    {"color": "red", "value": 500}
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "id": 4,
+            "title": "Error Budget Burn Rate",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8},
+            "targets": [
+              {
+                "expr": "sum(rate(http_requests_total{job=~\"grill-stats-.*\",status=~\"5..\"}[1h])) / sum(rate(http_requests_total{job=~\"grill-stats-.*\"}[1h]))",
+                "legendFormat": "1h Error Rate",
+                "refId": "A"
+              },
+              {
+                "expr": "sum(rate(http_requests_total{job=~\"grill-stats-.*\",status=~\"5..\"}[6h])) / sum(rate(http_requests_total{job=~\"grill-stats-.*\"}[6h]))",
+                "legendFormat": "6h Error Rate",
+                "refId": "B"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "percentunit",
+                "thresholds": {
+                  "steps": [
+                    {"color": "green", "value": 0},
+                    {"color": "yellow", "value": 0.005},
+                    {"color": "red", "value": 0.01}
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "id": 5,
+            "title": "Service Level Indicators",
+            "type": "table",
+            "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16},
+            "targets": [
+              {
+                "expr": "label_replace(up{job=~\"grill-stats-.*\"}, \"sli\", \"Service Availability\", \"job\", \".*\")",
+                "legendFormat": "{{ job }}",
+                "refId": "A",
+                "format": "table"
+              },
+              {
+                "expr": "label_replace(histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=~\"grill-stats-.*\"}[5m])) by (job, le)), \"sli\", \"Response Time P95\", \"job\", \".*\")",
+                "legendFormat": "{{ job }}",
+                "refId": "B",
+                "format": "table"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "short"
+              }
+            }
+          }
+        ],
+        "time": {"from": "now-30d", "to": "now"},
+        "refresh": "1m",
+        "schemaVersion": 27,
+        "version": 1
+      }
+    }

@@ -2,6 +2,8 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: certmanager
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -9,7 +11,7 @@ spec:
   source:
     repoURL: https://charts.jetstack.io
     chart: cert-manager
-    targetRevision: v1.13.3
+    targetRevision: v1.15.5
     helm:
       releaseName: cert-manager
       values: |
@@ -18,7 +20,6 @@ spec:
         acmesolver:
           image:
             repository: quay.io/jetstack/cert-manager-acmesolver
-            tag: v1.12.4
         cainjector:
           containerSecurityContext:
             allowPrivilegeEscalation: false
@@ -29,7 +30,6 @@ spec:
           image:
             pullPolicy: IfNotPresent
             repository: quay.io/jetstack/cert-manager-cainjector
-            tag: v1.12.4
           nodeSelector:
             kubernetes.io/arch: amd64
             kubernetes.io/os: linux
@@ -66,8 +66,9 @@ spec:
         image:
           pullPolicy: IfNotPresent
           repository: quay.io/jetstack/cert-manager-controller
-          tag: v1.12.4
         installCRDs: true
+        crds:
+          enabled: true
         maxConcurrentChallenges: 60
         nodeSelector:
           kubernetes.io/arch: amd64
@@ -107,7 +108,6 @@ spec:
           image:
             pullPolicy: IfNotPresent
             repository: quay.io/jetstack/cert-manager-webhook
-            tag: v1.12.4
           livenessProbe:
             failureThreshold: 3
             initialDelaySeconds: 35
@@ -195,6 +195,7 @@ spec:
     - Prune=true
     - RespectIgnoreDifferences=true
     - ServerSideApply=true
+    - Replace=true
     retry:
       limit: 5
       backoff:

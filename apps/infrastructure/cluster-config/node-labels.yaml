@@ -1,0 +1,121 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: node-labeling-policy
+  namespace: kube-system
+data:
+  policy.yaml: |
+    # Node labeling policy for homelab cluster
+    # Apply labels based on node characteristics
+    
+    # Control plane nodes
+    node-role.kubernetes.io/control-plane: "true"
+    
+    # Worker node types
+    node-type.homelab.io/compute: "true"    # General compute nodes
+    node-type.homelab.io/storage: "true"    # Storage-optimized nodes
+    node-type.homelab.io/gpu: "true"        # GPU nodes
+    node-type.homelab.io/edge: "true"       # Edge/IoT nodes
+    
+    # Hardware characteristics
+    hardware.homelab.io/arch: "amd64"       # Architecture
+    hardware.homelab.io/cpu-type: "intel"   # CPU vendor
+    hardware.homelab.io/memory-size: "large" # Memory class (small/medium/large)
+    hardware.homelab.io/storage-type: "ssd" # Storage type
+    hardware.homelab.io/network-speed: "1g" # Network speed
+    
+    # Workload placement
+    workload.homelab.io/media: "true"       # Media processing
+    workload.homelab.io/database: "true"    # Database workloads
+    workload.homelab.io/ml: "true"          # Machine learning
+    workload.homelab.io/monitoring: "true"  # Monitoring stack
+    workload.homelab.io/ingress: "true"     # Ingress controllers
+    
+    # Environment
+    environment.homelab.io/zone: "main"     # Physical zone
+    environment.homelab.io/rack: "r1"       # Rack location
+    environment.homelab.io/power: "ups"     # Power source
+    environment.homelab.io/cooling: "air"   # Cooling method
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: node-labeler
+  namespace: kube-system
+spec:
+  template:
+    spec:
+      serviceAccountName: node-labeler
+      containers:
+      - name: node-labeler
+        image: bitnami/kubectl:latest
+        command:
+        - /bin/bash
+        - -c
+        - |
+          # Auto-label nodes based on hardware detection
+          for node in $(kubectl get nodes -o name | cut -d/ -f2); do
+            echo "Labeling node: $node"
+            
+            # Get node info
+            ARCH=$(kubectl get node $node -o jsonpath='{.status.nodeInfo.architecture}')
+            OS=$(kubectl get node $node -o jsonpath='{.status.nodeInfo.operatingSystem}')
+            
+            # Apply basic labels
+            kubectl label node $node hardware.homelab.io/arch=$ARCH --overwrite
+            kubectl label node $node hardware.homelab.io/os=$OS --overwrite
+            kubectl label node $node environment.homelab.io/zone=main --overwrite
+            
+            # Check for GPU
+            if kubectl describe node $node | grep -q nvidia; then
+              kubectl label node $node node-type.homelab.io/gpu=true --overwrite
+              kubectl label node $node workload.homelab.io/ml=true --overwrite
+            fi
+            
+            # Check for high memory (>16GB)
+            MEMORY_KB=$(kubectl get node $node -o jsonpath='{.status.capacity.memory}' | sed 's/Ki//')
+            if [ $MEMORY_KB -gt 16777216 ]; then
+              kubectl label node $node hardware.homelab.io/memory-size=large --overwrite
+              kubectl label node $node workload.homelab.io/database=true --overwrite
+            fi
+            
+            # Label control plane nodes
+            if kubectl get node $node -o jsonpath='{.metadata.labels}' | grep -q control-plane; then
+              kubectl label node $node workload.homelab.io/ingress=true --overwrite
+              kubectl label node $node workload.homelab.io/monitoring=true --overwrite
+            fi
+          done
+      restartPolicy: OnFailure
+      
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: node-labeler
+  namespace: kube-system
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: node-labeler
+rules:
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "list", "patch", "update"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: node-labeler
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: node-labeler
+subjects:
+- kind: ServiceAccount
+  name: node-labeler
+  namespace: kube-system

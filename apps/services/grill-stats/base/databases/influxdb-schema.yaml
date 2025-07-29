@@ -1,0 +1,319 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: influxdb-schema-documentation
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+data:
+  schema.md: |
+    # InfluxDB Schema Documentation
+
+    ## Overview
+    This document describes the InfluxDB 2.x schema design for the grill-stats temperature monitoring system.
+
+    ## Organization Structure
+    - **Organization**: `grill-stats`
+    - **Default Bucket**: `grill-stats-realtime`
+
+    ## Bucket Organization
+
+    ### 1. grill-stats-realtime (7 days retention)
+    - **Purpose**: Real-time temperature data ingestion
+    - **Retention**: 7 days
+    - **Usage**: Live dashboard, alerts, real-time monitoring
+    - **Write Load**: High (continuous data ingestion)
+    - **Read Load**: High (real-time queries)
+
+    ### 2. grill-stats-hourly (90 days retention)
+    - **Purpose**: Hourly aggregated temperature data
+    - **Retention**: 90 days (2160 hours)
+    - **Usage**: Medium-term analysis, trend visualization
+    - **Write Load**: Low (hourly aggregation tasks)
+    - **Read Load**: Medium (historical analysis)
+
+    ### 3. grill-stats-daily (1 year retention)
+    - **Purpose**: Daily aggregated temperature data
+    - **Retention**: 1 year (8760 hours)
+    - **Usage**: Long-term trend analysis, reporting
+    - **Write Load**: Very low (daily aggregation tasks)
+    - **Read Load**: Low (reporting queries)
+
+    ### 4. grill-stats-archive (infinite retention)
+    - **Purpose**: Long-term data archival
+    - **Retention**: Infinite (manual cleanup)
+    - **Usage**: Historical analysis, compliance
+    - **Write Load**: Very low (archive tasks)
+    - **Read Load**: Very low (occasional queries)
+
+    ### 5. grill-stats-monitoring (30 days retention)
+    - **Purpose**: System monitoring and health metrics
+    - **Retention**: 30 days (720 hours)
+    - **Usage**: Database health monitoring, alerting
+    - **Write Load**: Low (monitoring tasks)
+    - **Read Load**: Low (monitoring dashboards)
+
+    ## Measurement Schemas
+
+    ### temperature_readings
+    **Purpose**: Primary measurement for temperature data from all devices
+
+    **Tags (Indexed)**:
+    - `device_id`: Unique device identifier (e.g., "signals_001", "rfx_001")
+    - `channel_id`: Channel/probe identifier (e.g., "1", "2", "3", "4")
+    - `probe_type`: Type of probe (e.g., "meat", "ambient", "grill", "external")
+    - `user_id`: User identifier for multi-tenant support
+    - `device_type`: Device type (e.g., "signals", "rfx", "bluetooth")
+    - `location`: Physical location (e.g., "backyard", "kitchen")
+
+    **Fields (Not Indexed)**:
+    - `temperature`: Temperature value (float64)
+    - `unit`: Temperature unit (string: "F", "C")
+    - `battery_level`: Battery percentage (int64, 0-100)
+    - `signal_strength`: Signal strength in dBm (int64)
+    - `accuracy`: Temperature accuracy/precision (float64)
+    - `calibration_offset`: Calibration offset applied (float64)
+
+    **Example Data Point**:
+    ```
+    temperature_readings,device_id=signals_001,channel_id=1,probe_type=meat,user_id=user123,device_type=signals,location=backyard temperature=165.5,unit="F",battery_level=85,signal_strength=-45,accuracy=0.1,calibration_offset=0.0 1642267800000000000
+    ```
+
+    ### device_status
+    **Purpose**: Device connectivity and health status
+
+    **Tags (Indexed)**:
+    - `device_id`: Unique device identifier
+    - `user_id`: User identifier
+    - `device_type`: Device type
+    - `location`: Physical location
+
+    **Fields (Not Indexed)**:
+    - `online`: Device online status (boolean)
+    - `battery_level`: Battery percentage (int64)
+    - `signal_strength`: Signal strength in dBm (int64)
+    - `connection_status`: Connection state (string: "connected", "disconnected", "reconnecting")
+    - `last_seen`: Last communication timestamp (int64)
+    - `firmware_version`: Device firmware version (string)
+    - `hardware_version`: Device hardware version (string)
+    - `uptime`: Device uptime in seconds (int64)
+    - `memory_usage`: Device memory usage percentage (int64)
+    - `cpu_usage`: Device CPU usage percentage (int64)
+
+    **Example Data Point**:
+    ```
+    device_status,device_id=signals_001,user_id=user123,device_type=signals,location=backyard online=true,battery_level=85,signal_strength=-45,connection_status="connected",last_seen=1642267800,firmware_version="2.1.0",hardware_version="1.0",uptime=3600,memory_usage=45,cpu_usage=12 1642267800000000000
+    ```
+
+    ### alert_events
+    **Purpose**: Temperature alert and threshold events
+
+    **Tags (Indexed)**:
+    - `device_id`: Device identifier
+    - `channel_id`: Channel identifier
+    - `user_id`: User identifier
+    - `alert_type`: Alert type (e.g., "high_temp", "low_temp", "battery_low", "offline")
+    - `severity`: Alert severity (e.g., "info", "warning", "critical")
+    - `status`: Alert status (e.g., "active", "acknowledged", "resolved")
+
+    **Fields (Not Indexed)**:
+    - `threshold_value`: Threshold that triggered the alert (float64)
+    - `actual_value`: Actual value when alert triggered (float64)
+    - `message`: Alert message (string)
+    - `duration`: Alert duration in seconds (int64)
+    - `acknowledged_by`: User who acknowledged the alert (string)
+    - `resolved_by`: User who resolved the alert (string)
+
+    **Example Data Point**:
+    ```
+    alert_events,device_id=signals_001,channel_id=1,user_id=user123,alert_type=high_temp,severity=warning,status=active threshold_value=200.0,actual_value=205.5,message="Temperature exceeded threshold",duration=120,acknowledged_by="",resolved_by="" 1642267800000000000
+    ```
+
+    ### cooking_sessions
+    **Purpose**: Cooking session metadata and statistics
+
+    **Tags (Indexed)**:
+    - `session_id`: Unique session identifier
+    - `user_id`: User identifier
+    - `device_id`: Primary device identifier
+    - `cooking_method`: Cooking method (e.g., "smoking", "grilling", "roasting")
+    - `meat_type`: Type of meat (e.g., "beef", "pork", "chicken", "fish")
+    - `cut_type`: Cut of meat (e.g., "brisket", "ribs", "steak")
+
+    **Fields (Not Indexed)**:
+    - `start_time`: Session start timestamp (int64)
+    - `end_time`: Session end timestamp (int64)
+    - `duration`: Session duration in seconds (int64)
+    - `target_temp`: Target temperature (float64)
+    - `max_temp`: Maximum temperature reached (float64)
+    - `min_temp`: Minimum temperature reached (float64)
+    - `avg_temp`: Average temperature during session (float64)
+    - `weight`: Meat weight in pounds (float64)
+    - `notes`: Session notes (string)
+    - `rating`: Session rating 1-5 (int64)
+
+    **Example Data Point**:
+    ```
+    cooking_sessions,session_id=session_001,user_id=user123,device_id=signals_001,cooking_method=smoking,meat_type=beef,cut_type=brisket start_time=1642267800,end_time=1642300000,duration=32200,target_temp=203.0,max_temp=205.5,min_temp=180.0,avg_temp=195.2,weight=12.5,notes="Perfect bark formation",rating=5 1642300000000000000
+    ```
+
+    ### system_metrics
+    **Purpose**: System performance and health metrics
+
+    **Tags (Indexed)**:
+    - `service_name`: Service name (e.g., "temperature-service", "device-service")
+    - `instance_id`: Service instance identifier
+    - `metric_type`: Metric type (e.g., "cpu", "memory", "disk", "network")
+    - `environment`: Environment (e.g., "dev", "staging", "prod")
+
+    **Fields (Not Indexed)**:
+    - `value`: Metric value (float64)
+    - `unit`: Metric unit (string)
+    - `threshold`: Alert threshold (float64)
+    - `description`: Metric description (string)
+
+    **Example Data Point**:
+    ```
+    system_metrics,service_name=temperature-service,instance_id=temp-001,metric_type=cpu,environment=prod value=45.2,unit="percent",threshold=80.0,description="CPU usage percentage" 1642267800000000000
+    ```
+
+    ## Indexing Strategy
+
+    ### Tag Cardinality Guidelines
+    - **Low Cardinality** (< 1000 unique values): device_type, probe_type, alert_type, severity
+    - **Medium Cardinality** (1000-10000): device_id, user_id, location
+    - **High Cardinality** (> 10000): session_id, instance_id
+
+    ### Performance Optimization
+    - Use appropriate shard group duration (7 days for high-frequency data)
+    - Implement proper retention policies to manage storage growth
+    - Use continuous queries for downsampling to reduce query load
+    - Monitor tag cardinality to prevent performance degradation
+
+    ## Query Patterns
+
+    ### Real-time Dashboard Queries
+    ```flux
+    // Current temperature for all devices
+    from(bucket: "grill-stats-realtime")
+      |> range(start: -5m)
+      |> filter(fn: (r) => r._measurement == "temperature_readings")
+      |> last()
+      |> group(columns: ["device_id", "channel_id"])
+    ```
+
+    ### Historical Analysis Queries
+    ```flux
+    // Temperature trend over last 24 hours
+    from(bucket: "grill-stats-hourly")
+      |> range(start: -24h)
+      |> filter(fn: (r) => r._measurement == "temperature_readings")
+      |> filter(fn: (r) => r.device_id == "signals_001")
+      |> aggregateWindow(every: 1h, fn: mean)
+    ```
+
+    ### Alert Queries
+    ```flux
+    // Active alerts
+    from(bucket: "grill-stats-realtime")
+      |> range(start: -1h)
+      |> filter(fn: (r) => r._measurement == "alert_events")
+      |> filter(fn: (r) => r.status == "active")
+      |> group(columns: ["device_id", "alert_type"])
+    ```
+
+    ## Data Lifecycle Management
+
+    ### Retention Policies
+    1. **Real-time**: 7 days → Automatic deletion
+    2. **Hourly**: 90 days → Automatic deletion
+    3. **Daily**: 1 year → Automatic deletion
+    4. **Archive**: Manual cleanup based on compliance requirements
+
+    ### Downsampling Strategy
+    1. **Hourly Aggregation**: Every hour, aggregate last hour's real-time data
+    2. **Daily Aggregation**: Every day, aggregate last day's hourly data
+    3. **Monthly Aggregation**: Every month, aggregate last month's daily data (future enhancement)
+
+    ### Backup Strategy
+    - Daily full backup of all buckets
+    - 7-day local retention of backups
+    - Optional cloud storage for long-term backup retention
+
+    ## Security Considerations
+
+    ### Authentication
+    - Token-based authentication for all API access
+    - Service-specific tokens with minimal required permissions
+    - Regular token rotation (automated)
+
+    ### Authorization
+    - Organization-level access control
+    - Bucket-level read/write permissions
+    - User-level data isolation using tags
+
+    ### Encryption
+    - TLS encryption for all client connections
+    - Encryption at rest for sensitive data
+    - Secure token storage in Kubernetes secrets
+
+    ## Monitoring and Alerting
+
+    ### Key Metrics to Monitor
+    - Write throughput (points/second)
+    - Query latency (95th percentile)
+    - Memory usage
+    - Disk usage
+    - Task execution success rate
+    - Cardinality growth
+
+    ### Alert Conditions
+    - Database unavailable
+    - High write latency (> 10s)
+    - High query latency (> 30s)
+    - High memory usage (> 85%)
+    - Failed tasks
+    - No data ingestion for 10+ minutes
+
+    ## Troubleshooting
+
+    ### Common Issues
+    1. **High Cardinality**: Monitor tag cardinality, redesign schema if needed
+    2. **Slow Queries**: Add appropriate indexes, optimize Flux queries
+    3. **Storage Growth**: Review retention policies, implement proper downsampling
+    4. **Memory Issues**: Tune cache settings, increase memory limits
+    5. **Connection Issues**: Check network policies, verify credentials
+
+    ### Debugging Commands
+    ```bash
+    # Check database health
+    influx ping --host http://influxdb-service:8086
+
+    # List buckets
+    influx bucket list --org grill-stats
+
+    # Check task status
+    influx task list --org grill-stats
+
+    # View logs
+    kubectl logs -f statefulset/influxdb -n grill-stats
+    ```
+
+    ## Future Enhancements
+
+    ### Planned Features
+    1. **Predictive Analytics**: Machine learning for temperature prediction
+    2. **Anomaly Detection**: Automatic detection of unusual temperature patterns
+    3. **Multi-Region Replication**: Cross-region data replication for disaster recovery
+    4. **Enhanced Visualization**: Advanced charting and analysis tools
+    5. **Mobile Push Notifications**: Real-time alerts to mobile devices
+    6. **Integration with IoT Platforms**: Support for additional device types
+
+    ### Schema Evolution
+    - Plan for backward compatibility when adding new fields
+    - Use semantic versioning for schema changes
+    - Document all schema migrations
+    - Test schema changes in non-production environments first

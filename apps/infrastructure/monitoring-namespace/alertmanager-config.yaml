@@ -1,0 +1,255 @@
+---
+# AlertManager Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-config
+  namespace: monitoring
+data:
+  alertmanager.yml: |
+    global:
+      smtp_smarthost: 'localhost:587'
+      smtp_from: 'alertmanager@homelab.local'
+      
+    route:
+      group_by: ['alertname', 'cluster', 'service']
+      group_wait: 10s
+      group_interval: 10s
+      repeat_interval: 1h
+      receiver: 'web.hook'
+      routes:
+      - match:
+          severity: critical
+        receiver: 'critical-alerts'
+      - match:
+          severity: warning
+        receiver: 'warning-alerts'
+      - match:
+          alertname: DeadMansSwitch
+        receiver: 'null'
+        
+    receivers:
+    - name: 'web.hook'
+      webhook_configs:
+      - url: 'http://homelab-webhook.monitoring.svc.cluster.local:5001/'
+        
+    - name: 'critical-alerts'
+      slack_configs:
+      - api_url: 'SLACK_WEBHOOK_URL_PLACEHOLDER'
+        channel: '#alerts-critical'
+        title: 'Critical Alert - {{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+        
+    - name: 'warning-alerts'
+      slack_configs:
+      - api_url: 'SLACK_WEBHOOK_URL_PLACEHOLDER'
+        channel: '#alerts-warning'
+        title: 'Warning Alert - {{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+        
+    - name: 'null'
+      
+    inhibit_rules:
+    - source_match:
+        severity: 'critical'
+      target_match:
+        severity: 'warning'
+      equal: ['alertname', 'dev', 'instance']
+
+---
+# Prometheus Rules
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-rules
+  namespace: monitoring
+data:
+  kubernetes.yml: |
+    groups:
+    - name: kubernetes
+      rules:
+      - alert: KubernetesNodeReady
+        expr: kube_node_status_condition{condition="Ready",status="true"} == 0
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Kubernetes Node not ready (instance {{ $labels.instance }})"
+          description: "Node {{ $labels.node }} has been unready for a long time"
+          
+      - alert: KubernetesMemoryPressure
+        expr: kube_node_status_condition{condition="MemoryPressure",status="true"} == 1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Kubernetes memory pressure (instance {{ $labels.instance }})"
+          description: "Node {{ $labels.node }} has MemoryPressure condition"
+          
+      - alert: KubernetesDiskPressure
+        expr: kube_node_status_condition{condition="DiskPressure",status="true"} == 1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Kubernetes disk pressure (instance {{ $labels.instance }})"
+          description: "Node {{ $labels.node }} has DiskPressure condition"
+          
+      - alert: KubernetesOutOfDisk
+        expr: kube_node_status_condition{condition="OutOfDisk",status="true"} == 1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Kubernetes out of disk (instance {{ $labels.instance }})"
+          description: "Node {{ $labels.node }} has OutOfDisk condition"
+          
+      - alert: KubernetesPodCrashLooping
+        expr: rate(kube_pod_container_status_restarts_total[15m]) * 60 * 15 > 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Kubernetes pod crash looping (instance {{ $labels.instance }})"
+          description: "Pod {{ $labels.pod }} is crash looping"
+          
+  homelab.yml: |
+    groups:
+    - name: homelab
+      rules:
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}"
+          description: "CPU usage is above 80% (current value: {{ $value }}%)"
+          
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: "Memory usage is above 85% (current value: {{ $value }}%)"
+          
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"} * 100) < 15
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Disk space low on {{ $labels.instance }}"
+          description: "Disk space is below 15% (current value: {{ $value }}%)"
+          
+      - alert: ServiceDown
+        expr: up == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service {{ $labels.job }} down"
+          description: "Service {{ $labels.job }} on {{ $labels.instance }} is down"
+
+---
+# AlertManager Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alertmanager
+  namespace: monitoring
+  labels:
+    app: alertmanager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alertmanager
+  template:
+    metadata:
+      labels:
+        app: alertmanager
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9093"
+    spec:
+      priorityClassName: infrastructure-high
+      containers:
+      - name: alertmanager
+        image: prom/alertmanager:v0.26.0
+        args:
+          - '--config.file=/etc/alertmanager/alertmanager.yml'
+          - '--storage.path=/alertmanager'
+          - '--web.external-url=https://alertmanager.homelab.local'
+        ports:
+        - containerPort: 9093
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        volumeMounts:
+        - name: alertmanager-config-volume
+          mountPath: /etc/alertmanager/
+        - name: alertmanager-storage-volume
+          mountPath: /alertmanager
+        livenessProbe:
+          httpGet:
+            path: /-/healthy
+            port: 9093
+          initialDelaySeconds: 30
+          timeoutSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /-/ready
+            port: 9093
+          initialDelaySeconds: 30
+          timeoutSeconds: 30
+      volumes:
+      - name: alertmanager-config-volume
+        configMap:
+          defaultMode: 420
+          name: alertmanager-config
+      - name: alertmanager-storage-volume
+        persistentVolumeClaim:
+          claimName: alertmanager-storage
+
+---
+# AlertManager Storage
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: alertmanager-storage
+  namespace: monitoring
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: monitoring
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+# AlertManager Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager
+  namespace: monitoring
+  labels:
+    app: alertmanager
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9093"
+spec:
+  selector:
+    app: alertmanager
+  ports:
+  - port: 9093
+    targetPort: 9093
+    protocol: TCP
+  type: ClusterIP

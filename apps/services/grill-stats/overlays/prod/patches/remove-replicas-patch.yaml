@@ -1,0 +1,8 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grill-stats
+  namespace: grill-stats
+spec:
+  # Remove replicas field when using HPA - HPA should control replica count
+  replicas: null

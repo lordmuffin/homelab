@@ -1,0 +1,204 @@
+# Main Web UI IngressRoute
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: grill-stats-web-ui
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`grill-stats.homelab.local`) || Host(`grill-stats.prod.homelab.local`) || Host(`grill-stats.dev.homelab.local`)
+      kind: Rule
+      services:
+        - name: web-ui-service
+          port: 80
+      middlewares:
+        - name: grill-stats-security-chain
+        - name: grill-stats-web-rate-limit
+  tls:
+    secretName: grill-stats-tls
+---
+# API Gateway IngressRoute
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: grill-stats-api-gateway
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    # Authentication API
+    - match: Host(`api.grill-stats.homelab.local`, `grill-stats.homelab.local`, `grill-stats.prod.homelab.local`, `grill-stats.dev.homelab.local`) && PathPrefix(`/api/auth`)
+      kind: Rule
+      services:
+        - name: auth-service
+          port: 8082
+      middlewares:
+        - name: grill-stats-api-security-chain
+        - name: grill-stats-cors
+        - name: grill-stats-api-rate-limit
+
+    # Device Management API
+    - match: Host(`api.grill-stats.homelab.local`, `grill-stats.homelab.local`, `grill-stats.prod.homelab.local`, `grill-stats.dev.homelab.local`) && PathPrefix(`/api/devices`)
+      kind: Rule
+      services:
+        - name: device-service
+          port: 8080
+      middlewares:
+        - name: grill-stats-api-security-chain
+        - name: grill-stats-cors
+        - name: grill-stats-api-rate-limit
+        - name: grill-stats-auth-middleware
+
+    # Temperature Data API
+    - match: Host(`api.grill-stats.homelab.local`, `grill-stats.homelab.local`, `grill-stats.prod.homelab.local`, `grill-stats.dev.homelab.local`) && PathPrefix(`/api/temperature`)
+      kind: Rule
+      services:
+        - name: temperature-service
+          port: 8081
+      middlewares:
+        - name: grill-stats-api-security-chain
+        - name: grill-stats-cors
+        - name: grill-stats-api-rate-limit
+        - name: grill-stats-auth-middleware
+
+    # Historical Data API
+    - match: Host(`api.grill-stats.homelab.local`, `grill-stats.homelab.local`, `grill-stats.prod.homelab.local`, `grill-stats.dev.homelab.local`) && PathPrefix(`/api/historical`)
+      kind: Rule
+      services:
+        - name: historical-data-service
+          port: 8083
+      middlewares:
+        - name: grill-stats-api-security-chain
+        - name: grill-stats-cors
+        - name: grill-stats-api-rate-limit
+        - name: grill-stats-auth-middleware
+
+    # Home Assistant Integration API
+    - match: Host(`api.grill-stats.homelab.local`, `grill-stats.homelab.local`, `grill-stats.prod.homelab.local`, `grill-stats.dev.homelab.local`) && PathPrefix(`/api/homeassistant`)
+      kind: Rule
+      services:
+        - name: homeassistant-service
+          port: 8080
+      middlewares:
+        - name: grill-stats-api-security-chain
+        - name: grill-stats-cors
+        - name: grill-stats-api-rate-limit
+        - name: grill-stats-auth-middleware
+
+    # Notification Service API
+    - match: Host(`api.grill-stats.homelab.local`, `grill-stats.homelab.local`, `grill-stats.prod.homelab.local`, `grill-stats.dev.homelab.local`) && PathPrefix(`/api/notifications`)
+      kind: Rule
+      services:
+        - name: notification-service
+          port: 8080
+      middlewares:
+        - name: grill-stats-api-security-chain
+        - name: grill-stats-cors
+        - name: grill-stats-api-rate-limit
+        - name: grill-stats-auth-middleware
+
+    # Data Processing API
+    - match: Host(`api.grill-stats.homelab.local`, `grill-stats.homelab.local`, `grill-stats.prod.homelab.local`, `grill-stats.dev.homelab.local`) && PathPrefix(`/api/data`)
+      kind: Rule
+      services:
+        - name: data-processing-service
+          port: 8080
+      middlewares:
+        - name: grill-stats-api-security-chain
+        - name: grill-stats-cors
+        - name: grill-stats-api-rate-limit
+        - name: grill-stats-auth-middleware
+
+  tls:
+    secretName: grill-stats-tls
+---
+# WebSocket IngressRoute for Real-Time Data
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: grill-stats-websocket
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`api.grill-stats.homelab.local`, `grill-stats.homelab.local`, `grill-stats.prod.homelab.local`, `grill-stats.dev.homelab.local`) && PathPrefix(`/ws`)
+      kind: Rule
+      services:
+        - name: temperature-service
+          port: 8081
+      middlewares:
+        - name: grill-stats-websocket-headers
+        - name: grill-stats-websocket-rate-limit
+        - name: grill-stats-auth-middleware
+
+  tls:
+    secretName: grill-stats-tls
+---
+# Server-Sent Events (SSE) IngressRoute
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: grill-stats-sse
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`api.grill-stats.homelab.local`, `grill-stats.homelab.local`, `grill-stats.prod.homelab.local`, `grill-stats.dev.homelab.local`) && PathPrefix(`/sse`)
+      kind: Rule
+      services:
+        - name: temperature-service
+          port: 8081
+      middlewares:
+        - name: grill-stats-sse-headers
+        - name: grill-stats-websocket-rate-limit
+        - name: grill-stats-auth-middleware
+
+  tls:
+    secretName: grill-stats-tls
+---
+# Health Check IngressRoute (No Authentication)
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: grill-stats-health
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: grill-stats
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/part-of: grill-stats
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`api.grill-stats.homelab.local`, `grill-stats.homelab.local`, `grill-stats.prod.homelab.local`, `grill-stats.dev.homelab.local`) && PathPrefix(`/health`)
+      kind: Rule
+      services:
+        - name: web-ui-service
+          port: 80
+      middlewares:
+        - name: grill-stats-health-headers
+        - name: grill-stats-health-rate-limit
+
+  tls:
+    secretName: grill-stats-tls

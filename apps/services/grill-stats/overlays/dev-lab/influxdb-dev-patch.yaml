@@ -1,0 +1,180 @@
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: influxdb
+  namespace: grill-stats
+spec:
+  template:
+    spec:
+      containers:
+      - name: influxdb
+        # Development environment specific configuration
+        resources:
+          requests:
+            cpu: 100m
+            memory: 512Mi
+          limits:
+            cpu: 1
+            memory: 2Gi
+        env:
+        # Reduced performance settings for development
+        - name: INFLUXD_QUERY_CONCURRENCY
+          value: "5"
+        - name: INFLUXD_QUERY_QUEUE_SIZE
+          value: "25"
+        - name: INFLUXD_STORAGE_CACHE_MAX_MEMORY_SIZE
+          value: "536870912"  # 512MB
+        - name: INFLUXD_STORAGE_CACHE_SNAPSHOT_MEMORY_SIZE
+          value: "13107200"   # 12.5MB
+        - name: INFLUXD_STORAGE_MAX_CONCURRENT_COMPACTIONS
+          value: "2"
+        - name: INFLUXD_LOG_LEVEL
+          value: "debug"
+        # Development-specific retention
+        - name: DOCKER_INFLUXDB_INIT_RETENTION
+          value: "168h"  # 7 days
+  volumeClaimTemplates:
+  - metadata:
+      name: influxdb-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 20Gi  # Smaller storage for dev
+      storageClassName: standard
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: influxdb-init-scripts
+  namespace: grill-stats
+data:
+  01-setup-buckets.sh: |
+    #!/bin/bash
+    set -e
+
+    echo "🔧 Setting up InfluxDB buckets for DEV environment..."
+
+    # Wait for InfluxDB to be ready
+    until curl -f http://localhost:8086/ping; do
+        echo "⏳ Waiting for InfluxDB to be ready..."
+        sleep 3
+    done
+
+    echo "✅ InfluxDB is ready, proceeding with bucket setup..."
+
+    # Get admin token from environment
+    ADMIN_TOKEN="${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}"
+    ORG="${DOCKER_INFLUXDB_INIT_ORG}"
+
+    # Create dev buckets with shorter retention
+    echo "📊 Creating DEV buckets with short retention policies..."
+
+    # Real-time bucket (2 days retention for dev)
+    influx bucket create \
+      --name grill-stats-realtime \
+      --org "$ORG" \
+      --retention 48h \
+      --token "$ADMIN_TOKEN" \
+      --host http://localhost:8086 || echo "Real-time bucket already exists"
+
+    # Hourly aggregated bucket (7 days retention for dev)
+    influx bucket create \
+      --name grill-stats-hourly \
+      --org "$ORG" \
+      --retention 168h \
+      --token "$ADMIN_TOKEN" \
+      --host http://localhost:8086 || echo "Hourly bucket already exists"
+
+    # Daily aggregated bucket (30 days retention for dev)
+    influx bucket create \
+      --name grill-stats-daily \
+      --org "$ORG" \
+      --retention 720h \
+      --token "$ADMIN_TOKEN" \
+      --host http://localhost:8086 || echo "Daily bucket already exists"
+
+    # Skip archive bucket for dev environment
+    echo "✅ DEV Buckets created successfully!"
+
+    # Create test data
+    echo "🧪 Creating test data for development..."
+
+    # Insert more comprehensive test data for development
+    CURRENT_TIME=$(date +%s)000000000
+
+    cat > /tmp/dev-test-data.txt << EOF
+    # Multiple devices with different probe types
+    temperature_readings,device_id=dev_signals_001,channel_id=1,probe_type=meat,user_id=dev_user,device_type=signals,location=dev_lab temperature=165.5,unit="F",battery_level=85,signal_strength=-45,accuracy=0.1,calibration_offset=0.0 $CURRENT_TIME
+    temperature_readings,device_id=dev_signals_001,channel_id=2,probe_type=ambient,user_id=dev_user,device_type=signals,location=dev_lab temperature=225.0,unit="F",battery_level=85,signal_strength=-45,accuracy=0.1,calibration_offset=0.0 $CURRENT_TIME
+    temperature_readings,device_id=dev_signals_001,channel_id=3,probe_type=meat,user_id=dev_user,device_type=signals,location=dev_lab temperature=155.2,unit="F",battery_level=85,signal_strength=-45,accuracy=0.1,calibration_offset=0.0 $CURRENT_TIME
+    temperature_readings,device_id=dev_signals_001,channel_id=4,probe_type=meat,user_id=dev_user,device_type=signals,location=dev_lab temperature=140.8,unit="F",battery_level=85,signal_strength=-45,accuracy=0.1,calibration_offset=0.0 $CURRENT_TIME
+
+    # RFX Gateway device
+    temperature_readings,device_id=dev_rfx_001,channel_id=1,probe_type=external,user_id=dev_user,device_type=rfx,location=dev_lab temperature=72.4,unit="F",battery_level=78,signal_strength=-76,accuracy=0.5,calibration_offset=0.0 $CURRENT_TIME
+
+    # Bluetooth device
+    temperature_readings,device_id=dev_bluetooth_001,channel_id=1,probe_type=meat,user_id=dev_user,device_type=bluetooth,location=dev_lab temperature=185.0,unit="F",battery_level=92,signal_strength=-55,accuracy=0.2,calibration_offset=0.0 $CURRENT_TIME
+
+    # Device status
+    device_status,device_id=dev_signals_001,user_id=dev_user,device_type=signals,location=dev_lab online=true,battery_level=85,signal_strength=-45,connection_status="connected",last_seen=1642267800,firmware_version="2.1.0-dev",hardware_version="1.0",uptime=3600,memory_usage=45,cpu_usage=12 $CURRENT_TIME
+    device_status,device_id=dev_rfx_001,user_id=dev_user,device_type=rfx,location=dev_lab online=true,battery_level=78,signal_strength=-76,connection_status="connected",last_seen=1642267800,firmware_version="1.5.0-dev",hardware_version="1.0",uptime=7200,memory_usage=32,cpu_usage=8 $CURRENT_TIME
+    device_status,device_id=dev_bluetooth_001,user_id=dev_user,device_type=bluetooth,location=dev_lab online=true,battery_level=92,signal_strength=-55,connection_status="connected",last_seen=1642267800,firmware_version="3.0.0-dev",hardware_version="2.0",uptime=1800,memory_usage=55,cpu_usage=15 $CURRENT_TIME
+
+    # Test alert events
+    alert_events,device_id=dev_signals_001,channel_id=1,user_id=dev_user,alert_type=high_temp,severity=warning,status=resolved threshold_value=200.0,actual_value=205.5,message="Temperature exceeded threshold in dev environment",duration=120,acknowledged_by="dev_user",resolved_by="dev_user" $CURRENT_TIME
+    alert_events,device_id=dev_signals_001,channel_id=2,user_id=dev_user,alert_type=low_battery,severity=info,status=active threshold_value=20.0,actual_value=15.0,message="Battery level low in dev environment",duration=300,acknowledged_by="",resolved_by="" $CURRENT_TIME
+
+    # Test cooking session
+    cooking_sessions,session_id=dev_session_001,user_id=dev_user,device_id=dev_signals_001,cooking_method=smoking,meat_type=beef,cut_type=brisket start_time=1642267800,end_time=1642300000,duration=32200,target_temp=203.0,max_temp=205.5,min_temp=180.0,avg_temp=195.2,weight=12.5,notes="Development test session",rating=5 $CURRENT_TIME
+
+    # System metrics
+    system_metrics,service_name=temperature-service,instance_id=temp-dev-001,metric_type=cpu,environment=dev value=25.2,unit="percent",threshold=80.0,description="CPU usage percentage in dev" $CURRENT_TIME
+    system_metrics,service_name=device-service,instance_id=device-dev-001,metric_type=memory,environment=dev value=512.0,unit="MB",threshold=1024.0,description="Memory usage in dev" $CURRENT_TIME
+    EOF
+
+    # Insert test data
+    influx write \
+      --org "$ORG" \
+      --bucket grill-stats-realtime \
+      --token "$ADMIN_TOKEN" \
+      --host http://localhost:8086 \
+      --file /tmp/dev-test-data.txt || echo "Test data insertion failed"
+
+    echo "✅ Development test data inserted successfully!"
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: influxdb-backup
+  namespace: grill-stats
+spec:
+  schedule: "0 4 * * *"  # Daily at 4 AM for dev
+  suspend: false  # Enable backups in dev for testing
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: backup
+            resources:
+              requests:
+                cpu: 50m
+                memory: 128Mi
+              limits:
+                cpu: 200m
+                memory: 256Mi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: influxdb-backup-pvc
+  namespace: grill-stats
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi  # Smaller backup storage for dev
+  storageClassName: standard

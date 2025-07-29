@@ -1,0 +1,43 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-info
+  namespace: kube-public
+data:
+  cluster.name: "homelab-cloud"
+  cluster.environment: "production"
+  cluster.region: "local"
+  cluster.provider: "k3s"
+  cluster.version: "v1.28"
+  networking.cni: "cilium"
+  networking.ingress: "nginx"
+  networking.service-mesh: "none"
+  storage.default-class: "sata"
+  monitoring.enabled: "true"
+  backup.enabled: "true"
+  backup.provider: "velero"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dns-config
+  namespace: kube-system
+data:
+  upstream-dns: "1.1.1.1,8.8.8.8"
+  domain-filters: "homelab.local,cluster.local"
+  search-domains: "homelab.local,svc.cluster.local,cluster.local"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: security-config
+  namespace: kube-system
+data:
+  pod-security-standard: "restricted"
+  network-policies-enabled: "true"
+  admission-controllers: "NamespaceLifecycle,ServiceAccount,NodeRestriction,PodSecurity"
+  audit-enabled: "true"
+  rbac-enabled: "true"

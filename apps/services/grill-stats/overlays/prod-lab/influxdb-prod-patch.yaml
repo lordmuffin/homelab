@@ -1,0 +1,291 @@
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: influxdb
+  namespace: grill-stats
+spec:
+  template:
+    spec:
+      containers:
+      - name: influxdb
+        # Production environment specific configuration
+        resources:
+          requests:
+            cpu: 500m
+            memory: 2Gi
+          limits:
+            cpu: 4
+            memory: 8Gi
+        env:
+        # High performance settings for production
+        - name: INFLUXD_QUERY_CONCURRENCY
+          value: "20"
+        - name: INFLUXD_QUERY_QUEUE_SIZE
+          value: "100"
+        - name: INFLUXD_STORAGE_CACHE_MAX_MEMORY_SIZE
+          value: "2147483648"  # 2GB
+        - name: INFLUXD_STORAGE_CACHE_SNAPSHOT_MEMORY_SIZE
+          value: "52428800"   # 50MB
+        - name: INFLUXD_STORAGE_MAX_CONCURRENT_COMPACTIONS
+          value: "5"
+        - name: INFLUXD_LOG_LEVEL
+          value: "info"
+        # Production retention policy
+        - name: DOCKER_INFLUXDB_INIT_RETENTION
+          value: "720h"  # 30 days
+        # Production-specific performance tuning
+        - name: INFLUXD_STORAGE_COMPACT_THROUGHPUT_BURST
+          value: "104857600"  # 100MB
+        - name: INFLUXD_STORAGE_SERIES_ID_SET_CACHE_SIZE
+          value: "200"
+        - name: INFLUXD_HTTP_MAX_BODY_SIZE
+          value: "50000000"  # 50MB
+        - name: INFLUXD_WRITE_TIMEOUT
+          value: "60s"
+        - name: INFLUXD_HTTP_REQUEST_TIMEOUT
+          value: "30s"
+  volumeClaimTemplates:
+  - metadata:
+      name: influxdb-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 500Gi  # Large storage for production
+      storageClassName: fast-ssd  # Use fast SSD storage class
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: influxdb-init-scripts
+  namespace: grill-stats
+data:
+  01-setup-buckets.sh: |
+    #!/bin/bash
+    set -e
+
+    echo "🔧 Setting up InfluxDB buckets for PRODUCTION environment..."
+
+    # Wait for InfluxDB to be ready
+    until curl -f http://localhost:8086/ping; do
+        echo "⏳ Waiting for InfluxDB to be ready..."
+        sleep 5
+    done
+
+    echo "✅ InfluxDB is ready, proceeding with bucket setup..."
+
+    # Get admin token from environment
+    ADMIN_TOKEN="${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}"
+    ORG="${DOCKER_INFLUXDB_INIT_ORG}"
+
+    # Create production buckets with full retention
+    echo "📊 Creating PRODUCTION buckets with full retention policies..."
+
+    # Real-time bucket (7 days retention)
+    influx bucket create \
+      --name grill-stats-realtime \
+      --org "$ORG" \
+      --retention 168h \
+      --token "$ADMIN_TOKEN" \
+      --host http://localhost:8086 || echo "Real-time bucket already exists"
+
+    # Hourly aggregated bucket (90 days retention)
+    influx bucket create \
+      --name grill-stats-hourly \
+      --org "$ORG" \
+      --retention 2160h \
+      --token "$ADMIN_TOKEN" \
+      --host http://localhost:8086 || echo "Hourly bucket already exists"
+
+    # Daily aggregated bucket (1 year retention)
+    influx bucket create \
+      --name grill-stats-daily \
+      --org "$ORG" \
+      --retention 8760h \
+      --token "$ADMIN_TOKEN" \
+      --host http://localhost:8086 || echo "Daily bucket already exists"
+
+    # Archive bucket (infinite retention)
+    influx bucket create \
+      --name grill-stats-archive \
+      --org "$ORG" \
+      --retention 0 \
+      --token "$ADMIN_TOKEN" \
+      --host http://localhost:8086 || echo "Archive bucket already exists"
+
+    # Monitoring bucket (30 days retention)
+    influx bucket create \
+      --name grill-stats-monitoring \
+      --org "$ORG" \
+      --retention 720h \
+      --token "$ADMIN_TOKEN" \
+      --host http://localhost:8086 || echo "Monitoring bucket already exists"
+
+    # Alerts bucket (90 days retention)
+    influx bucket create \
+      --name grill-stats-alerts \
+      --org "$ORG" \
+      --retention 2160h \
+      --token "$ADMIN_TOKEN" \
+      --host http://localhost:8086 || echo "Alerts bucket already exists"
+
+    # Analytics bucket (1 year retention)
+    influx bucket create \
+      --name grill-stats-analytics \
+      --org "$ORG" \
+      --retention 8760h \
+      --token "$ADMIN_TOKEN" \
+      --host http://localhost:8086 || echo "Analytics bucket already exists"
+
+    echo "✅ PRODUCTION Buckets created successfully!"
+
+    # Create production-specific continuous queries
+    echo "📈 Creating production continuous queries..."
+
+    # Enhanced downsampling for production
+    cat > /tmp/prod-hourly-downsample.flux << 'EOF'
+    import "influxdata/influxdb/tasks"
+
+    option task = {
+      name: "prod-downsample-hourly-temperature",
+      every: 1h,
+      offset: 5m,
+    }
+
+    from(bucket: "grill-stats-realtime")
+      |> range(start: -1h)
+      |> filter(fn: (r) => r._measurement == "temperature_readings")
+      |> group(columns: ["device_id", "channel_id", "probe_type", "user_id"])
+      |> aggregateWindow(every: 1h, fn: mean, createEmpty: false)
+      |> set(key: "_measurement", value: "temperature_readings_hourly")
+      |> to(bucket: "grill-stats-hourly")
+
+    from(bucket: "grill-stats-realtime")
+      |> range(start: -1h)
+      |> filter(fn: (r) => r._measurement == "temperature_readings")
+      |> group(columns: ["device_id", "channel_id", "probe_type", "user_id"])
+      |> aggregateWindow(every: 1h, fn: max, createEmpty: false)
+      |> set(key: "_field", value: "temperature_max")
+      |> set(key: "_measurement", value: "temperature_readings_hourly")
+      |> to(bucket: "grill-stats-hourly")
+
+    from(bucket: "grill-stats-realtime")
+      |> range(start: -1h)
+      |> filter(fn: (r) => r._measurement == "temperature_readings")
+      |> group(columns: ["device_id", "channel_id", "probe_type", "user_id"])
+      |> aggregateWindow(every: 1h, fn: min, createEmpty: false)
+      |> set(key: "_field", value: "temperature_min")
+      |> set(key: "_measurement", value: "temperature_readings_hourly")
+      |> to(bucket: "grill-stats-hourly")
+    EOF
+
+    # Create the production tasks
+    influx task create \
+      --file /tmp/prod-hourly-downsample.flux \
+      --org "$ORG" \
+      --token "$ADMIN_TOKEN" \
+      --host http://localhost:8086 || echo "Production hourly task already exists"
+
+    echo "✅ Production continuous queries created successfully!"
+
+    # No test data insertion for production
+    echo "🔒 Skipping test data insertion for production environment"
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: influxdb-backup
+  namespace: grill-stats
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM for production
+  suspend: false
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: backup
+            resources:
+              requests:
+                cpu: 200m
+                memory: 512Mi
+              limits:
+                cpu: 1
+                memory: 1Gi
+            env:
+            - name: BACKUP_UPLOAD_ENABLED
+              value: "true"  # Enable cloud backup for production
+            - name: BACKUP_RETENTION_DAYS
+              value: "30"  # Keep 30 days of backups
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: influxdb-backup-pvc
+  namespace: grill-stats
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 200Gi  # Large backup storage for production
+  storageClassName: standard
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: influxdb-pdb
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: influxdb
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: influxdb-hpa
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: StatefulSet
+    name: influxdb
+  minReplicas: 1
+  maxReplicas: 1  # InfluxDB 2.x single-node deployment
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 75
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 600
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60

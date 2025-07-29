@@ -18,9 +18,6 @@ spec:
   routes:
     - match: Host(`argo.lab.apj.dev`)
       kind: Rule
-      middlewares:
-        - name: traefik-forward-auth
-          namespace: traefik # Assuming your forward-auth middleware is in the 'traefik' namespace
       services:
         - name: argocd-server # Standard ArgoCD service name
           port: 80 # Standard HTTP port for ArgoCD server

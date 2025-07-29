@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: grill-stats-dev
+  labels:
+    environment: dev-lab
+    deployment.homelab/type: development
+    name: grill-stats-dev
+  annotations:
+    deployment.homelab/managed-by: "argocd"
+    deployment.homelab/environment: "dev-lab"
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: grill-stats-dev-quota
+  namespace: grill-stats-dev
+  labels:
+    environment: dev-lab
+spec:
+  hard:
+    requests.cpu: "2"
+    requests.memory: 4Gi
+    limits.cpu: "4"
+    limits.memory: 8Gi
+    pods: "20"
+    persistentvolumeclaims: "10"
+    services: "10"
+    secrets: "20"
+    configmaps: "20"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: grill-stats-dev-limits
+  namespace: grill-stats-dev
+  labels:
+    environment: dev-lab
+spec:
+  limits:
+  - default:
+      cpu: "500m"
+      memory: "512Mi"
+    defaultRequest:
+      cpu: "100m"
+      memory: "128Mi"
+    type: Container
+  - default:
+      storage: "10Gi"
+    defaultRequest:
+      storage: "1Gi"
+    type: PersistentVolumeClaim

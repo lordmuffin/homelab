@@ -5,3 +5,5 @@ resources:
 - svc.yaml
 - cm.yaml
 - ingress.yaml
+- backups.yaml
+- restore-job.yaml

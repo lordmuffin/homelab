@@ -1,0 +1,187 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: redis-network-policy
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: redis
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow connections from grill-stats services
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: grill-stats
+    ports:
+    - protocol: TCP
+      port: 6379
+  # Allow connections from redis-exporter
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: redis-exporter
+    ports:
+    - protocol: TCP
+      port: 6379
+  # Allow connections from backup jobs
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: backup
+    ports:
+    - protocol: TCP
+      port: 6379
+  # Allow Redis Sentinel connections
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: redis-sentinel
+    ports:
+    - protocol: TCP
+      port: 6379
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow connections to Redis Sentinel
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: redis-sentinel
+    ports:
+    - protocol: TCP
+      port: 26379
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: redis-sentinel-network-policy
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: redis-sentinel
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: database
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: redis-sentinel
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow connections from grill-stats services
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: grill-stats
+    ports:
+    - protocol: TCP
+      port: 26379
+  # Allow connections from other Sentinel instances
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: redis-sentinel
+    ports:
+    - protocol: TCP
+      port: 26379
+  # Allow connections from Redis instances
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: redis
+    ports:
+    - protocol: TCP
+      port: 26379
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow connections to Redis instances
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  # Allow connections to other Sentinel instances
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: redis-sentinel
+    ports:
+    - protocol: TCP
+      port: 26379
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: redis-exporter-network-policy
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: redis-exporter
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: redis-exporter
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow connections from Prometheus
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: prometheus
+    ports:
+    - protocol: TCP
+      port: 9121
+  # Allow connections from Grafana
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: grafana
+    ports:
+    - protocol: TCP
+      port: 9121
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow connections to Redis
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: redis
+    ports:
+    - protocol: TCP
+      port: 6379

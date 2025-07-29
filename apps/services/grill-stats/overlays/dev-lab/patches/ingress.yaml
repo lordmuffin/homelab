@@ -1,0 +1,108 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: grill-stats-dev-ingress
+  namespace: grill-stats-dev
+  labels:
+    environment: dev-lab
+spec:
+  entryPoints:
+  - websecure
+  routes:
+  - match: Host(`grill-stats-dev.homelab.local`)
+    kind: Rule
+    services:
+    - name: web-ui-service
+      port: 80
+    middlewares:
+    - name: dev-auth-middleware
+  - match: Host(`grill-stats-dev.homelab.local`) && PathPrefix(`/api/auth`)
+    kind: Rule
+    services:
+    - name: auth-service
+      port: 8082
+    middlewares:
+    - name: dev-api-middleware
+  - match: Host(`grill-stats-dev.homelab.local`) && PathPrefix(`/api/devices`)
+    kind: Rule
+    services:
+    - name: device-service
+      port: 8080
+    middlewares:
+    - name: dev-api-middleware
+  - match: Host(`grill-stats-dev.homelab.local`) && PathPrefix(`/api/temperature`)
+    kind: Rule
+    services:
+    - name: temperature-service
+      port: 8081
+    middlewares:
+    - name: dev-api-middleware
+  - match: Host(`grill-stats-dev.homelab.local`) && PathPrefix(`/api/historical`)
+    kind: Rule
+    services:
+    - name: historical-data-service
+      port: 8083
+    middlewares:
+    - name: dev-api-middleware
+  - match: Host(`grill-stats-dev.homelab.local`) && PathPrefix(`/ws`)
+    kind: Rule
+    services:
+    - name: temperature-service
+      port: 8081
+    middlewares:
+    - name: dev-websocket-middleware
+  tls:
+    secretName: grill-stats-dev-tls
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: dev-auth-middleware
+  namespace: grill-stats-dev
+  labels:
+    environment: dev-lab
+spec:
+  headers:
+    customRequestHeaders:
+      X-Environment: "dev-lab"
+    customResponseHeaders:
+      X-Environment: "dev-lab"
+      X-Debug: "true"
+  rateLimit:
+    average: 100
+    burst: 50
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: dev-api-middleware
+  namespace: grill-stats-dev
+  labels:
+    environment: dev-lab
+spec:
+  headers:
+    customRequestHeaders:
+      X-Environment: "dev-lab"
+    customResponseHeaders:
+      X-Environment: "dev-lab"
+      X-Debug: "true"
+  rateLimit:
+    average: 200
+    burst: 100
+  stripPrefix:
+    prefixes:
+    - /api
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: dev-websocket-middleware
+  namespace: grill-stats-dev
+  labels:
+    environment: dev-lab
+spec:
+  headers:
+    customRequestHeaders:
+      X-Environment: "dev-lab"
+    customResponseHeaders:
+      X-Environment: "dev-lab"

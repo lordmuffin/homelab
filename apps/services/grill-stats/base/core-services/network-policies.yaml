@@ -1,0 +1,580 @@
+# Core Services Network Policies for Grill-Stats Platform
+# This file contains comprehensive network policies for service-to-service communication security
+
+---
+# Web UI Service Network Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: web-ui-network-policy
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: web-ui
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: frontend
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: web-ui
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow traffic from Traefik ingress controller
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: traefik
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: traefik
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 3000
+  # Allow Prometheus metrics scraping
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: prometheus
+    ports:
+    - protocol: TCP
+      port: 8080
+  # Allow metrics scraping from running prometheus deployment
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring
+      podSelector:
+        matchLabels:
+          app: prometheus-server
+    ports:
+    - protocol: TCP
+      port: 8080
+  # Allow health checks from Kubernetes
+  - from: []
+    ports:
+    - protocol: TCP
+      port: 8080
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow access to Auth Service
+  - to:
+    - podSelector:
+        matchLabels:
+          app: auth-service
+    ports:
+    - protocol: TCP
+      port: 8082
+  # Allow access to Device Service
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: device-service
+    ports:
+    - protocol: TCP
+      port: 8080
+  # Allow access to Temperature Service
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: temperature-service
+    ports:
+    - protocol: TCP
+      port: 8081
+  # Allow access to Historical Service
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: historical-service
+    ports:
+    - protocol: TCP
+      port: 8083
+
+---
+# Device Service Network Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: device-service-network-policy
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: device-service
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: microservice
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: device-service
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow from Web UI
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: web-ui
+    ports:
+    - protocol: TCP
+      port: 8080
+  # Allow from Temperature Service
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: temperature-service
+    ports:
+    - protocol: TCP
+      port: 8080
+  # Allow from Historical Service
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: historical-service
+    ports:
+    - protocol: TCP
+      port: 8080
+  # Allow from Traefik for direct API access
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: traefik
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: traefik
+    ports:
+    - protocol: TCP
+      port: 8080
+  # Allow Prometheus metrics scraping
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: prometheus
+    ports:
+    - protocol: TCP
+      port: 8080
+  # Allow metrics scraping from running prometheus deployment
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring
+      podSelector:
+        matchLabels:
+          app: prometheus-server
+    ports:
+    - protocol: TCP
+      port: 8080
+  # Allow health checks
+  - from: []
+    ports:
+    - protocol: TCP
+      port: 8080
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow PostgreSQL access
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: postgresql
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Allow Redis access
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  # Allow Auth Service access
+  - to:
+    - podSelector:
+        matchLabels:
+          app: auth-service
+    ports:
+    - protocol: TCP
+      port: 8082
+  # Allow external HTTPS for ThermoWorks API
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+    ports:
+    - protocol: TCP
+      port: 443
+  # Allow external HTTP for ThermoWorks API (if needed)
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+    ports:
+    - protocol: TCP
+      port: 80
+  # Allow Home Assistant communication
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: home-assistant
+    ports:
+    - protocol: TCP
+      port: 8123
+
+---
+# Temperature Service Network Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: temperature-service-network-policy
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: temperature-service
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: microservice
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: temperature-service
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow from Web UI
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: web-ui
+    ports:
+    - protocol: TCP
+      port: 8081
+  # Allow from Device Service
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: device-service
+    ports:
+    - protocol: TCP
+      port: 8081
+  # Allow from Historical Service
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: historical-service
+    ports:
+    - protocol: TCP
+      port: 8081
+  # Allow from Traefik for direct API access
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: traefik
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: traefik
+    ports:
+    - protocol: TCP
+      port: 8081
+  # Allow Prometheus metrics scraping
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: prometheus
+    ports:
+    - protocol: TCP
+      port: 8080
+  # Allow metrics scraping from running prometheus deployment
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring
+      podSelector:
+        matchLabels:
+          app: prometheus-server
+    ports:
+    - protocol: TCP
+      port: 8080
+  # Allow health checks
+  - from: []
+    ports:
+    - protocol: TCP
+      port: 8081
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow InfluxDB access
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: influxdb
+    ports:
+    - protocol: TCP
+      port: 8086
+  # Allow Redis access for caching
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  # Allow Device Service access
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: device-service
+    ports:
+    - protocol: TCP
+      port: 8080
+  # Allow Auth Service access
+  - to:
+    - podSelector:
+        matchLabels:
+          app: auth-service
+    ports:
+    - protocol: TCP
+      port: 8082
+
+---
+# Historical Service Network Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: historical-service-network-policy
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: historical-service
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: microservice
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: historical-service
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow from Web UI
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: web-ui
+    ports:
+    - protocol: TCP
+      port: 8083
+  # Allow from Device Service for data analysis
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: device-service
+    ports:
+    - protocol: TCP
+      port: 8083
+  # Allow from Traefik for direct API access
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: traefik
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: traefik
+    ports:
+    - protocol: TCP
+      port: 8083
+  # Allow Prometheus metrics scraping
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: prometheus
+    ports:
+    - protocol: TCP
+      port: 8080
+  # Allow metrics scraping from running prometheus deployment
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring
+      podSelector:
+        matchLabels:
+          app: prometheus-server
+    ports:
+    - protocol: TCP
+      port: 8080
+  # Allow health checks
+  - from: []
+    ports:
+    - protocol: TCP
+      port: 8083
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow InfluxDB access for historical data
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: influxdb
+    ports:
+    - protocol: TCP
+      port: 8086
+  # Allow TimescaleDB (PostgreSQL) access
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: postgresql
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Allow Auth Service access
+  - to:
+    - podSelector:
+        matchLabels:
+          app: auth-service
+    ports:
+    - protocol: TCP
+      port: 8082
+  # Allow Temperature Service access for data synchronization
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: temperature-service
+    ports:
+    - protocol: TCP
+      port: 8081
+
+---
+# Encryption Service Network Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: encryption-service-network-policy
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: encryption-service
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: security
+spec:
+  podSelector:
+    matchLabels:
+      app: encryption-service
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow from Auth Service
+  - from:
+    - podSelector:
+        matchLabels:
+          app: auth-service
+    ports:
+    - protocol: TCP
+      port: 8082
+  # Allow from Device Service for sensitive data encryption
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: device-service
+    ports:
+    - protocol: TCP
+      port: 8082
+  # Allow Prometheus metrics scraping
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: prometheus
+    ports:
+    - protocol: TCP
+      port: 8080
+  # Allow metrics scraping from running prometheus deployment
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring
+      podSelector:
+        matchLabels:
+          app: prometheus-server
+    ports:
+    - protocol: TCP
+      port: 8080
+  # Allow health checks
+  - from: []
+    ports:
+    - protocol: TCP
+      port: 8082
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow HashiCorp Vault access
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: vault
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: vault
+    ports:
+    - protocol: TCP
+      port: 8200
+  # Allow Auth Service callbacks
+  - to:
+    - podSelector:
+        matchLabels:
+          app: auth-service
+    ports:
+    - protocol: TCP
+      port: 8082
+  # Allow PostgreSQL access for encryption key metadata
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: postgresql
+    ports:
+    - protocol: TCP
+      port: 5432

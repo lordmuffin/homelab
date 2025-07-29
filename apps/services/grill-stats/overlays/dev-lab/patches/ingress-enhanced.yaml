@@ -1,0 +1,163 @@
+# Development Lab Enhanced Ingress Configuration
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: grill-stats-web-ui
+  namespace: grill-stats-dev
+  labels:
+    environment: dev-lab
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`grill-stats.dev.homelab.local`)
+      kind: Rule
+      services:
+        - name: web-ui-service
+          port: 80
+      middlewares:
+        - name: dev-security-chain
+        - name: dev-rate-limit
+        - name: dev-auth-bypass
+  tls:
+    secretName: grill-stats-dev-tls
+---
+# Development Environment Middleware Patches
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: dev-security-chain
+  namespace: grill-stats-dev
+  labels:
+    environment: dev-lab
+spec:
+  chain:
+    middlewares:
+      - name: dev-security-headers
+      - name: dev-cors
+      - name: grill-stats-compress
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: dev-security-headers
+  namespace: grill-stats-dev
+  labels:
+    environment: dev-lab
+spec:
+  headers:
+    frameDeny: false
+    sslRedirect: true
+    browserXssFilter: true
+    contentTypeNosniff: true
+    customRequestHeaders:
+      X-Environment: "dev-lab"
+      X-Forwarded-Proto: "https"
+    customResponseHeaders:
+      X-Environment: "dev-lab"
+      X-Frame-Options: "SAMEORIGIN"
+      Content-Security-Policy: "default-src 'self' 'unsafe-inline' 'unsafe-eval'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' ws: wss: https:;"
+      Referrer-Policy: "no-referrer-when-downgrade"
+      X-Content-Type-Options: "nosniff"
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: dev-cors
+  namespace: grill-stats-dev
+  labels:
+    environment: dev-lab
+spec:
+  headers:
+    accessControlAllowMethods:
+      - "GET"
+      - "POST"
+      - "PUT"
+      - "DELETE"
+      - "OPTIONS"
+      - "PATCH"
+    accessControlAllowHeaders:
+      - "Content-Type"
+      - "Authorization"
+      - "X-Requested-With"
+      - "Accept"
+      - "Origin"
+      - "Cache-Control"
+      - "X-File-Name"
+      - "X-Debug-Token"
+    accessControlAllowOriginList:
+      - "https://grill-stats.dev.homelab.local"
+      - "http://localhost:3000"
+      - "http://localhost:8080"
+    accessControlMaxAge: 3600
+    addVaryHeader: true
+    accessControlAllowCredentials: true
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: dev-rate-limit
+  namespace: grill-stats-dev
+  labels:
+    environment: dev-lab
+spec:
+  rateLimit:
+    average: 1000
+    period: 1m
+    burst: 500
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: dev-auth-bypass
+  namespace: grill-stats-dev
+  labels:
+    environment: dev-lab
+spec:
+  headers:
+    customRequestHeaders:
+      X-Auth-Bypass: "true"
+      X-User-Id: "dev-user"
+      X-User-Email: "dev@homelab.local"
+      X-User-Role: "admin"
+---
+# Development API Gateway
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: grill-stats-api-gateway
+  namespace: grill-stats-dev
+  labels:
+    environment: dev-lab
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`grill-stats.dev.homelab.local`) && PathPrefix(`/api/`)
+      kind: Rule
+      services:
+        - name: web-ui-service
+          port: 80
+      middlewares:
+        - name: dev-api-security
+        - name: dev-cors
+        - name: dev-rate-limit
+  tls:
+    secretName: grill-stats-dev-tls
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: dev-api-security
+  namespace: grill-stats-dev
+  labels:
+    environment: dev-lab
+spec:
+  headers:
+    customRequestHeaders:
+      X-Environment: "dev-lab"
+      X-Forwarded-Proto: "https"
+    customResponseHeaders:
+      X-Environment: "dev-lab"
+      X-Debug-Mode: "enabled"
+      Access-Control-Allow-Origin: "*"

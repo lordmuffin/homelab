@@ -1,0 +1,427 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: redis-backup
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: redis-backup
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: backup
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: redis-backup
+            app.kubernetes.io/part-of: grill-stats
+            app.kubernetes.io/component: backup
+        spec:
+          securityContext:
+            fsGroup: 999
+            runAsUser: 999
+            runAsNonRoot: true
+          containers:
+          - name: redis-backup
+            image: redis:7-alpine
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+
+              # Create backup directory with timestamp
+              BACKUP_DIR="/backup/$(date +%Y%m%d_%H%M%S)"
+              mkdir -p "$BACKUP_DIR"
+
+              # Set Redis password from environment
+              export REDISCLI_AUTH="$REDIS_PASSWORD"
+
+              # Create RDB backup
+              echo "Creating RDB backup..."
+              redis-cli -h redis -p 6379 --rdb "$BACKUP_DIR/dump.rdb"
+
+              # Create AOF backup if available
+              echo "Creating AOF backup..."
+              redis-cli -h redis -p 6379 BGREWRITEAOF
+              sleep 10  # Wait for AOF rewrite to complete
+
+              # Copy AOF file
+              if redis-cli -h redis -p 6379 LASTSAVE | grep -q "$(date +%s)"; then
+                redis-cli -h redis -p 6379 --raw DUMP appendonly.aof > "$BACKUP_DIR/appendonly.aof" || true
+              fi
+
+              # Create metadata file
+              cat > "$BACKUP_DIR/backup_metadata.json" << EOF
+              {
+                "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+                "redis_version": "$(redis-cli -h redis -p 6379 INFO server | grep redis_version | cut -d: -f2 | tr -d '\r')",
+                "databases": $(redis-cli -h redis -p 6379 INFO keyspace | grep -c "^db" || echo 0),
+                "total_keys": $(redis-cli -h redis -p 6379 DBSIZE),
+                "memory_usage": "$(redis-cli -h redis -p 6379 INFO memory | grep used_memory_human | cut -d: -f2 | tr -d '\r')",
+                "backup_type": "scheduled",
+                "backup_size": "$(du -sh $BACKUP_DIR | cut -f1)"
+              }
+              EOF
+
+              # Compress backup
+              echo "Compressing backup..."
+              tar -czf "$BACKUP_DIR.tar.gz" -C "$(dirname $BACKUP_DIR)" "$(basename $BACKUP_DIR)"
+              rm -rf "$BACKUP_DIR"
+
+              # Clean up old backups (keep last 7 days)
+              echo "Cleaning up old backups..."
+              find /backup -name "*.tar.gz" -mtime +7 -delete
+
+              # Verify backup
+              echo "Verifying backup..."
+              if [ -f "$BACKUP_DIR.tar.gz" ]; then
+                tar -tzf "$BACKUP_DIR.tar.gz" > /dev/null
+                echo "Backup created successfully: $BACKUP_DIR.tar.gz"
+              else
+                echo "Backup failed!" >&2
+                exit 1
+              fi
+
+              # Log backup completion
+              echo "Backup completed at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: grill-stats-secrets
+                  key: REDIS_PASSWORD
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backup
+            resources:
+              requests:
+                cpu: 100m
+                memory: 128Mi
+              limits:
+                cpu: 200m
+                memory: 256Mi
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: false
+              capabilities:
+                drop:
+                - ALL
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: redis-backup-pvc
+          restartPolicy: OnFailure
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-backup-pvc
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: redis-backup
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: backup
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: ""  # Use default storage class
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: redis-backup-verification
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: redis-backup-verification
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: backup
+spec:
+  schedule: "0 6 * * *"  # Daily at 6 AM (4 hours after backup)
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: redis-backup-verification
+            app.kubernetes.io/part-of: grill-stats
+            app.kubernetes.io/component: backup
+        spec:
+          securityContext:
+            fsGroup: 999
+            runAsUser: 999
+            runAsNonRoot: true
+          containers:
+          - name: backup-verification
+            image: redis:7-alpine
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+
+              # Find latest backup
+              LATEST_BACKUP=$(find /backup -name "*.tar.gz" -type f -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)
+
+              if [ -z "$LATEST_BACKUP" ]; then
+                echo "No backup files found!" >&2
+                exit 1
+              fi
+
+              echo "Verifying backup: $LATEST_BACKUP"
+
+              # Extract backup to temporary directory
+              TEMP_DIR="/tmp/backup_verification"
+              mkdir -p "$TEMP_DIR"
+              tar -xzf "$LATEST_BACKUP" -C "$TEMP_DIR"
+
+              # Find extracted directory
+              EXTRACTED_DIR=$(find "$TEMP_DIR" -type d -name "*_*" | head -1)
+
+              if [ -z "$EXTRACTED_DIR" ]; then
+                echo "Could not find extracted backup directory!" >&2
+                exit 1
+              fi
+
+              # Verify RDB file
+              if [ -f "$EXTRACTED_DIR/dump.rdb" ]; then
+                echo "RDB file found, verifying..."
+                redis-check-rdb "$EXTRACTED_DIR/dump.rdb"
+                echo "RDB verification passed"
+              else
+                echo "RDB file not found in backup!" >&2
+                exit 1
+              fi
+
+              # Verify AOF file if present
+              if [ -f "$EXTRACTED_DIR/appendonly.aof" ]; then
+                echo "AOF file found, verifying..."
+                redis-check-aof "$EXTRACTED_DIR/appendonly.aof"
+                echo "AOF verification passed"
+              else
+                echo "AOF file not found in backup (this is normal for some backups)"
+              fi
+
+              # Verify metadata
+              if [ -f "$EXTRACTED_DIR/backup_metadata.json" ]; then
+                echo "Metadata file found:"
+                cat "$EXTRACTED_DIR/backup_metadata.json"
+              else
+                echo "Metadata file not found!" >&2
+                exit 1
+              fi
+
+              # Cleanup
+              rm -rf "$TEMP_DIR"
+
+              echo "Backup verification completed successfully"
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backup
+            resources:
+              requests:
+                cpu: 50m
+                memory: 64Mi
+              limits:
+                cpu: 100m
+                memory: 128Mi
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: false
+              capabilities:
+                drop:
+                - ALL
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: redis-backup-pvc
+          restartPolicy: OnFailure
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-recovery-scripts
+  namespace: grill-stats
+  labels:
+    app.kubernetes.io/name: redis-recovery
+    app.kubernetes.io/part-of: grill-stats
+    app.kubernetes.io/component: backup
+data:
+  restore-redis.sh: |
+    #!/bin/bash
+    set -e
+
+    # Redis restore script
+    # Usage: ./restore-redis.sh <backup_file_path>
+
+    if [ $# -ne 1 ]; then
+      echo "Usage: $0 <backup_file_path>"
+      exit 1
+    fi
+
+    BACKUP_FILE="$1"
+
+    if [ ! -f "$BACKUP_FILE" ]; then
+      echo "Backup file not found: $BACKUP_FILE"
+      exit 1
+    fi
+
+    echo "Starting Redis restore process..."
+
+    # Stop Redis temporarily
+    echo "Stopping Redis service..."
+    kubectl scale statefulset redis -n grill-stats --replicas=0
+
+    # Wait for Redis to stop
+    echo "Waiting for Redis to stop..."
+    kubectl wait --for=delete pod -l app.kubernetes.io/name=redis -n grill-stats --timeout=60s
+
+    # Extract backup
+    TEMP_DIR="/tmp/redis_restore"
+    mkdir -p "$TEMP_DIR"
+    tar -xzf "$BACKUP_FILE" -C "$TEMP_DIR"
+
+    # Find extracted directory
+    EXTRACTED_DIR=$(find "$TEMP_DIR" -type d -name "*_*" | head -1)
+
+    if [ -z "$EXTRACTED_DIR" ]; then
+      echo "Could not find extracted backup directory!"
+      exit 1
+    fi
+
+    # Create restore job
+    cat << EOF | kubectl apply -f -
+    apiVersion: batch/v1
+    kind: Job
+    metadata:
+      name: redis-restore-$(date +%s)
+      namespace: grill-stats
+    spec:
+      template:
+        spec:
+          containers:
+          - name: redis-restore
+            image: redis:7-alpine
+            command:
+            - /bin/sh
+            - -c
+            - |
+              # Copy RDB file to Redis data directory
+              if [ -f /restore/dump.rdb ]; then
+                cp /restore/dump.rdb /data/dump.rdb
+                echo "RDB file restored"
+              fi
+
+              # Copy AOF file if present
+              if [ -f /restore/appendonly.aof ]; then
+                cp /restore/appendonly.aof /data/appendonly.aof
+                echo "AOF file restored"
+              fi
+
+              # Set correct permissions
+              chown -R 999:999 /data
+              chmod -R 755 /data
+
+              echo "Restore completed"
+            volumeMounts:
+            - name: redis-data
+              mountPath: /data
+            - name: restore-data
+              mountPath: /restore
+          volumes:
+          - name: redis-data
+            persistentVolumeClaim:
+              claimName: redis-data-redis-0
+          - name: restore-data
+            hostPath:
+              path: $EXTRACTED_DIR
+          restartPolicy: Never
+    EOF
+
+    # Wait for restore job to complete
+    echo "Waiting for restore job to complete..."
+    kubectl wait --for=condition=complete job -l app.kubernetes.io/name=redis-restore -n grill-stats --timeout=300s
+
+    # Restart Redis
+    echo "Restarting Redis service..."
+    kubectl scale statefulset redis -n grill-stats --replicas=1
+
+    # Wait for Redis to be ready
+    echo "Waiting for Redis to be ready..."
+    kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=redis -n grill-stats --timeout=300s
+
+    # Cleanup
+    rm -rf "$TEMP_DIR"
+
+    echo "Redis restore completed successfully"
+
+  backup-now.sh: |
+    #!/bin/bash
+    set -e
+
+    # Manual backup script
+    echo "Creating manual Redis backup..."
+
+    # Create manual backup job
+    cat << EOF | kubectl apply -f -
+    apiVersion: batch/v1
+    kind: Job
+    metadata:
+      name: redis-manual-backup-$(date +%s)
+      namespace: grill-stats
+    spec:
+      template:
+        spec:
+          containers:
+          - name: redis-backup
+            image: redis:7-alpine
+            command:
+            - /bin/sh
+            - -c
+            - |
+              BACKUP_DIR="/backup/manual_$(date +%Y%m%d_%H%M%S)"
+              mkdir -p "$BACKUP_DIR"
+
+              export REDISCLI_AUTH="$REDIS_PASSWORD"
+
+              redis-cli -h redis -p 6379 --rdb "$BACKUP_DIR/dump.rdb"
+
+              cat > "$BACKUP_DIR/backup_metadata.json" << EOF2
+              {
+                "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+                "backup_type": "manual",
+                "total_keys": $(redis-cli -h redis -p 6379 DBSIZE)
+              }
+              EOF2
+
+              tar -czf "$BACKUP_DIR.tar.gz" -C "$(dirname $BACKUP_DIR)" "$(basename $BACKUP_DIR)"
+              rm -rf "$BACKUP_DIR"
+
+              echo "Manual backup created: $BACKUP_DIR.tar.gz"
+            env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: grill-stats-secrets
+                  key: REDIS_PASSWORD
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backup
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: redis-backup-pvc
+          restartPolicy: Never
+    EOF
+
+    echo "Manual backup job created"

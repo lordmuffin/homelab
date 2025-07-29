@@ -1,0 +1,119 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: obsidian
+  namespace: services
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: obsidian
+  template:
+    metadata:
+      labels:
+        app: obsidian
+    spec:
+      initContainers:
+      - name: obsidian-restore
+        image: backblazeit/b2:latest
+        env:
+        - name: B2_APPLICATION_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: backblaze-cloud-homelab-creds-1password
+              key: keyID
+        - name: B2_APPLICATION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: backblaze-cloud-homelab-creds-1password
+              key: applicationKey
+        - name: B2_BUCKET_NAME
+          value: "cloud-homelab-backups"
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            # Install required tools
+            apk add --no-cache tar gzip curl jq
+            
+            # Check if data directory is empty or contains only basic files
+            if [ "$(find /config -mindepth 1 -maxdepth 1 | wc -l)" -le 1 ]; then
+              echo "Data directory is empty or minimal, attempting to restore from latest backup..."
+              
+              # List backups and find the latest one
+              echo "Fetching list of backups from B2..."
+              LATEST_BACKUP=$(b2v4 file list --json $B2_BUCKET_NAME obsidian/ | jq -r '.[] | select(.fileName | startswith("obsidian/obsidian_backup_")) | .fileName' | sort -r | head -n1)
+              
+              if [ -n "$LATEST_BACKUP" ] && [ "$LATEST_BACKUP" != "null" ]; then
+                echo "Found latest backup: $LATEST_BACKUP"
+                BACKUP_FILE="/tmp/$(basename $LATEST_BACKUP)"
+                
+                # Download the latest backup
+                echo "Downloading backup..."
+                b2v4 file download-file-by-name $B2_BUCKET_NAME "$LATEST_BACKUP" "$BACKUP_FILE"
+                
+                # Extract backup to config directory
+                echo "Extracting backup to /config..."
+                cd /config
+                tar -xzf "$BACKUP_FILE"
+                
+                # Clean up downloaded file
+                rm -f "$BACKUP_FILE"
+                
+                echo "Restoration completed successfully!"
+              else
+                echo "No backups found in B2, starting with fresh installation"
+              fi
+            else
+              echo "Data directory contains files, skipping restoration"
+            fi
+        volumeMounts:
+        - name: obsidian-data
+          mountPath: /config
+      containers:
+      - name: obsidian
+        image: lscr.io/linuxserver/obsidian:latest
+        ports:
+        - containerPort: 3000
+          name: http
+        - containerPort: 3001
+          name: websocket
+        env:
+        - name: PUID
+          value: "1000"
+        - name: PGID
+          value: "1000"
+        - name: TZ
+          value: "America/Chicago"
+        - name: DISPLAY
+          value: ":0"
+        volumeMounts:
+        - name: obsidian-data
+          mountPath: /config
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 15
+          periodSeconds: 15
+          timeoutSeconds: 5
+      volumes:
+      - name: obsidian-data
+        persistentVolumeClaim:
+          claimName: obsidian-pvc
+      restartPolicy: Always

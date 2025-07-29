@@ -1,0 +1,134 @@
+# OneNote to Tandoor Migration Configuration
+
+# Microsoft Graph API Configuration
+microsoft:
+  client_id: "${MICROSOFT_CLIENT_ID}"
+  client_secret: "${MICROSOFT_CLIENT_SECRET}"
+  tenant_id: "${MICROSOFT_TENANT_ID}"
+  # Use interactive authentication for delegated permissions (required for OneNote)
+  use_interactive_auth: ${MICROSOFT_USE_INTERACTIVE_AUTH:-true}
+  
+# Tandoor API Configuration
+tandoor:
+  url: "${TANDOOR_URL}"
+  api_token: "${TANDOOR_API_TOKEN}"
+  # Microsoft authentication (for middleware-protected instances)
+  msft_username: "${TANDOOR_MSFT_USERNAME:-}"
+  msft_password: "${TANDOOR_MSFT_PASSWORD:-}"
+  skip_msft_auth: ${TANDOOR_SKIP_MSFT_AUTH:-false}
+
+# Migration Settings
+migration:
+  # OneNote notebook to scan (leave empty for all notebooks)
+  notebook_name: "${ONENOTE_NOTEBOOK_NAME:-}"
+  
+  # OneNote page name filter (leave empty for automatic recipe detection)
+  page_name_filter: "${ONENOTE_PAGE_NAME_FILTER:-}"
+  
+  # File import settings (alternative to OneNote API)
+  use_file_import: ${USE_FILE_IMPORT:-false}
+  import_directory: "${IMPORT_FILES_DIRECTORY:-exported_recipes}"
+  supported_formats: ["txt", "html", "docx", "md"]
+  
+  # Batch processing settings
+  batch_size: ${BATCH_SIZE:-10}
+  delay_between_requests: ${DELAY_BETWEEN_REQUESTS:-1.0}
+  
+  # Duplicate handling
+  skip_duplicates: ${SKIP_DUPLICATES:-true}
+  
+  # Content filtering
+  min_ingredients: ${MIN_INGREDIENTS:-2}
+  min_instructions: ${MIN_INSTRUCTIONS:-2}
+  
+  # Image processing
+  download_images: ${DOWNLOAD_IMAGES:-true}
+  max_image_size_mb: ${MAX_IMAGE_SIZE_MB:-10}
+  
+  # Dry run mode (preview only, no actual upload)
+  dry_run: ${DRY_RUN:-false}
+
+# Logging Configuration
+logging:
+  level: ${LOG_LEVEL:-INFO}
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "${LOG_FILE:-migration.log}"
+  console: ${LOG_CONSOLE:-true}
+
+# Recipe Processing Rules
+recipe_processing:
+  # Minimum content thresholds
+  min_title_length: 3
+  max_title_length: 200
+  min_description_length: 10
+  max_description_length: 1000
+  
+  # Default values
+  default_servings: 1
+  default_working_time: 30  # minutes
+  
+  # Text cleaning rules
+  remove_common_prefixes:
+    - "recipe:"
+    - "recipe for"
+    - "how to make"
+  
+  # Ingredient parsing
+  ingredient_parsing:
+    # Common measurement conversions
+    unit_aliases:
+      cup: ["c", "cups"]
+      tablespoon: ["tbsp", "tbs", "tablespoons"]
+      teaspoon: ["tsp", "teaspoons"]
+      pound: ["lb", "lbs", "pounds"]
+      ounce: ["oz", "ounces"]
+    
+    # Words to ignore in ingredient names
+    ignore_words:
+      - "fresh"
+      - "dried"
+      - "chopped"
+      - "diced"
+      - "sliced"
+      - "minced"
+  
+  # Instruction processing
+  instruction_processing:
+    # Common step prefixes to remove
+    remove_step_prefixes:
+      - "step"
+      - "instructions:"
+      - "directions:"
+    
+    # Time extraction patterns
+    time_patterns:
+      - "for (\\d+) minutes?"
+      - "for (\\d+) hours?"
+      - "until (\\w+)"
+
+# Error Handling
+error_handling:
+  # Maximum retries for API calls
+  max_retries: 3
+  retry_delay: 2.0
+  
+  # Continue on errors
+  continue_on_recipe_error: true
+  continue_on_api_error: false
+  
+  # Error reporting
+  create_error_report: true
+  error_report_file: "${ERROR_REPORT_FILE:-migration_errors.json}"
+
+# Output Settings
+output:
+  # Success report
+  create_success_report: true
+  success_report_file: "${SUCCESS_REPORT_FILE:-migration_success.json}"
+  
+  # Progress tracking
+  show_progress_bar: true
+  progress_update_interval: 1  # seconds
+  
+  # Summary statistics
+  show_detailed_summary: true

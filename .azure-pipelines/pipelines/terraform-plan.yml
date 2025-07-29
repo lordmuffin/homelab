@@ -1,0 +1,411 @@
+# Azure DevOps Stage Template: Terraform Plan
+# Validates Terraform configurations and generates plans for review
+
+parameters:
+- name: environment
+  type: string
+  default: 'dev-lab'
+  values:
+  - 'dev-lab'
+  - 'prod-lab'
+
+stages:
+  - stage: TerraformPlan
+    displayName: 'Terraform Plan Validation'
+    variables:
+    # Import shared variables template
+    - template: ../templates/shared-variables.yml
+      parameters:
+        environment: ${{ parameters.environment }}
+    jobs:
+    - job: TerraformPlanMatrix
+      displayName: 'Terraform Plan'
+      timeoutInMinutes: 45
+      cancelTimeoutInMinutes: 5
+      
+      strategy:
+        matrix:
+          DevLab_Main:
+            Environment: 'dev-lab'
+            Module: 'main'
+            Priority: 'critical'
+          DevLab_Vault:
+            Environment: 'dev-lab'
+            Module: 'vault'
+            Priority: 'high'
+          DevLab_Unifi:
+            Environment: 'dev-lab'
+            Module: 'unifi'
+            Priority: 'medium'
+          DevLab_Vultr:
+            Environment: 'dev-lab'
+            Module: 'vultr'
+            Priority: 'low'
+          ProdLab_Main:
+            Environment: 'prod-lab'
+            Module: 'main'
+            Priority: 'critical'
+          ProdLab_Vault:
+            Environment: 'prod-lab'
+            Module: 'vault'
+            Priority: 'high'
+          ProdLab_Unifi:
+            Environment: 'prod-lab'
+            Module: 'unifi'
+            Priority: 'medium'
+          ProdLab_Vultr:
+            Environment: 'prod-lab'
+            Module: 'vultr'
+            Priority: 'low'
+          ProdLab_B2:
+            Environment: 'prod-lab'
+            Module: 'b2'
+            Priority: 'medium'
+        maxParallel: 3  # Reduced to prevent Azure throttling
+      
+      pool:
+        vmImage: 'ubuntu-latest'
+      
+      variables:
+      # Environment-specific variable groups (resolved at runtime)
+      - group: terraform-$(Environment)
+      - group: azure-service-connections
+      
+      # Job-specific variables
+      - name: StateKey
+        value: '$(Environment)/$(Module)/terraform.tfstate'
+      
+      steps:
+      - task: PowerShell@2
+        displayName: 'Set Working Directory Variable'
+        inputs:
+          targetType: 'inline'
+          script: |
+            if ("$(Module)" -eq "main") {
+              $workingDir = "terraform"
+            } else {
+              $workingDir = "terraform/modules/$(Module)"
+            }
+            Write-Host "##vso[task.setvariable variable=WORKING_DIR]$workingDir"
+            Write-Host "Working directory set to: $workingDir"
+            
+            # Set additional computed variables for downstream tasks
+            Write-Host "##vso[task.setvariable variable=COMPUTED_STATE_KEY]$(Environment)/$(Module)/terraform.tfstate"
+            Write-Host "##vso[task.setvariable variable=ARTIFACT_NAME]terraform-plan-$(Environment)-$(Module)"
+            Write-Host "##vso[task.setvariable variable=BACKEND_CONFIG_FILE]$workingDir/backend.tf"
+      
+      - template: ../templates/terraform-setup.yml
+        parameters:
+          azureServiceConnection: 'azure-terraform-backend'
+          terraformVersion: $(TF_VERSION)
+          workingDirectory: $(WORKING_DIR)
+          environment: $(Environment)
+          module: $(Module)
+          stateKey: $(StateKey)
+      
+      - task: TerraformCLI@0
+        displayName: 'Terraform Format Check'
+        inputs:
+          command: 'fmt'
+          terraformVersion: $(TF_VERSION)
+          workingDirectory: $(WORKING_DIR)
+          commandOptions: '-check -recursive'
+        continueOnError: false
+      
+      - task: PowerShell@2
+        displayName: 'Terraform Init with Retry Logic'
+        inputs:
+          targetType: 'inline'
+          workingDirectory: $(WORKING_DIR)
+          script: |
+            # Set plugin cache directory for performance
+            $env:TF_PLUGIN_CACHE_DIR = "$(Agent.TempDirectory)/terraform-plugins"
+            New-Item -ItemType Directory -Force -Path $env:TF_PLUGIN_CACHE_DIR | Out-Null
+            
+            $maxRetries = 3
+            $retryDelay = 30
+            
+            for ($attempt = 1; $attempt -le $maxRetries; $attempt++) {
+              try {
+                Write-Host "🔄 Terraform Init attempt $attempt of $maxRetries"
+                
+                terraform init `
+                  -backend-config="resource_group_name=$(AZURE_BACKEND_RESOURCE_GROUP)" `
+                  -backend-config="storage_account_name=$(AZURE_BACKEND_STORAGE_ACCOUNT)" `
+                  -backend-config="container_name=$(AZURE_BACKEND_CONTAINER_NAME)" `
+                  -backend-config="key=$(StateKey)" `
+                  -lock-timeout=$(STATE_LOCK_TIMEOUT) `
+                  -input=false `
+                  -no-color
+                
+                if ($LASTEXITCODE -eq 0) {
+                  Write-Host "✅ Terraform init successful on attempt $attempt"
+                  break
+                } else {
+                  throw "Terraform init failed with exit code $LASTEXITCODE"
+                }
+              }
+              catch {
+                Write-Host "❌ Attempt $attempt failed: $($_.Exception.Message)"
+                
+                if ($attempt -lt $maxRetries) {
+                  Write-Host "⏳ Waiting $retryDelay seconds before retry..."
+                  Start-Sleep -Seconds $retryDelay
+                  $retryDelay = $retryDelay * 2  # Exponential backoff
+                } else {
+                  Write-Host "💥 All $maxRetries attempts failed"
+                  exit 1
+                }
+              }
+            }
+      
+      - task: TerraformCLI@0
+        displayName: 'Terraform Validate'
+        inputs:
+          command: 'validate'
+          terraformVersion: $(TF_VERSION)
+          workingDirectory: $(WORKING_DIR)
+      
+      - task: TerraformCLI@0
+        displayName: 'Terraform Plan'
+        inputs:
+          command: 'plan'
+          terraformVersion: $(TF_VERSION)
+          workingDirectory: $(WORKING_DIR)
+          environmentServiceName: 'azure-terraform-backend'
+          commandOptions: '-input=false -out=tfplan-$(Environment)-$(Module).out -detailed-exitcode'
+        env:
+          # Secure environment variables from variable groups
+          TF_VAR_api_key: $(RACKSPACE_API_KEY)
+          TF_VAR_environment: $(Environment)
+          TF_VAR_subscription_id: $(ARM_SUBSCRIPTION_ID)
+          TF_VAR_tenant_id: $(ARM_TENANT_ID)
+          ARM_USE_AZUREAD: true
+          ARM_STORAGE_USE_AZUREAD: true
+        continueOnError: true
+        name: 'TerraformPlan'
+      
+      - task: PowerShell@2
+        displayName: 'Generate Plan Output'
+        inputs:
+          targetType: 'inline'
+          workingDirectory: $(WORKING_DIR)
+          script: |
+            # Generate human-readable plan output
+            terraform show -no-color tfplan-$(Environment)-$(Module).out > plan-output.txt
+            
+            # Set plan exit code for downstream tasks
+            $planExitCode = $env:TERRAFORMCLI_COMMAND_EXIT_CODE
+            Write-Host "##vso[task.setvariable variable=PLAN_EXIT_CODE]$planExitCode"
+            Write-Host "Plan exit code: $planExitCode"
+            
+            # Display plan summary
+            switch ($planExitCode) {
+              "0" { 
+                Write-Host "✅ No changes detected"
+                Write-Host "##vso[task.setvariable variable=PLAN_STATUS]No Changes"
+              }
+              "1" { 
+                Write-Host "❌ Terraform plan failed"
+                Write-Host "##vso[task.setvariable variable=PLAN_STATUS]Failed"
+              }
+              "2" { 
+                Write-Host "📋 Changes detected in plan"
+                Write-Host "##vso[task.setvariable variable=PLAN_STATUS]Changes Detected"
+              }
+              default { 
+                Write-Host "❓ Unknown plan exit code: $planExitCode"
+                Write-Host "##vso[task.setvariable variable=PLAN_STATUS]Unknown"
+              }
+            }
+      
+      - task: PublishPipelineArtifact@1
+        displayName: 'Upload Plan Artifacts'
+        inputs:
+          targetPath: '$(WORKING_DIR)'
+          artifactName: 'terraform-plan-$(Environment)-$(Module)'
+          publishLocation: 'pipeline'
+        condition: always()
+      
+      # Enhanced security scanning with dedicated template
+      - template: ../templates/security-scanning.yml
+        parameters:
+          workingDirectory: $(WORKING_DIR)
+          failOnHigh: true
+          enableCache: true
+      
+      - task: PowerShell@2
+        displayName: 'Comment on Pull Request'
+        inputs:
+          targetType: 'inline'
+          script: |
+            # Only run for pull requests
+            if ("$(Build.Reason)" -eq "PullRequest") {
+              $planOutput = Get-Content "$(WORKING_DIR)/plan-output.txt" -Raw
+              
+              # Determine status emoji and text
+              $statusEmoji = "✅"
+              $statusText = "No changes"
+              
+              switch ("$(PLAN_EXIT_CODE)") {
+                "1" { 
+                  $statusEmoji = "❌"
+                  $statusText = "Plan failed"
+                }
+                "2" { 
+                  $statusEmoji = "📋"
+                  $statusText = "Changes detected"
+                }
+              }
+              
+              # Truncate plan output if too long
+              if ($planOutput.Length -gt 60000) {
+                $planOutput = $planOutput.Substring(0, 60000) + "`n`n... (truncated)"
+              }
+              
+              # Create comment body
+              $comment = @"
+            ## $statusEmoji Terraform Plan: $(Environment)/$(Module)
+            
+            **Status:** $statusText
+            **Environment:** $(Environment)
+            **Module:** $(Module)
+            **Commit:** $(Build.SourceVersion.Substring(0, 7))
+            
+            <details>
+            <summary>📋 Plan Output</summary>
+            
+            ```terraform
+            $planOutput
+            ```
+            
+            </details>
+            
+            ---
+            *Plan generated at $(Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")*
+            "@
+              
+              # Post comment to PR with enhanced error handling
+              try {
+                $headers = @{
+                  "Authorization" = "Bearer $(System.AccessToken)"
+                  "Content-Type" = "application/json"
+                  "Accept" = "application/json"
+                }
+                
+                $body = @{
+                  "content" = $comment
+                  "parentCommentId" = 0
+                  "commentType" = 1
+                } | ConvertTo-Json -Depth 3
+                
+                $uri = "$(System.CollectionUri)$(System.TeamProject)/_apis/git/repositories/$(Build.Repository.ID)/pullRequests/$(System.PullRequest.PullRequestId)/threads?api-version=7.0"
+                
+                $response = Invoke-RestMethod -Uri $uri -Method POST -Headers $headers -Body $body -TimeoutSec 30
+                Write-Host "✅ Comment posted to pull request (ID: $($response.id))"
+              } catch {
+                Write-Host "⚠️ Failed to post PR comment: $($_.Exception.Message)"
+                Write-Host "Debug: URI = $uri"
+                Write-Host "Debug: PR ID = $(System.PullRequest.PullRequestId)"
+              }
+            }
+        condition: eq(variables['Build.Reason'], 'PullRequest')
+        continueOnError: true
+      
+      - task: PowerShell@2
+        displayName: 'Plan Status Check & Notifications'
+        inputs:
+          targetType: 'inline'
+          script: |
+            # Plan status evaluation
+            $planStatus = "Unknown"
+            $planEmoji = "❓"
+            $exitCode = 0
+            
+            switch ("$(PLAN_EXIT_CODE)") {
+              "0" { 
+                $planStatus = "No changes detected"
+                $planEmoji = "✅"
+                $exitCode = 0
+              }
+              "1" { 
+                $planStatus = "Terraform plan failed"
+                $planEmoji = "❌"
+                $exitCode = 1
+              }
+              "2" { 
+                $planStatus = "Changes detected in plan"
+                $planEmoji = "📋"
+                $exitCode = 0
+              }
+              default { 
+                $planStatus = "Unknown plan exit code: $(PLAN_EXIT_CODE)"
+                $planEmoji = "❓"
+                $exitCode = 1
+              }
+            }
+            
+            Write-Host "$planEmoji $planStatus"
+            
+            # Send notifications if enabled
+            if ("$(NOTIFICATION_ENABLED)" -eq "true") {
+              $securityEmoji = if ("$(SECURITY_STATUS)" -eq "Pass") { "✅" } else { "⚠️" }
+              
+              # Enhanced notification with security details
+              $notification = @{
+                "@type" = "MessageCard"
+                "@context" = "http://schema.org/extensions"
+                text = "Terraform Plan: $(Environment)/$(Module)"
+                themeColor = if ($planStatus -match "failed") { "FF0000" } elseif ($planStatus -match "Changes") { "FFA500" } else { "00FF00" }
+                sections = @(
+                  @{
+                    activityTitle = "$planEmoji Plan Status: $planStatus"
+                    activitySubtitle = "Environment: $(Environment) | Module: $(Module) | Priority: $(Priority)"
+                    facts = @(
+                      @{ name = "Branch"; value = "$(Build.SourceBranch)" },
+                      @{ name = "Commit"; value = "$(Build.SourceVersion.Substring(0, 7))" },
+                      @{ name = "Security Status"; value = "$securityEmoji $(SECURITY_STATUS)" },
+                      @{ name = "Security Issues"; value = "$(TFSEC_TOTAL) total ($(TFSEC_CRITICAL) critical, $(TFSEC_HIGH) high)" },
+                      @{ name = "Build"; value = "[View Build]($(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId))" }
+                    )
+                  }
+                )
+              } | ConvertTo-Json -Depth 4
+              
+              # Send to Teams
+              if ("$(TEAMS_WEBHOOK_URL)") {
+                try {
+                  Invoke-RestMethod -Uri "$(TEAMS_WEBHOOK_URL)" -Method POST -Body $notification -ContentType "application/json" -TimeoutSec 30
+                  Write-Host "✅ Teams notification sent"
+                } catch {
+                  Write-Host "⚠️ Failed to send Teams notification: $($_.Exception.Message)"
+                }
+              }
+              
+              # Send to Slack if configured
+              if ("$(SLACK_WEBHOOK_URL)") {
+                $slackMessage = @{
+                  text = "Terraform Plan: $(Environment)/$(Module)"
+                  attachments = @(
+                    @{
+                      color = if ($planStatus -match "failed") { "danger" } elseif ($planStatus -match "Changes") { "warning" } else { "good" }
+                      fields = @(
+                        @{ title = "Status"; value = "$planEmoji $planStatus"; short = $true },
+                        @{ title = "Environment"; value = "$(Environment)"; short = $true },
+                        @{ title = "Security"; value = "$securityEmoji $(SECURITY_STATUS)"; short = $true },
+                        @{ title = "Build"; value = "<$(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)|View Build>"; short = $true }
+                      )
+                    }
+                  )
+                } | ConvertTo-Json -Depth 4
+                
+                try {
+                  Invoke-RestMethod -Uri "$(SLACK_WEBHOOK_URL)" -Method POST -Body $slackMessage -ContentType "application/json" -TimeoutSec 30
+                  Write-Host "✅ Slack notification sent"
+                } catch {
+                  Write-Host "⚠️ Failed to send Slack notification: $($_.Exception.Message)"
+                }
+              }
+            }
+            
+            exit $exitCode

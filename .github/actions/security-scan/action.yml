@@ -1,0 +1,357 @@
+# Reusable Action: Security Scanning
+# Converted from Azure DevOps template: security-scanning.yml
+# Performs comprehensive security scanning with multiple tools
+
+name: '🛡️ Security Scanning'
+description: 'Comprehensive security scanning with tfsec, Checkov, and Terrascan'
+
+inputs:
+  working-directory:
+    description: 'Working directory to scan'
+    required: true
+  fail-on-high:
+    description: 'Fail build on high severity issues'
+    required: false
+    default: 'true'
+  environment:
+    description: 'Target environment'
+    required: true
+  module:
+    description: 'Module being scanned'
+    required: true
+
+outputs:
+  status:
+    description: 'Overall security scan status'
+    value: ${{ steps.report.outputs.status }}
+  score:
+    description: 'Security score (0-100)'
+    value: ${{ steps.report.outputs.score }}
+  total-issues:
+    description: 'Total number of security issues'
+    value: ${{ steps.report.outputs.total-issues }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: 📦 Cache Security Tools
+      uses: actions/cache@v4
+      with:
+        path: ~/.security-tools
+        key: security-tools-${{ runner.os }}-${{ env.TFSEC_VERSION }}-${{ env.CHECKOV_VERSION }}-${{ env.TERRASCAN_VERSION }}
+        restore-keys: |
+          security-tools-${{ runner.os }}-
+
+    - name: 🔧 Install Security Tools
+      shell: bash
+      run: |
+        SECURITY_TOOLS_DIR="$HOME/.security-tools"
+        BIN_DIR="$SECURITY_TOOLS_DIR/bin"
+        
+        # Create directories
+        mkdir -p "$BIN_DIR"
+        export PATH="$BIN_DIR:$PATH"
+        
+        # Skip installation if cache hit and tools exist
+        if [ -f "$BIN_DIR/tfsec" ] && [ -f "$BIN_DIR/checkov" ]; then
+          echo "✅ Security tools restored from cache"
+          "$BIN_DIR/tfsec" --version
+          "$BIN_DIR/checkov" --version 2>/dev/null || echo "Checkov not in cache, will install"
+          export PATH="$BIN_DIR:$PATH"
+          echo "PATH=$PATH" >> $GITHUB_ENV
+          exit 0
+        fi
+        
+        echo "🔧 Installing security scanning tools..."
+        
+        # Install tfsec with verification
+        TFSEC_VERSION="${{ env.TFSEC_VERSION }}"
+        PLATFORM="linux-amd64"
+        TFSEC_URL="https://github.com/aquasecurity/tfsec/releases/download/v$TFSEC_VERSION/tfsec-$PLATFORM"
+        TFSEC_CHECKSUM_URL="https://github.com/aquasecurity/tfsec/releases/download/v$TFSEC_VERSION/tfsec_${TFSEC_VERSION}_checksums.txt"
+        
+        echo "📦 Downloading tfsec v$TFSEC_VERSION..."
+        curl -fsSL "$TFSEC_URL" -o "$BIN_DIR/tfsec"
+        
+        # Download and verify checksum
+        curl -fsSL "$TFSEC_CHECKSUM_URL" -o "$SECURITY_TOOLS_DIR/checksums.txt"
+        EXPECTED_CHECKSUM=$(grep "tfsec-$PLATFORM" "$SECURITY_TOOLS_DIR/checksums.txt" | cut -d' ' -f1)
+        
+        if [ -z "$EXPECTED_CHECKSUM" ]; then
+          echo "⚠️ Checksum not found for platform: $PLATFORM"
+        else
+          ACTUAL_CHECKSUM=$(sha256sum "$BIN_DIR/tfsec" | cut -d' ' -f1)
+          if [ "$ACTUAL_CHECKSUM" = "$EXPECTED_CHECKSUM" ]; then
+            echo "✅ tfsec checksum verified: $ACTUAL_CHECKSUM"
+          else
+            echo "❌ Checksum verification failed for tfsec"
+            echo "Expected: $EXPECTED_CHECKSUM"
+            echo "Actual: $ACTUAL_CHECKSUM"
+            exit 1
+          fi
+        fi
+        
+        chmod +x "$BIN_DIR/tfsec"
+        echo "✅ tfsec installed and verified"
+        
+        # Install Checkov via pip
+        echo "📦 Installing Checkov v${{ env.CHECKOV_VERSION }}..."
+        python3 -m venv "$SECURITY_TOOLS_DIR/checkov-venv"
+        source "$SECURITY_TOOLS_DIR/checkov-venv/bin/activate"
+        pip install --upgrade pip
+        pip install "checkov==${{ env.CHECKOV_VERSION }}" --no-cache-dir
+        
+        # Create wrapper script
+        cat > "$BIN_DIR/checkov" << 'EOF'
+        #!/bin/bash
+        exec "$HOME/.security-tools/checkov-venv/bin/checkov" "$@"
+        EOF
+        chmod +x "$BIN_DIR/checkov"
+        echo "✅ Checkov installed in isolated environment"
+        
+        # Install Terrascan
+        echo "📦 Installing Terrascan v${{ env.TERRASCAN_VERSION }}..."
+        TERRASCAN_URL="https://github.com/tenable/terrascan/releases/download/v${{ env.TERRASCAN_VERSION }}/terrascan_${{ env.TERRASCAN_VERSION }}_Linux_x86_64.tar.gz"
+        
+        curl -fsSL "$TERRASCAN_URL" -o "$SECURITY_TOOLS_DIR/terrascan.tar.gz"
+        tar -xzf "$SECURITY_TOOLS_DIR/terrascan.tar.gz" -C "$BIN_DIR" terrascan 2>/dev/null || echo "⚠️ Terrascan extraction failed (optional)"
+        chmod +x "$BIN_DIR/terrascan" 2>/dev/null || echo "⚠️ Terrascan not available"
+        
+        # Update PATH
+        export PATH="$BIN_DIR:$PATH"
+        echo "PATH=$PATH" >> $GITHUB_ENV
+        
+        # Verify installations
+        echo "🔍 Verifying security tool installations:"
+        "$BIN_DIR/tfsec" --version
+        "$BIN_DIR/checkov" --version
+        "$BIN_DIR/terrascan" version 2>/dev/null || echo "Terrascan not available"
+
+    - name: 🔍 Security Scan - tfsec
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        echo "🔍 Running tfsec security scan..."
+        
+        # Run tfsec with comprehensive options
+        tfsec . \
+          --format json \
+          --out tfsec-results.json \
+          --include-ignored \
+          --soft-fail || true
+        
+        # Process results
+        if [ -f "tfsec-results.json" ]; then
+          CRITICAL=$(jq -r '.results[] | select(.severity=="CRITICAL") | .severity' tfsec-results.json | wc -l)
+          HIGH=$(jq -r '.results[] | select(.severity=="HIGH") | .severity' tfsec-results.json | wc -l)
+          MEDIUM=$(jq -r '.results[] | select(.severity=="MEDIUM") | .severity' tfsec-results.json | wc -l)
+          LOW=$(jq -r '.results[] | select(.severity=="LOW") | .severity' tfsec-results.json | wc -l)
+          
+          echo "📊 tfsec Results:"
+          echo "  CRITICAL: $CRITICAL"
+          echo "  HIGH: $HIGH"
+          echo "  MEDIUM: $MEDIUM"
+          echo "  LOW: $LOW"
+          
+          # Set outputs
+          echo "TFSEC_CRITICAL=$CRITICAL" >> $GITHUB_ENV
+          echo "TFSEC_HIGH=$HIGH" >> $GITHUB_ENV
+          echo "TFSEC_TOTAL=$((CRITICAL + HIGH + MEDIUM + LOW))" >> $GITHUB_ENV
+          
+          # Report issues
+          if [ "$CRITICAL" -gt 0 ] || [ "$HIGH" -gt 0 ]; then
+            echo "⚠️ Security issues found:"
+            if [ "$CRITICAL" -gt 0 ]; then
+              echo "🚨 CRITICAL Issues:"
+              jq -r '.results[] | select(.severity=="CRITICAL") | "  🔴 \(.rule_description) - \(.location.filename):\(.location.start_line)"' tfsec-results.json
+            fi
+            if [ "$HIGH" -gt 0 ]; then
+              echo "🔶 HIGH Issues:"
+              jq -r '.results[] | select(.severity=="HIGH") | "  🟠 \(.rule_description) - \(.location.filename):\(.location.start_line)"' tfsec-results.json
+            fi
+            
+            # Fail based on configuration
+            if [ "${{ inputs.fail-on-high }}" = "true" ]; then
+              if [ "$CRITICAL" -gt 0 ]; then
+                echo "❌ Build failed due to $CRITICAL CRITICAL security issues"
+                exit 1
+              elif [ "$HIGH" -gt 0 ] && [ "${SECURITY_FAIL_ON_HIGH:-true}" = "true" ]; then
+                echo "❌ Build failed due to $HIGH HIGH security issues"
+                exit 1
+              fi
+            fi
+          fi
+        else
+          echo "⚠️ tfsec results file not found"
+          echo "TFSEC_TOTAL=0" >> $GITHUB_ENV
+        fi
+
+    - name: 🔍 Security Scan - Checkov
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        echo "🔍 Running Checkov security scan..."
+        
+        # Run Checkov with comprehensive framework support
+        checkov -d . \
+          --framework terraform \
+          --framework dockerfile \
+          --framework kubernetes \
+          --output json \
+          --output-file checkov-results.json \
+          --soft-fail \
+          --quiet || true
+        
+        # Process results
+        if [ -f "checkov-results.json" ]; then
+          FAILED=$(jq -r '.summary.failed // 0' checkov-results.json)
+          PASSED=$(jq -r '.summary.passed // 0' checkov-results.json)
+          SKIPPED=$(jq -r '.summary.skipped // 0' checkov-results.json)
+          
+          echo "📊 Checkov Results:"
+          echo "  FAILED: $FAILED"
+          echo "  PASSED: $PASSED"
+          echo "  SKIPPED: $SKIPPED"
+          
+          # Set outputs
+          echo "CHECKOV_FAILED=$FAILED" >> $GITHUB_ENV
+          echo "CHECKOV_PASSED=$PASSED" >> $GITHUB_ENV
+          
+          # Show failed checks
+          if [ "$FAILED" -gt 0 ]; then
+            echo "🔍 Top failed checks:"
+            jq -r '.results.failed_checks[0:10][] | "  ⚠️ \(.check_name) - \(.file_path):\(.file_line_range[0])"' checkov-results.json 2>/dev/null || echo "  No detailed results available"
+            
+            # Fail build based on thresholds
+            if [ "${{ inputs.fail-on-high }}" = "true" ]; then
+              MAX_ALLOWED="${MAX_SECURITY_ISSUES:-0}"
+              if [ "$FAILED" -gt "$MAX_ALLOWED" ]; then
+                echo "❌ Too many security issues found ($FAILED > $MAX_ALLOWED) - failing build"
+                exit 1
+              fi
+            fi
+          fi
+        else
+          echo "⚠️ Checkov results file not found"
+          echo "CHECKOV_FAILED=0" >> $GITHUB_ENV
+        fi
+
+    - name: 🔍 Security Scan - Terrascan
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      continue-on-error: true
+      run: |
+        if command -v terrascan >/dev/null 2>&1; then
+          echo "🔍 Running Terrascan security scan..."
+          
+          terrascan scan \
+            -i terraform \
+            -t aws \
+            -t azure \
+            -t gcp \
+            -o json \
+            --output-file terrascan-results.json \
+            --non-recursive \
+            --verbose || true
+          
+          # Process results if available
+          if [ -f "terrascan-results.json" ]; then
+            VIOLATIONS=$(jq -r '.results.violations | length' terrascan-results.json 2>/dev/null || echo "0")
+            
+            echo "📊 Terrascan Results: $VIOLATIONS violations"
+            echo "TERRASCAN_VIOLATIONS=$VIOLATIONS" >> $GITHUB_ENV
+            
+            if [ "$VIOLATIONS" -gt 0 ]; then
+              echo "🔍 Top violations:"
+              jq -r '.results.violations[0:5][] | "  ⚠️ \(.rule_name) - \(.description)"' terrascan-results.json 2>/dev/null || echo "  No detailed results available"
+            fi
+          fi
+        else
+          echo "ℹ️ Terrascan not available, skipping"
+          echo "TERRASCAN_VIOLATIONS=0" >> $GITHUB_ENV
+        fi
+
+    - name: 📊 Generate Security Report
+      id: report
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        echo "📋 Security Scan Summary Report"
+        echo "================================"
+        
+        TFSEC_TOTAL="${TFSEC_TOTAL:-0}"
+        TFSEC_CRITICAL="${TFSEC_CRITICAL:-0}"
+        TFSEC_HIGH="${TFSEC_HIGH:-0}"
+        CHECKOV_FAILED="${CHECKOV_FAILED:-0}"
+        CHECKOV_PASSED="${CHECKOV_PASSED:-0}"
+        TERRASCAN_VIOLATIONS="${TERRASCAN_VIOLATIONS:-0}"
+        
+        echo "🔍 tfsec: $TFSEC_TOTAL total issues ($TFSEC_CRITICAL critical, $TFSEC_HIGH high)"
+        echo "🔍 Checkov: $CHECKOV_FAILED failed, $CHECKOV_PASSED passed"
+        echo "🔍 Terrascan: $TERRASCAN_VIOLATIONS violations"
+        
+        TOTAL_CRITICAL_HIGH=$((TFSEC_CRITICAL + TFSEC_HIGH + CHECKOV_FAILED))
+        TOTAL_ISSUES=$((TFSEC_TOTAL + CHECKOV_FAILED + TERRASCAN_VIOLATIONS))
+        
+        # Calculate security score
+        if [ "$TOTAL_ISSUES" -eq 0 ]; then
+          SECURITY_SCORE=100
+        else
+          CRITICAL_PENALTY=$((TFSEC_CRITICAL * 50))
+          HIGH_PENALTY=$((TFSEC_HIGH * 20))
+          MEDIUM_PENALTY=$(((TFSEC_TOTAL - TFSEC_CRITICAL - TFSEC_HIGH) * 5))
+          CHECKOV_PENALTY=$((CHECKOV_FAILED * 10))
+          TERRASCAN_PENALTY=$((TERRASCAN_VIOLATIONS * 5))
+          
+          TOTAL_PENALTY=$((CRITICAL_PENALTY + HIGH_PENALTY + MEDIUM_PENALTY + CHECKOV_PENALTY + TERRASCAN_PENALTY))
+          SECURITY_SCORE=$((100 - TOTAL_PENALTY))
+          if [ "$SECURITY_SCORE" -lt 0 ]; then
+            SECURITY_SCORE=0
+          fi
+        fi
+        
+        echo "📊 Security Assessment Results:"
+        echo "  Overall Score: $SECURITY_SCORE/100"
+        echo "  Total Issues: $TOTAL_ISSUES"
+        echo "  Critical/High: $TOTAL_CRITICAL_HIGH"
+        
+        # Set outputs
+        echo "score=$SECURITY_SCORE" >> $GITHUB_OUTPUT
+        echo "total-issues=$TOTAL_ISSUES" >> $GITHUB_OUTPUT
+        
+        # Determine overall status
+        if [ "$TOTAL_CRITICAL_HIGH" -eq 0 ] && [ "$SECURITY_SCORE" -ge 90 ]; then
+          echo "✅ Security scans passed - excellent security posture"
+          echo "status=Pass" >> $GITHUB_OUTPUT
+        elif [ "$TOTAL_CRITICAL_HIGH" -eq 0 ] && [ "$SECURITY_SCORE" -ge 70 ]; then
+          echo "⚠️ Security scans passed with warnings - good security posture"
+          echo "status=Pass with Warnings" >> $GITHUB_OUTPUT
+        else
+          echo "❌ Security scans found significant issues (Score: $SECURITY_SCORE)"
+          echo "status=Issues Found" >> $GITHUB_OUTPUT
+        fi
+        
+        # Create consolidated report
+        cat > security-report.json << EOF
+        {
+          "timestamp": "$(date -u '+%Y-%m-%dT%H:%M:%SZ')",
+          "environment": "${{ inputs.environment }}",
+          "module": "${{ inputs.module }}",
+          "tfsec": {
+            "total": $TFSEC_TOTAL,
+            "critical": $TFSEC_CRITICAL,
+            "high": $TFSEC_HIGH
+          },
+          "checkov": {
+            "failed": $CHECKOV_FAILED,
+            "passed": $CHECKOV_PASSED
+          },
+          "terrascan": {
+            "violations": $TERRASCAN_VIOLATIONS
+          },
+          "overall_score": $SECURITY_SCORE,
+          "overall_status": "$([ $TOTAL_CRITICAL_HIGH -eq 0 ] && echo "PASS" || echo "FAIL")"
+        }
+        EOF
+        
+        echo "📄 Security report saved to security-report.json"

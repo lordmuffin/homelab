@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-ui-config
+data:
+  API_BASE_URL: "https://grill-stats-dev.homelab.local/api"
+  WS_BASE_URL: "wss://grill-stats-dev.homelab.local/ws"
+  ENVIRONMENT: "dev-lab"
+  VERSION: "dev-latest"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: auth-service-config
+data:
+  LOG_LEVEL: "DEBUG"
+  RATE_LIMIT_ATTEMPTS: "10"
+  RATE_LIMIT_WINDOW: "600"
+  RATE_LIMIT_LOCKOUT: "1800"
+  SESSION_TIMEOUT: "43200"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: historical-data-service-config
+data:
+  LOG_LEVEL: "DEBUG"
+  CACHE_TTL: "60"
+  MAX_QUERY_RANGE_DAYS: "7"
+  AGGREGATION_WINDOW: "1m"
+  RETENTION_POLICY: "7d"

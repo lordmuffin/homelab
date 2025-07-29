@@ -1,0 +1,165 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kubernetes-mcp
+  namespace: mcp-servers
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kubernetes-mcp
+      app.kubernetes.io/component: mcp-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kubernetes-mcp
+        app.kubernetes.io/component: mcp-server
+        monitoring: "enabled"
+    spec:
+      serviceAccountName: mcp-kubernetes-server
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: kubernetes-mcp
+          image: bitnami/kubectl:latest
+          imagePullPolicy: IfNotPresent
+          workingDir: /app
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              
+              # Install Node.js and npm
+              curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+              apt-get install -y nodejs
+              
+              # Install MCP server for Kubernetes
+              npm install -g @modelcontextprotocol/server-kubernetes
+              
+              # Create startup script
+              cat > /app/start.sh << 'EOF'
+              #!/bin/bash
+              set -e
+              
+              echo "Starting Kubernetes MCP Server..."
+              echo "Using kubeconfig: $KUBECONFIG"
+              echo "Kubernetes cluster: $KUBERNETES_SERVICE_HOST:$KUBERNETES_SERVICE_PORT"
+              
+              # Test cluster connectivity
+              kubectl cluster-info
+              kubectl get nodes
+              
+              # Start MCP server
+              exec node /usr/local/lib/node_modules/@modelcontextprotocol/server-kubernetes/dist/index.js
+              EOF
+              
+              chmod +x /app/start.sh
+              exec /app/start.sh
+          env:
+            - name: KUBECONFIG
+              value: "/var/run/secrets/kubernetes.io/serviceaccount"
+            - name: KUBERNETES_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: MCP_SERVER_NAME
+              value: "kubernetes-mcp"
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: mcp-servers-shared-config
+                  key: LOG_LEVEL
+            - name: METRICS_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: mcp-servers-shared-config
+                  key: METRICS_ENABLED
+            - name: METRICS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: mcp-servers-shared-config
+                  key: METRICS_PORT
+            - name: CLUSTER_DOMAIN
+              valueFrom:
+                configMapKeyRef:
+                  name: mcp-servers-shared-config
+                  key: CLUSTER_DOMAIN
+          ports:
+            - name: mcp
+              containerPort: 3000
+              protocol: TCP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+          livenessProbe:
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - kubectl cluster-info
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - kubectl get nodes
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          startupProbe:
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - kubectl cluster-info
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 10
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "200m"
+            limits:
+              memory: "512Mi"
+              cpu: "400m"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+            - name: app-data
+              mountPath: /app-data
+      volumes:
+        - name: config
+          configMap:
+            name: kubernetes-mcp-config
+            defaultMode: 0644
+        - name: tmp
+          emptyDir: {}
+        - name: app-data
+          emptyDir: {}
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirst
