@@ -14,88 +14,92 @@ spec:
       values: |
         global:
           hostname: kasm.lab.apj.dev
-          kubernetesClusterDomain: cluster.local
-          deploySize: small
-          tls:
+          clusterDomain: cluster.local
+          image:
+            pullPolicy: IfNotPresent
+          kasmPasswords:
+            adminPassword: "WILL_BE_REPLACED"
+            dbPassword: "WILL_BE_REPLACED"
+            redisPassword: "WILL_BE_REPLACED"
+            encryptionSecret: "WILL_BE_REPLACED"
+
+        kasmApp:
+          secrets:
+            secretName: kasm-secrets
+            existingSecrets:
+              adminPassword: "kasm-admin-creds"
+              dbPassword: "kasm-db-postgres-creds"
+              redisPassword: "kasm-db-postgres-creds"
+              encryptionSecret: "kasm-encryption-key"
+          ingress:
             enabled: true
-            existingSecretName: "lab-apj-dev-tls"
-          existingSecrets:
-            adminPassword: "kasm-admin-creds"
-            dbPassword: "kasm-db-postgres-creds"
-            redisPw: "kasm-db-postgres-creds"
-            encryptionSecret: "kasm-encryption-key"
-
-        db:
-          persistence:
-            enabled: true
-            size: 10Gi
-          resources:
-            requests:
-              memory: 1Gi
-              cpu: 500m
-            limits:
-              memory: 2Gi
-              cpu: 1000m
-
-        api:
-          replicaCount: 1
-          resources:
-            requests:
-              memory: 1Gi
-              cpu: 500m
-            limits:
-              memory: 2Gi
-              cpu: 1000m
-
-        manager:
-          replicaCount: 1
-          resources:
-            requests:
-              memory: 1Gi
-              cpu: 500m
-            limits:
-              memory: 2Gi
-              cpu: 1000m
-
-        proxy:
-          replicaCount: 1
-          resources:
-            requests:
-              memory: 1Gi
-              cpu: 500m
-            limits:
-              memory: 2Gi
-              cpu: 1000m
-
-        guac:
-          replicaCount: 1
-          resources:
-            requests:
-              memory: 1Gi
-              cpu: 500m
-            limits:
-              memory: 2Gi
-              cpu: 1000m
-
-        share:
-          replicaCount: 1
-          resources:
-            requests:
-              memory: 512Mi
-              cpu: 250m
-            limits:
-              memory: 1Gi
-              cpu: 500m
-
-        rdpgw:
-          replicaCount: 1
-          resources:
-            requests:
-              memory: 512Mi
-              cpu: 250m
-            limits:
-              memory: 1Gi
-              cpu: 500m
+            tls:
+              enabled: true
+              secretName: "lab-apj-dev-tls"
+          servicesToDeploy:
+            db:
+              storageClassName: ""
+              resources:
+                requests:
+                  memory: 1Gi
+                  cpu: 500m
+                limits:
+                  memory: 2Gi
+                  cpu: 1000m
+            api:
+              replicaCount: 1
+              resources:
+                requests:
+                  memory: 1Gi
+                  cpu: 500m
+                limits:
+                  memory: 2Gi
+                  cpu: 1000m
+            manager:
+              replicaCount: 1
+              resources:
+                requests:
+                  memory: 1Gi
+                  cpu: 500m
+                limits:
+                  memory: 2Gi
+                  cpu: 1000m
+            proxy:
+              replicaCount: 1
+              resources:
+                requests:
+                  memory: 1Gi
+                  cpu: 500m
+                limits:
+                  memory: 2Gi
+                  cpu: 1000m
+            guac:
+              replicaCount: 1
+              resources:
+                requests:
+                  memory: 1Gi
+                  cpu: 500m
+                limits:
+                  memory: 2Gi
+                  cpu: 1000m
+            share:
+              replicaCount: 1
+              resources:
+                requests:
+                  memory: 512Mi
+                  cpu: 250m
+                limits:
+                  memory: 1Gi
+                  cpu: 500m
+            rdpgw:
+              replicaCount: 1
+              resources:
+                requests:
+                  memory: 512Mi
+                  cpu: 250m
+                limits:
+                  memory: 1Gi
+                  cpu: 500m
   destination:
     namespace: kasm
     name: in-cluster
