@@ -10,6 +10,22 @@ spec:
     repoURL: 'https://github.com/lordmuffin/homelab.git'
     path: apps/services/kasm
     targetRevision: main
+  # Exclude resources that are managed by the kasm Helm chart
+  ignoreDifferences:
+  - group: ""
+    kind: Secret
+    name: kasm-secrets
+    namespace: kasm
+    jsonPointers:
+    - /data
+  - group: ""
+    kind: ConfigMap
+    name: kasm-db-configmap
+    namespace: kasm
+  - group: ""
+    kind: Secret
+    name: kasm-db-cert
+    namespace: kasm
   destination:
     namespace: kasm
     name: in-cluster

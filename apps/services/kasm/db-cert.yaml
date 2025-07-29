@@ -3,6 +3,8 @@ kind: Secret
 metadata:
   name: kasm-db-cert
   namespace: kasm
+  annotations:
+    argocd.argoproj.io/sync-options: Replace=true
 type: Opaque
 stringData:
   tls.crt: |

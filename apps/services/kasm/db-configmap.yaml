@@ -3,6 +3,8 @@ kind: ConfigMap
 metadata:
   name: kasm-db-configmap
   namespace: kasm
+  annotations:
+    argocd.argoproj.io/sync-options: Replace=true
 data:
   postgresql.conf: |
     # PostgreSQL configuration
