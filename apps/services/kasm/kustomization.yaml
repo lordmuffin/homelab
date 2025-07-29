@@ -6,6 +6,7 @@ resources:
   - ingress.yaml
   - ingressroute.yaml
   - rbac.yaml
+  - onepassword-items.yaml
   - secrets.yaml
   - db-configmap.yaml
   - db-cert.yaml
