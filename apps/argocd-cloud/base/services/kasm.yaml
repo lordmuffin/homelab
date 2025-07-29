@@ -7,9 +7,9 @@ metadata:
 spec:
   project: apps
   source:
-    repoURL: 'https://github.com/kasmtech/helm-charts'
-    chart: kasm-single-zone
-    targetRevision: 1.16.0
+    repoURL: 'https://github.com/kasmtech/kasm-helm.git'
+    path: kasm-single-zone
+    targetRevision: release/1.17.0
     helm:
       values: |
         global:
