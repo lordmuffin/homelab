@@ -10,6 +10,7 @@ metadata:
 spec:
   template:
     spec:
+      # Updated volumes configuration
       volumes:
       - name: kasm-db-data-sql
         configMap:
@@ -18,6 +19,10 @@ spec:
       - name: kasm-db-configs
         configMap:
           name: kasm-db-init-startup  # Changed from kasm-db-configmap to kasm-db-init-startup
+      # Use kasm-db-cert from the kasm application
+      - name: kasm-db-cert
+        secret:
+          secretName: kasm-db-cert
       containers:
       - name: kasm-db-container
         # Replace all environment variables to ensure we override the existing ones
