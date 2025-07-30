@@ -1,0 +1,86 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kasm-db-init-fix-job
+  namespace: kasm
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true,Prune=false
+    argocd.argoproj.io/sync-wave: "3"
+    argocd.argoproj.io/compare-options: IgnoreExtraneous
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+      - name: db-is-ready
+        image: kasmweb/api:1.17.0
+        command:
+        - /bin/bash
+        - -c
+        - |
+          while ! pg_isready -h db -p 5432 -t 10; do 
+            echo "Waiting for DB..."; 
+            sleep 5; 
+          done
+      containers:
+      - name: kasm-db-init-container
+        image: kasmweb/api:1.17.0
+        command:
+        - /bin/bash
+        - -c
+        - |
+          # First check if zones table exists
+          if ! PGPASSWORD="$POSTGRES_PASSWORD" psql -U kasmapp -d kasm -h db -c "SELECT 1 FROM zones LIMIT 1" &>/dev/null; then
+            echo "Zones table doesn't exist, initializing database..."
+            export DB_AUTO_INITIALIZE="true"
+            /usr/bin/startup.sh
+            echo "Database initialization completed"
+          else
+            count=$(PGPASSWORD="$POSTGRES_PASSWORD" psql -U kasmapp -d kasm -h db -t -c "SELECT COUNT(*) FROM zones" 2>/dev/null)
+            echo "Found $count zones records"
+            if [ "$count" -lt 2 ]; then
+              echo "Not enough zones records, initializing database..."
+              export DB_AUTO_INITIALIZE="true"
+              /usr/bin/startup.sh
+              echo "Database initialization completed"
+            else
+              echo "Database already properly initialized."
+            fi
+          fi
+        env:
+        - name: DEFAULT_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kasm-all-in-one-secrets
+              key: admin-password
+        - name: DEFAULT_MANAGER_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: kasm-all-in-one-secrets
+              key: manager-token
+        - name: DEFAULT_REGISTRATION_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: kasm-all-in-one-secrets
+              key: service-token
+        - name: DEFAULT_USER_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kasm-all-in-one-secrets
+              key: user-password
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kasm-all-in-one-secrets
+              key: db-password
+        volumeMounts:
+        - name: db-init-script
+          mountPath: /usr/bin/startup.sh
+          subPath: startup.sh
+      volumes:
+      - name: db-init-script
+        configMap:
+          name: kasm-db-init-startup
+          defaultMode: 0755
