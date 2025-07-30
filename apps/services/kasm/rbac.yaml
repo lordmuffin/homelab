@@ -11,7 +11,7 @@ metadata:
   namespace: kasm
 rules:
   - apiGroups: [""]
-    resources: ["pods", "services", "configmaps", "secrets", "persistentvolumeclaims"]
+    resources: ["pods", "pods/exec", "services", "configmaps", "secrets", "persistentvolumeclaims"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: ["apps"]
     resources: ["deployments", "replicasets", "statefulsets"]
