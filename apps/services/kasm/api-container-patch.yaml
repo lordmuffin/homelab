@@ -20,6 +20,15 @@ spec:
             secretKeyRef:
               name: kasm-all-in-one-secrets  # Changed from kasm-secrets
               key: db-password
+        command:
+        - /bin/bash
+        - -c
+        args:
+        - |
+          while [ ! $(PGPASSWORD=$POSTGRES_PASSWORD psql -U kasmapp -d kasm -h db -t -c "select zone_id from zones" 2>/dev/null | wc -l) -ge 2 ]; do 
+            echo "Waiting for DB to initialize..."; 
+            sleep 5; 
+          done
       containers:
       - name: kasm-api-container
         env:
