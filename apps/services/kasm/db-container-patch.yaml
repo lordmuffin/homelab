@@ -14,6 +14,10 @@ spec:
       - name: kasm-db-data-sql
         configMap:
           name: kasm-db-data-sql
+      # Update the main db-configs volume to use the Helm-created ConfigMap
+      - name: kasm-db-configs
+        configMap:
+          name: kasm-db-init-startup  # Changed from kasm-db-configmap to kasm-db-init-startup
       containers:
       - name: kasm-db-container
         env:
