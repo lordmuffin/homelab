@@ -1,0 +1,162 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kasm-api-direct-fix-job
+  namespace: kasm
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true,Prune=false
+    argocd.argoproj.io/sync-wave: "5"
+    argocd.argoproj.io/compare-options: IgnoreExtraneous
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: kubectl-container
+        image: bitnami/kubectl:latest
+        command:
+        - /bin/bash
+        - -c
+        - |
+          # Create a modified API deployment without the check for zones
+          echo "Creating modified API deployment..."
+          cat << EOF > /tmp/api-fixed.yaml
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: kasm-api-deployment-fixed
+            namespace: kasm
+            labels:
+              app.kubernetes.io/instance: kasm
+              app.kubernetes.io/managed-by: Helm
+              app.kubernetes.io/name: kasm-api
+              app.kubernetes.io/version: 1.17.0
+              helm.sh/chart: kasm-single-zone-1.17.0-develop
+              kasm-version: 1.17.0
+              release: kasm
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app.kubernetes.io/name: kasm-api
+            strategy:
+              rollingUpdate:
+                maxSurge: 2
+                maxUnavailable: 1
+              type: RollingUpdate
+            template:
+              metadata:
+                labels:
+                  app.kubernetes.io/instance: kasm
+                  app.kubernetes.io/managed-by: Helm
+                  app.kubernetes.io/name: kasm-api
+                  app.kubernetes.io/version: 1.17.0
+                  helm.sh/chart: kasm-single-zone-1.17.0-develop
+                  kasm-version: 1.17.0
+                  release: kasm
+              spec:
+                initContainers:
+                - name: db-is-ready
+                  image: kasmweb/api:1.17.0
+                  command:
+                  - /bin/bash
+                  - -c
+                  - |
+                    # Use a simpler check that just verifies DB connectivity
+                    while ! PGPASSWORD=\$POSTGRES_PASSWORD psql -U kasmapp -d kasm -h db -c "SELECT 1" >/dev/null 2>&1; do
+                      echo "Waiting for DB connection...";
+                      sleep 5;
+                    done
+                    echo "DB is ready!"
+                  env:
+                  - name: POSTGRES_PASSWORD
+                    valueFrom:
+                      secretKeyRef:
+                        key: db-password
+                        name: kasm-all-in-one-secrets
+                  securityContext:
+                    allowPrivilegeEscalation: false
+                    capabilities:
+                      drop:
+                      - ALL
+                    readOnlyRootFilesystem: true
+                    runAsGroup: 1000
+                    runAsNonRoot: true
+                    runAsUser: 1000
+                    seccompProfile:
+                      type: RuntimeDefault
+                containers:
+                - env:
+                  - name: START_SERVICES
+                    value: "true"
+                  - name: KUBERNETES_SERVICE_HOST
+                    value: "true"
+                  - name: POSTGRES_PASSWORD
+                    valueFrom:
+                      secretKeyRef:
+                        key: db-password
+                        name: kasm-all-in-one-secrets
+                  image: kasmweb/api:1.17.0
+                  imagePullPolicy: IfNotPresent
+                  livenessProbe:
+                    failureThreshold: 3
+                    initialDelaySeconds: 30
+                    periodSeconds: 30
+                    successThreshold: 1
+                    tcpSocket:
+                      port: kasm-api-pt
+                    timeoutSeconds: 10
+                  name: kasm-api-container
+                  ports:
+                  - containerPort: 8080
+                    name: kasm-api-pt
+                    protocol: TCP
+                  readinessProbe:
+                    failureThreshold: 3
+                    httpGet:
+                      path: /api/__healthcheck
+                      port: kasm-api-pt
+                    initialDelaySeconds: 10
+                    periodSeconds: 30
+                    successThreshold: 1
+                    timeoutSeconds: 10
+                  resources:
+                    limits:
+                      cpu: 500m
+                      ephemeral-storage: 2Gi
+                      memory: 512Mi
+                    requests:
+                      cpu: 150m
+                      ephemeral-storage: 50Mi
+                      memory: 64Mi
+                  securityContext:
+                    allowPrivilegeEscalation: false
+                    capabilities:
+                      drop:
+                      - ALL
+                    readOnlyRootFilesystem: true
+                    runAsGroup: 1000
+                    runAsNonRoot: true
+                    runAsUser: 1000
+                    seccompProfile:
+                      type: RuntimeDefault
+                restartPolicy: Always
+                securityContext:
+                  fsGroup: 1000
+                  fsGroupChangePolicy: Always
+                  runAsGroup: 1000
+                  runAsUser: 1000
+          EOF
+          
+          # Delete the existing API deployment
+          echo "Deleting existing API deployment..."
+          kubectl delete deployment kasm-api-deployment -n kasm
+          
+          # Apply the fixed API deployment
+          echo "Applying fixed API deployment..."
+          kubectl apply -f /tmp/api-fixed.yaml
+          
+          echo "Completed API direct fix"
+      serviceAccountName: kasm-serviceaccount
