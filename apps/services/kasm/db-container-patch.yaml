@@ -16,6 +16,13 @@ spec:
           name: kasm-db-data-sql
       containers:
       - name: kasm-db-container
+        env:
+        # Fix the POSTGRES_PASSWORD secret reference to use kasm-all-in-one-secrets
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kasm-all-in-one-secrets
+              key: db-password
         volumeMounts:
         - name: kasm-db-data-sql
           mountPath: /docker-entrypoint-initdb.d/data.sql

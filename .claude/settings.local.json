@@ -22,7 +22,9 @@
       "Bash(kubectl describe:*)",
       "Bash(git rev-parse:*)",
       "Bash(kubectl logs:*)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(kubectl delete:*)",
+      "WebFetch(domain:spot.rackspace.com)"
     ],
     "deny": []
   },
