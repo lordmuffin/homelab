@@ -25,9 +25,9 @@ spec:
           protocol: TCP
         env:
         - name: DOMAIN
-          value: "healingorganics.org"
+          value: "lab.apj.dev"
         - name: COOKIE_DOMAIN
-          value: "labs.andrewpjackson.com"
+          value: "lab.apj.dev"
         - name: AUTH_HOST
           value: "auth.labs.andrewpjackson.com"
         - name: DEFAULT_PROVIDER
