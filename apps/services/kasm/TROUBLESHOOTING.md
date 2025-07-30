@@ -163,3 +163,120 @@ We've successfully resolved the database pod issues by completely replacing the 
 ### Ongoing Monitoring
 
 After fixing the database pod, we need to monitor the other components to ensure they start successfully. Some components might still be in the initialization phase as they wait for the database to be fully operational.
+
+## Comprehensive Fix for All Kasm Components
+
+### Problem: All Kasm Pods Failing with "secret kasm-secrets not found"
+
+After fixing the database pod, we discovered that all other Kasm components (API, Manager, Guac, Proxy, Share) were also failing with the same error. All these pods were trying to use a secret named `kasm-secrets` for various credentials, but this secret didn't exist in our cluster. Instead, we have a `kasm-all-in-one-secrets` secret that contains all the necessary credentials.
+
+### Solution: Patch All Deployments to Use kasm-all-in-one-secrets
+
+We created patch files for each deployment to override their environment variables to use the existing `kasm-all-in-one-secrets` secret. Here's an example for the API deployment:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kasm-api-deployment
+  namespace: kasm
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true,Prune=false
+    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/compare-options: IgnoreExtraneous
+    argocd.argoproj.io/sync-hook: Sync
+    argocd.argoproj.io/sync-hook-weight: "10"
+spec:
+  template:
+    spec:
+      initContainers:
+      - name: db-is-ready
+        env:
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kasm-all-in-one-secrets  # Changed from kasm-secrets
+              key: db-password
+      containers:
+      - name: kasm-api-container
+        env:
+        - name: START_SERVICES
+          value: "true"
+        - name: KUBERNETES_SERVICE_HOST
+          value: "true"
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kasm-all-in-one-secrets  # Changed from kasm-secrets
+              key: db-password
+```
+
+We created similar patches for all the other deployments and updated the kustomization.yaml file to include these patches:
+
+```yaml
+patches:
+  - path: db-container-patch.yaml
+    target:
+      group: apps
+      version: v1
+      kind: StatefulSet
+      name: kasm-db-statefulset
+      namespace: kasm
+  - path: api-container-patch.yaml
+    target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: kasm-api-deployment
+      namespace: kasm
+  - path: manager-container-patch.yaml
+    target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: kasm-manager-deployment
+      namespace: kasm
+  - path: guac-container-patch.yaml
+    target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: kasm-guac-deployment
+      namespace: kasm
+  - path: proxy-container-patch.yaml
+    target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: kasm-proxy-deployment
+      namespace: kasm
+  - path: share-container-patch.yaml
+    target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: kasm-share-deployment
+      namespace: kasm
+```
+
+### Key Insights and Recommendations
+
+1. **Secret Standardization**: Instead of trying to create and maintain a separate `kasm-secrets` secret, we directly reference the existing `kasm-all-in-one-secrets` secret in all deployments.
+
+2. **Simplified Approach**: This approach is simpler and more reliable than trying to create a sync job that copies data between secrets.
+
+3. **ArgoCD Optimization**: We added proper ArgoCD annotations to ensure the patches are applied correctly and not pruned during sync operations.
+
+4. **Dependency Chain**: We observed that other pods were waiting for the API pod to be ready before they could initialize, creating a dependency chain: DB → API → Other components.
+
+5. **Comprehensive Patching**: Rather than patching each deployment individually through kubectl, we created proper patch files that are applied through ArgoCD, maintaining the GitOps workflow.
+
+### Future Recommendations
+
+1. **Standardize Secret Names**: When using Helm charts with custom secret management (like 1Password), ensure that the secret names are standardized or that proper overrides are in place.
+
+2. **Documentation**: Document the relationship between components and their dependencies to make troubleshooting easier.
+
+3. **Monitoring**: Set up proper monitoring for secret-related issues, as they can cause cascading failures across all components.
+
+4. **Testing**: Test changes in a development environment before applying to production to catch similar issues early.
