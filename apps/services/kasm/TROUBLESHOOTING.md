@@ -280,3 +280,144 @@ patches:
 3. **Monitoring**: Set up proper monitoring for secret-related issues, as they can cause cascading failures across all components.
 
 4. **Testing**: Test changes in a development environment before applying to production to catch similar issues early.
+
+## Database Initialization Issues
+
+### Problem: Database Not Properly Initialized
+
+After fixing the secret references, we observed that the pods were still not starting properly. The API pod was stuck in an init container loop with the message "Waiting for DB to initialize..." even though the database pod was running. Further investigation revealed that while the database was running, it didn't have the required schema and data.
+
+#### Root Cause
+
+1. **Missing Schema**: The database was created but not properly initialized with the required tables and data.
+2. **Init Container Check**: The API pod's init container was checking for at least 2 records in the `zones` table, but this table didn't exist.
+3. **Failed Initialization Job**: The original database initialization job was using the wrong secret references (`kasm-secrets` instead of `kasm-all-in-one-secrets`).
+
+#### Detailed Analysis
+
+We found these key components involved in database initialization:
+
+1. **kasm-db-init-startup ConfigMap**: Contains the `startup.sh` script that performs database initialization, including:
+   - Creating the database if it doesn't exist
+   - Setting up the schema
+   - Populating initial data like admin accounts and tokens
+   - The script checks if the `settings` table exists, and if not, runs the initialization
+
+2. **kasm-db-init-job**: A Kubernetes job that runs the database initialization script. This job was failing because it was using the non-existent `kasm-secrets` secret.
+
+3. **API Pod Check**: The API pod's init container has this check:
+   ```bash
+   while [ ! $(PGPASSWORD=$POSTGRES_PASSWORD psql -U kasmapp -d kasm -h db -t -c "select zone_id from zones" 2>/dev/null | wc -l) -ge 2 ]; do 
+     echo "Waiting for DB to initialize..."; 
+     sleep 5; 
+   done
+   ```
+   This check is waiting for at least 2 records in the `zones` table, which wasn't being created.
+
+### Solution: Create a Database Initialization Job
+
+We created a new job (`kasm-db-init-fix-job`) that properly references the existing `kasm-all-in-one-secrets` secret for all credentials:
+
+```yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kasm-db-init-fix-job
+  namespace: kasm
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true,Prune=false
+    argocd.argoproj.io/sync-wave: "3"
+    argocd.argoproj.io/compare-options: IgnoreExtraneous
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+      - name: db-is-ready
+        image: kasmweb/api:1.17.0
+        command:
+        - /bin/bash
+        - -c
+        - |
+          while ! pg_isready -h db -p 5432 -t 10; do 
+            echo "Waiting for DB..."; 
+            sleep 5; 
+          done
+      containers:
+      - name: kasm-db-init-container
+        image: kasmweb/api:1.17.0
+        command:
+        - /bin/bash
+        - -c
+        - |
+          # First check if zones table exists
+          if ! PGPASSWORD="$POSTGRES_PASSWORD" psql -U kasmapp -d kasm -h db -c "SELECT 1 FROM zones LIMIT 1" &>/dev/null; then
+            echo "Zones table doesn't exist, initializing database..."
+            export DB_AUTO_INITIALIZE="true"
+            /usr/bin/startup.sh
+            echo "Database initialization completed"
+          else
+            count=$(PGPASSWORD="$POSTGRES_PASSWORD" psql -U kasmapp -d kasm -h db -t -c "SELECT COUNT(*) FROM zones" 2>/dev/null)
+            echo "Found $count zones records"
+            if [ "$count" -lt 2 ]; then
+              echo "Not enough zones records, initializing database..."
+              export DB_AUTO_INITIALIZE="true"
+              /usr/bin/startup.sh
+              echo "Database initialization completed"
+            else
+              echo "Database already properly initialized."
+            fi
+          fi
+        env:
+        - name: DEFAULT_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kasm-all-in-one-secrets
+              key: admin-password
+        - name: DEFAULT_MANAGER_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: kasm-all-in-one-secrets
+              key: manager-token
+        - name: DEFAULT_REGISTRATION_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: kasm-all-in-one-secrets
+              key: service-token
+        - name: DEFAULT_USER_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kasm-all-in-one-secrets
+              key: user-password
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kasm-all-in-one-secrets
+              key: db-password
+        volumeMounts:
+        - name: db-init-script
+          mountPath: /usr/bin/startup.sh
+          subPath: startup.sh
+      volumes:
+      - name: db-init-script
+        configMap:
+          name: kasm-db-init-startup
+          defaultMode: 0755
+```
+
+This job:
+1. Waits for the database to be ready
+2. Checks if the `zones` table exists, and if not, runs the initialization
+3. If the `zones` table exists but has fewer than 2 records, also runs the initialization
+4. Uses the existing `kasm-all-in-one-secrets` secret for all credentials
+5. Uses the existing `startup.sh` script from the `kasm-db-init-startup` ConfigMap
+
+### Lessons Learned
+
+1. **Initialization Dependencies**: Database initialization is a critical dependency for all other components. It's important to ensure that this step completes successfully before other components try to use the database.
+
+2. **Validation Checks**: It's important to have proper validation checks in initialization scripts. In this case, the API pod was checking for a specific condition (2 records in the `zones` table) that wasn't being met.
+
+3. **Secret Consistency**: When using custom secret management, it's critical to ensure that all components use the same secret references consistently.
