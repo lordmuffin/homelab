@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kasm-share-deployment
+  namespace: kasm
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true,Prune=false
+    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/compare-options: IgnoreExtraneous
+    argocd.argoproj.io/sync-hook: Sync
+    argocd.argoproj.io/sync-hook-weight: "10"
+spec:
+  template:
+    spec:
+      containers:
+      - name: kasm-share-container
+        env:
+        - name: REGISTRATION_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: kasm-all-in-one-secrets  # Changed from kasm-secrets
+              key: service-token

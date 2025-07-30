@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kasm-guac-deployment
+  namespace: kasm
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true,Prune=false
+    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/compare-options: IgnoreExtraneous
+    argocd.argoproj.io/sync-hook: Sync
+    argocd.argoproj.io/sync-hook-weight: "10"
+spec:
+  template:
+    spec:
+      containers:
+      - name: kasm-guac-container
+        env:
+        - name: CLUSTER_SIZE
+          value: "4"
+        - name: REGISTRATION_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: kasm-all-in-one-secrets  # Changed from kasm-secrets
+              key: service-token
+        - name: ZONE
+          value: "default"
+        - name: KUBERNETES_SERVICE_HOST
+          value: "true"
+        - name: SERVER_ADDRESS
+          value: "kasm-proxy"
+        - name: SERVER_PORT
+          value: "8080"

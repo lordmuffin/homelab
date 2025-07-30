@@ -20,3 +20,38 @@ patches:
       kind: StatefulSet
       name: kasm-db-statefulset
       namespace: kasm
+  - path: api-container-patch.yaml
+    target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: kasm-api-deployment
+      namespace: kasm
+  - path: manager-container-patch.yaml
+    target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: kasm-manager-deployment
+      namespace: kasm
+  - path: guac-container-patch.yaml
+    target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: kasm-guac-deployment
+      namespace: kasm
+  - path: proxy-container-patch.yaml
+    target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: kasm-proxy-deployment
+      namespace: kasm
+  - path: share-container-patch.yaml
+    target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: kasm-share-deployment
+      namespace: kasm
