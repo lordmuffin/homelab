@@ -29,7 +29,7 @@ spec:
         - name: COOKIE_DOMAIN
           value: "lab.apj.dev"
         - name: AUTH_HOST
-          value: "auth.labs.andrewpjackson.com"
+          value: "auth.lab.apj.dev"
         - name: DEFAULT_PROVIDER
           value: "oidc"
         - name: PROVIDERS_OIDC_ISSUER_URL

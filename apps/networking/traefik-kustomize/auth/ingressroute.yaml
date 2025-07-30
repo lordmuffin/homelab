@@ -10,10 +10,10 @@ spec:
     - web
     - websecure
   routes:
-    - match: Host(`auth.labs.andrewpjackson.com`)
+    - match: Host(`auth.lab.apj.dev`)
       kind: Rule
       services:
         - name: traefik-forward-auth
           port: 4181
   tls:
-    secretName: labs-andrewpjackson-com-tls
+    secretName: lab-apj-dev-tls
