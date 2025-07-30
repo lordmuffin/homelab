@@ -11,7 +11,7 @@ resources:
   - db-configmap.yaml
   - db-cert.yaml
   - db-data-sql-configmap.yaml
-  - db-init-job.yaml
+  - db-direct-init.yaml
 
 patches:
   - path: db-container-patch.yaml
