@@ -1,0 +1,33 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kasm-api-init-job
+  namespace: kasm
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true,Prune=false
+    argocd.argoproj.io/sync-wave: "4"
+    argocd.argoproj.io/compare-options: IgnoreExtraneous
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: kubectl-container
+        image: bitnami/kubectl:latest
+        command:
+        - /bin/bash
+        - -c
+        - |
+          # Delete the API pod to force a restart with updated environment
+          echo "Deleting API pod to force restart..."
+          kubectl delete pod -n kasm -l app.kubernetes.io/name=kasm-api
+          
+          # Update the API deployment to use the correct secret
+          echo "Patching API deployment to use correct secret..."
+          kubectl patch deployment kasm-api-deployment -n kasm --type json -p '[{"op": "replace", "path": "/spec/template/spec/initContainers/0/env/0/valueFrom/secretKeyRef/name", "value": "kasm-all-in-one-secrets"}]'
+          kubectl patch deployment kasm-api-deployment -n kasm --type json -p '[{"op": "replace", "path": "/spec/template/spec/containers/0/env/2/valueFrom/secretKeyRef/name", "value": "kasm-all-in-one-secrets"}]'
+          
+          echo "Completed API initialization"
+      serviceAccountName: kasm-serviceaccount
