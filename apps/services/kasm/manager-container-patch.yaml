@@ -5,7 +5,7 @@ metadata:
   namespace: kasm
   annotations:
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true,Prune=false
-    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/sync-wave: "7"  # Run after database setup jobs
     argocd.argoproj.io/compare-options: IgnoreExtraneous
     argocd.argoproj.io/sync-hook: Sync
     argocd.argoproj.io/sync-hook-weight: "10"
@@ -20,8 +20,12 @@ spec:
         - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: kasm-all-in-one-secrets  # Changed from kasm-secrets
+              name: kasm-all-in-one-secrets  # Use consistent secret
               key: db-password
+        - name: DATABASE_USER  # Force manager to use kasm user instead of kasmapp
+          value: "kasm"
+        - name: POSTGRES_USER  # Force manager to use kasm user instead of kasmapp
+          value: "kasm"
         # Updated probe delays for proper startup time
         livenessProbe:
           initialDelaySeconds: 120  # Increased from 30s

@@ -53,8 +53,8 @@ spec:
             echo "WARNING: Database initialization may not be complete, proceeding anyway..."
           fi
           
-          # Grant permissions to kasm user (API)
-          echo "Granting permissions to kasm user (API)..."
+          # Grant comprehensive permissions to kasm user (used by both API and Manager)
+          echo "Granting comprehensive permissions to kasm user..."
           kubectl exec -i deployment/kasm-database -n kasm -- env PGPASSWORD="$POSTGRES_ADMIN_PASSWORD" psql -U postgres -d kasm -c "
             GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO kasm;
             GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO kasm;
@@ -62,17 +62,6 @@ spec:
             ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO kasm;
             ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO kasm;
           " || echo "Permissions grant to kasm user failed, retrying..."
-          
-          # Grant kasm role to kasmapp user (Manager)
-          echo "Granting kasm role to kasmapp user (Manager)..."
-          kubectl exec -i deployment/kasm-database -n kasm -- env PGPASSWORD="$POSTGRES_ADMIN_PASSWORD" psql -U postgres -d kasm -c "
-            GRANT kasm TO kasmapp;
-            GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO kasmapp;
-            GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO kasmapp;
-            GRANT USAGE ON SCHEMA public TO kasmapp;
-            ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO kasmapp;
-            ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO kasmapp;
-          " || echo "Permissions grant to kasmapp user failed, retrying..."
           
           # Verify permissions
           echo "Verifying database permissions..."
@@ -82,7 +71,7 @@ spec:
               table_name, 
               privilege_type 
             FROM information_schema.table_privileges 
-            WHERE grantee IN ('kasm', 'kasmapp') 
+            WHERE grantee = 'kasm' 
             AND table_name = 'settings'
             ORDER BY grantee, table_name;
           "

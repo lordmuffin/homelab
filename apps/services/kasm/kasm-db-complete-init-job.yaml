@@ -56,15 +56,9 @@ spec:
           echo "✓ Validating database connectivity..."
           DB_POD=$(kubectl get pods -l cnpg.io/cluster=kasm-database -n kasm -o jsonpath='{.items[0].metadata.name}')
           
-          # Test kasm user connection
+          # Test kasm user connection (used by both API and Manager)
           kubectl exec $DB_POD -n kasm -- env PGPASSWORD='$(kubectl get secret kasm-all-in-one-secrets -n kasm -o jsonpath='{.data.db-password}' | base64 -d)' psql -U kasm -d kasm -c "SELECT 1;" >/dev/null || {
             echo "ERROR: Cannot connect as kasm user"
-            exit 1
-          }
-          
-          # Test kasmapp user connection  
-          kubectl exec $DB_POD -n kasm -- env PGPASSWORD='$(kubectl get secret kasm-all-in-one-secrets -n kasm -o jsonpath='{.data.db-password}' | base64 -d)' psql -U kasmapp -d kasm -c "SELECT 1;" >/dev/null || {
-            echo "ERROR: Cannot connect as kasmapp user"
             exit 1
           }
           
@@ -76,8 +70,8 @@ spec:
           echo "📋 Automated Configuration Summary:"
           echo "   ✓ Database pod labeled with app.kubernetes.io/name=kasm-db"  
           echo "   ✓ Database service endpoints properly configured"
-          echo "   ✓ kasmapp user created with correct password"
-          echo "   ✓ Database permissions granted to both kasm and kasmapp users"
-          echo "   ✓ All database connectivity validated"
+          echo "   ✓ kasm user configured with correct password"
+          echo "   ✓ Database permissions granted to kasm user (used by both API and Manager)"
+          echo "   ✓ Database connectivity validated"
           echo ""
           echo "🚀 KASM components can now start successfully!"

@@ -52,28 +52,17 @@ spec:
           
           echo "Database is ready, proceeding with user setup..."
           
-          # Create kasmapp user if it doesn't exist
-          echo "Creating kasmapp user..."
+          # Ensure kasm user has correct password (standardizing on kasm user only)
+          echo "Updating kasm user password..."
           kubectl exec -i deployment/kasm-database -n kasm -- env PGPASSWORD="$POSTGRES_ADMIN_PASSWORD" psql -U postgres -c "
-            DO \$\$
-            BEGIN
-              IF NOT EXISTS (SELECT FROM pg_catalog.pg_user WHERE usename = 'kasmapp') THEN
-                CREATE USER kasmapp WITH PASSWORD '$KASM_DB_PASSWORD';
-                GRANT ALL PRIVILEGES ON DATABASE kasm TO kasmapp;
-                RAISE NOTICE 'User kasmapp created successfully';
-              ELSE
-                ALTER USER kasmapp WITH PASSWORD '$KASM_DB_PASSWORD';
-                GRANT ALL PRIVILEGES ON DATABASE kasm TO kasmapp;
-                RAISE NOTICE 'User kasmapp already exists, updated password';
-              END IF;
-            END
-            \$\$;
-          " || echo "User creation failed, retrying..."
+            ALTER USER kasm WITH PASSWORD '$KASM_DB_PASSWORD';
+            GRANT ALL PRIVILEGES ON DATABASE kasm TO kasm;
+          " || echo "User update failed, retrying..."
           
-          # Verify user creation
-          echo "Verifying kasmapp user creation..."
+          # Verify user configuration
+          echo "Verifying kasm user configuration..."
           kubectl exec -i deployment/kasm-database -n kasm -- env PGPASSWORD="$POSTGRES_ADMIN_PASSWORD" psql -U postgres -c "
-            SELECT usename, usecreatedb, usesuper FROM pg_user WHERE usename IN ('kasm', 'kasmapp');
+            SELECT usename, usecreatedb, usesuper FROM pg_user WHERE usename = 'kasm';
           "
           
           echo "Database user setup completed successfully"

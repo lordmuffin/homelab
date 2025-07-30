@@ -16,6 +16,8 @@ resources:
   - kasm-db-user-setup-job.yaml
   - kasm-db-permissions-job.yaml
   - kasm-db-complete-init-job.yaml
+  - kasm-secrets-sync-job.yaml
+  - kasm-admin-password-fix-job.yaml
 
 patches:
   - path: api-container-patch.yaml
