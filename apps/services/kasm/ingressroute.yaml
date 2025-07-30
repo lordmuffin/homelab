@@ -22,8 +22,8 @@ spec:
         - name: traefik-forward-auth
           namespace: traefik
       services:
-        - name: proxy
-          port: 443
+        - name: kasm-proxy
+          port: 8443
           scheme: https
           passHostHeader: true
   tls:
@@ -51,8 +51,8 @@ spec:
     - match: Host(`kasm.lab.apj.dev`)
       kind: Rule
       services:
-        - name: proxy
-          port: 443
+        - name: kasm-proxy
+          port: 8443
           scheme: https
           passHostHeader: true
   tls:

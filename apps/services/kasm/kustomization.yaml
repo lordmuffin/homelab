@@ -8,21 +8,13 @@ resources:
   - rbac.yaml
   - onepassword-items.yaml
   - secrets.yaml
-  - db-configmap.yaml
-  - db-cert.yaml
-  - db-data-sql-configmap.yaml
-  - db-direct-init.yaml
+  - base/db.yaml
+  - kasm-db-init-job.yaml
   - api-init-job.yaml
   - api-direct-fix.yaml
+  - db-label-job.yaml
 
 patches:
-  - path: db-container-patch.yaml
-    target:
-      group: apps
-      version: v1
-      kind: StatefulSet
-      name: kasm-db-statefulset
-      namespace: kasm
   - path: api-container-patch.yaml
     target:
       group: apps

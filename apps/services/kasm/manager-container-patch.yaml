@@ -22,3 +22,8 @@ spec:
             secretKeyRef:
               name: kasm-all-in-one-secrets  # Changed from kasm-secrets
               key: db-password
+        # Updated probe delays for proper startup time
+        livenessProbe:
+          initialDelaySeconds: 120  # Increased from 30s
+        readinessProbe:
+          initialDelaySeconds: 120  # Increased from 10s

@@ -1,0 +1,112 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kasm-db-init-job
+  namespace: kasm
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true,Prune=false
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app: kasm-db-init
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+        - name: db-is-ready
+          image: kasmweb/api:1.17.0
+          command:
+            - "/bin/bash"
+            - "-c"
+          args:
+            - |
+              while ! pg_isready -h kasm-database-rw -p 5432 -t 10; do echo "Waiting for DB..."; sleep 5; done
+      containers:
+        - name: kasm-db-init-container
+          image: kasmweb/api:1.17.0
+          env:
+            - name: DEFAULT_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: kasm-all-in-one-secrets
+                  key: admin-password
+            - name: DEFAULT_MANAGER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: kasm-all-in-one-secrets
+                  key: manager-token
+            - name: DEFAULT_REGISTRATION_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: kasm-all-in-one-secrets
+                  key: service-token
+            - name: DEFAULT_USER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: kasm-all-in-one-secrets
+                  key: user-password
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: kasm-db-postgres-creds
+                  key: password
+            - name: POSTGRES_USER
+              value: "kasm"
+            - name: DATABASE_MASTER_USER  
+              value: "kasm"
+            - name: DATABASE_MASTER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: kasm-db-postgres-creds
+                  key: password
+            - name: POSTGRES_HOST
+              value: "kasm-database-rw"
+            - name: POSTGRES_DB
+              value: "kasm"
+            - name: DB_AUTO_INITIALIZE
+              value: "true"
+          command:
+            - "/bin/bash"
+            - "-c"
+          args:
+            - |
+              echo "Starting KASM database initialization..."
+              export DB_AUTO_INITIALIZE="true"
+              
+              # Copy default properties and customize
+              cp /opt/kasm/current/conf/database/seed_data/default_properties.yaml /tmp/default_properties.yaml
+              
+              # Update manager token
+              if [ -n "${DEFAULT_MANAGER_TOKEN}" ]; then
+                /usr/bin/yq_$(uname -m) -i '(.settings.[] | select(.name=="token") | select(.category == "manager")) .value = "'${DEFAULT_MANAGER_TOKEN}'"' /tmp/default_properties.yaml
+              fi
+              
+              # Update registration token  
+              if [ -n "${DEFAULT_REGISTRATION_TOKEN}" ]; then
+                /usr/bin/yq_$(uname -m) -i '(.settings.[] | select(.name=="registration_token") | select(.category == "auth")) .value = "'${DEFAULT_REGISTRATION_TOKEN}'"' /tmp/default_properties.yaml
+              fi
+              
+              # Update admin password
+              if [ -n "${DEFAULT_ADMIN_PASSWORD}" ]; then
+                ADMIN_SALT=$(cat /proc/sys/kernel/random/uuid)
+                ADMIN_HASH=$(printf ${DEFAULT_ADMIN_PASSWORD}${ADMIN_SALT} | sha256sum | cut -c-64)
+                /usr/bin/yq_$(uname -m) -i '(.users.[] | select(.username=="admin@kasm.local") | .salt) = "'${ADMIN_SALT}'"' /tmp/default_properties.yaml
+                /usr/bin/yq_$(uname -m) -i '(.users.[] | select(.username=="admin@kasm.local") | .pw_hash) = "'${ADMIN_HASH}'"' /tmp/default_properties.yaml
+              fi
+              
+              # Update user password
+              if [ -n "${DEFAULT_USER_PASSWORD}" ]; then
+                USER_SALT=$(cat /proc/sys/kernel/random/uuid)
+                USER_HASH=$(printf ${DEFAULT_USER_PASSWORD}${USER_SALT} | sha256sum | cut -c-64)
+                /usr/bin/yq_$(uname -m) -i '(.users.[] | select(.username=="user@kasm.local") | .salt) = "'${USER_SALT}'"' /tmp/default_properties.yaml
+                /usr/bin/yq_$(uname -m) -i '(.users.[] | select(.username=="user@kasm.local") | .pw_hash) = "'${USER_HASH}'"' /tmp/default_properties.yaml
+              fi
+              
+              echo "Seeding database with KASM initialization..."
+              python3 /src/api_server/server.pyc --initialize-database --cfg /opt/kasm/current/conf/app/api/api.app.config.yaml --populate-production --seed-file "/tmp/default_properties.yaml"
+              
+              echo "Database initialization completed successfully!"
+      serviceAccountName: kasm-serviceaccount

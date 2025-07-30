@@ -66,7 +66,7 @@ spec:
                   - |
                     # Use a direct check without hostname
                     echo "Checking direct database connection..."
-                    if PGPASSWORD=\$POSTGRES_PASSWORD psql -U kasmapp -d kasm -h db -c "SELECT 1" >/dev/null 2>&1; then
+                    if PGPASSWORD=\$POSTGRES_PASSWORD psql -U kasm -d kasm -h kasm-database-rw -c "SELECT 1" >/dev/null 2>&1; then
                       echo "DB connection successful!"
                     else
                       echo "Initial connection failed, creating a workaround..."
@@ -77,8 +77,8 @@ spec:
                   - name: POSTGRES_PASSWORD
                     valueFrom:
                       secretKeyRef:
-                        key: db-password
-                        name: kasm-all-in-one-secrets
+                        key: password
+                        name: kasm-db-postgres-creds
                   securityContext:
                     allowPrivilegeEscalation: false
                     capabilities:
@@ -99,8 +99,8 @@ spec:
                   - name: POSTGRES_PASSWORD
                     valueFrom:
                       secretKeyRef:
-                        key: db-password
-                        name: kasm-all-in-one-secrets
+                        key: password
+                        name: kasm-db-postgres-creds
                   image: kasmweb/api:1.17.0
                   imagePullPolicy: IfNotPresent
                   livenessProbe:

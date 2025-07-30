@@ -24,7 +24,18 @@
       "Bash(kubectl logs:*)",
       "Bash(chmod:*)",
       "Bash(kubectl delete:*)",
-      "WebFetch(domain:spot.rackspace.com)"
+      "WebFetch(domain:spot.rackspace.com)",
+      "Bash(kubectl patch:*)",
+      "Bash(kubectl config:*)",
+      "Bash(kubectl annotate:*)",
+      "Bash(git push:*)",
+      "Bash(kubectl exec:*)",
+      "Bash(kubectl apply:*)",
+      "Bash(kubectl rollout restart:*)",
+      "Bash(kubectl rollout status:*)",
+      "Bash(kubectl create secret:*)",
+      "Bash(kubectl wait:*)",
+      "Bash(kubectl set env:*)"
     ],
     "deny": []
   },

@@ -1,0 +1,46 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: kasm-database
+  namespace: kasm
+spec:
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.2-10
+  instances: 1
+  startDelay: 35
+  stopDelay: 35
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 200m
+    limits:
+      memory: 512Mi
+      cpu: 500m
+  postgresql:
+    parameters:
+      shared_buffers: 128MB
+      timezone: "America/Chicago"
+      pg_stat_statements.max: '10000'
+      pg_stat_statements.track: all
+      auto_explain.log_min_duration: '10s'
+      # Additional parameters for KASM
+      max_connections: '100'
+      dynamic_shared_memory_type: 'posix'
+      log_timezone: 'UTC'
+      # Set password encryption to SCRAM-SHA-256 for better security
+      password_encryption: 'scram-sha-256'
+  bootstrap:
+    initdb:
+      database: kasm
+      owner: kasm
+      secret:
+        name: kasm-db-postgres-creds
+      options:
+        - "--auth-local=trust"
+        - "--auth-host=scram-sha-256"
+      postInitSQL:
+        - "CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";"
+  storage:
+    storageClass: sata
+    size: 10Gi
+  monitoring:
+    enablePodMonitor: true

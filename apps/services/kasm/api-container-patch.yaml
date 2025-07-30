@@ -24,14 +24,14 @@ spec:
         - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: kasm-all-in-one-secrets  # Changed from kasm-secrets
-              key: db-password
+              name: kasm-db-postgres-creds
+              key: password
         command:
         - /bin/bash
         - -c
         args:
         - |
-          while [ ! $(PGPASSWORD=$POSTGRES_PASSWORD psql -U kasmapp -d kasm -h db -t -c "select zone_id from zones" 2>/dev/null | wc -l) -ge 2 ]; do 
+          while [ ! $(PGPASSWORD=$POSTGRES_PASSWORD psql -U kasm -d kasm -h kasm-database-rw -t -c "select zone_id from zones" 2>/dev/null | wc -l) -ge 2 ]; do 
             echo "Waiting for DB to initialize..."; 
             sleep 5; 
           done
@@ -45,5 +45,8 @@ spec:
         - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: kasm-all-in-one-secrets  # Changed from kasm-secrets
-              key: db-password
+              name: kasm-db-postgres-creds
+              key: password
+        # Updated readiness probe timeout for better reliability
+        readinessProbe:
+          timeoutSeconds: 30  # Increased from 10s

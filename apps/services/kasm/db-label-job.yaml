@@ -1,0 +1,34 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kasm-db-label-job
+  namespace: kasm
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true,Prune=false
+    argocd.argoproj.io/sync-wave: "3"
+    argocd.argoproj.io/sync-hook: PostSync
+    argocd.argoproj.io/sync-hook-weight: "5"
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      serviceAccountName: kasm-database-operator
+      restartPolicy: OnFailure
+      containers:
+      - name: label-db-pod
+        image: bitnami/kubectl:latest
+        command:
+        - /bin/bash
+        - -c
+        - |
+          echo "Waiting for database pod to be ready..."
+          kubectl wait --for=condition=Ready pod -l cnpg.io/cluster=kasm-database -n kasm --timeout=300s
+          
+          echo "Adding required label to database pod..."
+          kubectl label pod -l cnpg.io/cluster=kasm-database -n kasm app.kubernetes.io/name=kasm-db --overwrite
+          
+          echo "Verifying label was added..."
+          kubectl get pods -l cnpg.io/cluster=kasm-database -n kasm --show-labels
+          
+          echo "Database pod labeling completed successfully"
