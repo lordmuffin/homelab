@@ -10,7 +10,13 @@ metadata:
     argocd.argoproj.io/sync-hook: Sync
     argocd.argoproj.io/sync-hook-weight: "10"
 spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kasm-api
   template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kasm-api
     spec:
       initContainers:
       - name: db-is-ready
