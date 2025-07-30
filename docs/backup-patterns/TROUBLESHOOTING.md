@@ -505,6 +505,147 @@ spec:
                 --jobs=4 --format=custom | gzip > /mnt/backup/$BACKUP_FILE'
 ```
 
+## 🔒 **SSL Connection Issues**
+
+### **Issue: SSL Required for Database Connection**
+```
+Error: connection to server at "db" (10.x.x.x), port 5432 failed: server does not support SSL, but SSL was required
+```
+
+**Diagnosis:**
+```bash
+# Check if PostgreSQL is configured for SSL
+kubectl exec -it {{DATABASE_POD}} -n {{NAMESPACE}} -- bash -c "cat /var/lib/postgresql/data/postgresql.conf | grep ssl"
+
+# Check database logs for SSL-related errors
+kubectl logs {{DATABASE_POD}} -n {{NAMESPACE}} | grep -i ssl
+
+# Check if database container has SSL certificates mounted
+kubectl describe pod {{DATABASE_POD}} -n {{NAMESPACE}} | grep -A 10 "Mounts"
+```
+
+**Solution:**
+```bash
+# 1. Enable SSL in PostgreSQL (when SSL is required but not configured)
+kubectl exec -it {{DATABASE_POD}} -n {{NAMESPACE}} -- bash -c "echo 'ssl = on' >> /var/lib/postgresql/data/postgresql.conf"
+kubectl exec -it {{DATABASE_POD}} -n {{NAMESPACE}} -- bash -c "echo 'ssl_cert_file = '/etc/ssl/certs/server.crt'' >> /var/lib/postgresql/data/postgresql.conf"
+kubectl exec -it {{DATABASE_POD}} -n {{NAMESPACE}} -- bash -c "echo 'ssl_key_file = '/etc/ssl/private/server.key'' >> /var/lib/postgresql/data/postgresql.conf"
+
+# 2. Generate self-signed certificate if needed
+kubectl exec -it {{DATABASE_POD}} -n {{NAMESPACE}} -- bash -c "mkdir -p /etc/ssl/private"
+kubectl exec -it {{DATABASE_POD}} -n {{NAMESPACE}} -- bash -c "openssl req -new -x509 -days 365 -nodes -text -out /etc/ssl/certs/server.crt -keyout /etc/ssl/private/server.key -subj '/CN=db'"
+kubectl exec -it {{DATABASE_POD}} -n {{NAMESPACE}} -- bash -c "chmod 600 /etc/ssl/private/server.key"
+kubectl exec -it {{DATABASE_POD}} -n {{NAMESPACE}} -- bash -c "chown postgres:postgres /etc/ssl/certs/server.crt /etc/ssl/private/server.key"
+
+# 3. Restart PostgreSQL to apply changes
+kubectl rollout restart statefulset {{DATABASE_STATEFULSET}} -n {{NAMESPACE}}
+```
+
+### **Issue: Disable SSL Requirement in Client**
+```
+Error: connection to server at "db" (10.x.x.x), port 5432 failed: server does not support SSL, but SSL was required
+```
+
+**Diagnosis:**
+```bash
+# Check if client is using SSL by default
+kubectl exec -it {{CLIENT_POD}} -n {{NAMESPACE}} -- bash -c "env | grep PGSSLMODE"
+
+# Check connection string in application configuration
+kubectl describe pod {{CLIENT_POD}} -n {{NAMESPACE}} | grep -A 20 "Environment"
+```
+
+**Solution:**
+```bash
+# 1. Patch deployment to disable SSL requirement
+kubectl patch deployment {{CLIENT_DEPLOYMENT}} -n {{NAMESPACE}} --patch='
+{
+  "spec": {
+    "template": {
+      "spec": {
+        "containers": [{
+          "name": "{{CONTAINER_NAME}}",
+          "env": [{
+            "name": "PGSSLMODE",
+            "value": "disable"
+          }]
+        }]
+      }
+    }
+  }
+}'
+
+# 2. For connection strings, add sslmode=disable parameter
+kubectl patch configmap {{APP}}-config -n {{NAMESPACE}} --patch='
+{
+  "data": {
+    "database-url": "postgresql://{{USERNAME}}:{{PASSWORD}}@{{DB_HOST}}:5432/{{DB_NAME}}?sslmode=disable"
+  }
+}'
+
+# 3. Restart client pod to apply changes
+kubectl rollout restart deployment {{CLIENT_DEPLOYMENT}} -n {{NAMESPACE}}
+```
+
+### **Issue: Create SSL Certificates for PostgreSQL**
+```
+Error: could not load server certificate file "/etc/ssl/certs/server.crt": No such file or directory
+```
+
+**Diagnosis:**
+```bash
+# Check if certificate files exist
+kubectl exec -it {{DATABASE_POD}} -n {{NAMESPACE}} -- ls -la /etc/ssl/certs/server.crt /etc/ssl/private/server.key
+
+# Check PostgreSQL SSL configuration
+kubectl exec -it {{DATABASE_POD}} -n {{NAMESPACE}} -- grep ssl /var/lib/postgresql/data/postgresql.conf
+```
+
+**Solution:**
+```bash
+# 1. Create a Kubernetes secret with SSL certificates
+kubectl create secret generic {{APP}}-db-ssl -n {{NAMESPACE}} \
+  --from-file=server.crt=./server.crt \
+  --from-file=server.key=./server.key
+
+# 2. Update the database StatefulSet to mount the certificates
+kubectl patch statefulset {{DATABASE_STATEFULSET}} -n {{NAMESPACE}} --patch='
+{
+  "spec": {
+    "template": {
+      "spec": {
+        "volumes": [{
+          "name": "ssl-certs",
+          "secret": {
+            "secretName": "{{APP}}-db-ssl"
+          }
+        }],
+        "containers": [{
+          "name": "postgres",
+          "volumeMounts": [{
+            "name": "ssl-certs",
+            "mountPath": "/etc/ssl/certs/server.crt",
+            "subPath": "server.crt"
+          }, {
+            "name": "ssl-certs",
+            "mountPath": "/etc/ssl/private/server.key",
+            "subPath": "server.key"
+          }]
+        }]
+      }
+    }
+  }
+}'
+
+# 3. Update PostgreSQL configuration to use certificates
+kubectl exec -it {{DATABASE_POD}} -n {{NAMESPACE}} -- bash -c "echo 'ssl = on' >> /var/lib/postgresql/data/postgresql.conf"
+kubectl exec -it {{DATABASE_POD}} -n {{NAMESPACE}} -- bash -c "echo 'ssl_cert_file = '/etc/ssl/certs/server.crt'' >> /var/lib/postgresql/data/postgresql.conf"
+kubectl exec -it {{DATABASE_POD}} -n {{NAMESPACE}} -- bash -c "echo 'ssl_key_file = '/etc/ssl/private/server.key'' >> /var/lib/postgresql/data/postgresql.conf"
+
+# 4. Restart PostgreSQL to apply changes
+kubectl rollout restart statefulset {{DATABASE_STATEFULSET}} -n {{NAMESPACE}}
+```
+
 ## 🔍 **Debugging Tools & Commands**
 
 ### **Quick Diagnosis Script**
