@@ -4,9 +4,11 @@ metadata:
   name: kasm-db-statefulset
   namespace: kasm
   annotations:
-    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true,Prune=false
     argocd.argoproj.io/sync-wave: "2"
     argocd.argoproj.io/compare-options: IgnoreExtraneous
+    argocd.argoproj.io/sync-hook: Sync
+    argocd.argoproj.io/sync-hook-weight: "10"
 spec:
   template:
     spec:
@@ -32,7 +34,7 @@ spec:
         - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: kasm-all-in-one-secrets
+              name: kasm-all-in-one-secrets  # Direct reference to the existing secret
               key: db-password
         - name: POSTGRES_USER
           value: kasmapp
