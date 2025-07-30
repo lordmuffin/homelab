@@ -13,6 +13,9 @@ resources:
   - api-init-job.yaml
   - api-direct-fix.yaml
   - db-label-job.yaml
+  - kasm-db-user-setup-job.yaml
+  - kasm-db-permissions-job.yaml
+  - kasm-db-complete-init-job.yaml
 
 patches:
   - path: api-container-patch.yaml

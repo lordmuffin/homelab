@@ -35,7 +35,13 @@
       "Bash(kubectl rollout status:*)",
       "Bash(kubectl create secret:*)",
       "Bash(kubectl wait:*)",
-      "Bash(kubectl set env:*)"
+      "Bash(kubectl set env:*)",
+      "Bash(kubectl run:*)",
+      "Bash(PGPASSWORD='J4mp/VRX4xyl6Uvifeh8EA==' kubectl exec -it kasm-database-1 -n kasm -- psql -U kasmapp -d kasm -h localhost -c \"SELECT 1;\")",
+      "Bash(kubectl label:*)",
+      "Bash(nslookup:*)",
+      "Bash(echo)",
+      "Bash(dig:*)"
     ],
     "deny": []
   },

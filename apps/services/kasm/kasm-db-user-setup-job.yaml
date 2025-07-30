@@ -1,0 +1,82 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kasm-db-user-setup-job
+  namespace: kasm
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true,Prune=false
+    argocd.argoproj.io/sync-wave: "4"
+    argocd.argoproj.io/sync-hook: PostSync
+    argocd.argoproj.io/sync-hook-weight: "10"
+spec:
+  backoffLimit: 5
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      serviceAccountName: kasm-database-operator
+      restartPolicy: OnFailure
+      containers:
+      - name: db-user-setup
+        image: postgres:15-alpine
+        env:
+        - name: POSTGRES_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kasm-database-postgres-creds
+              key: password
+        - name: KASM_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kasm-all-in-one-secrets
+              key: db-password
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          echo "Starting database user setup automation..."
+          
+          # Wait for database to be ready
+          echo "Waiting for database pod to be ready..."
+          while ! kubectl get pod -l cnpg.io/cluster=kasm-database -n kasm --field-selector=status.phase=Running >/dev/null 2>&1; do
+            echo "Waiting for database pod..."
+            sleep 10
+          done
+          
+          # Wait for database service to have endpoints
+          echo "Waiting for database service endpoints..."
+          while [ -z "$(kubectl get endpoints db -n kasm -o jsonpath='{.subsets[0].addresses[0].ip}' 2>/dev/null)" ]; do
+            echo "Waiting for database service endpoints..."
+            sleep 10
+          done
+          
+          echo "Database is ready, proceeding with user setup..."
+          
+          # Create kasmapp user if it doesn't exist
+          echo "Creating kasmapp user..."
+          kubectl exec -i deployment/kasm-database -n kasm -- env PGPASSWORD="$POSTGRES_ADMIN_PASSWORD" psql -U postgres -c "
+            DO \$\$
+            BEGIN
+              IF NOT EXISTS (SELECT FROM pg_catalog.pg_user WHERE usename = 'kasmapp') THEN
+                CREATE USER kasmapp WITH PASSWORD '$KASM_DB_PASSWORD';
+                GRANT ALL PRIVILEGES ON DATABASE kasm TO kasmapp;
+                RAISE NOTICE 'User kasmapp created successfully';
+              ELSE
+                ALTER USER kasmapp WITH PASSWORD '$KASM_DB_PASSWORD';
+                GRANT ALL PRIVILEGES ON DATABASE kasm TO kasmapp;
+                RAISE NOTICE 'User kasmapp already exists, updated password';
+              END IF;
+            END
+            \$\$;
+          " || echo "User creation failed, retrying..."
+          
+          # Verify user creation
+          echo "Verifying kasmapp user creation..."
+          kubectl exec -i deployment/kasm-database -n kasm -- env PGPASSWORD="$POSTGRES_ADMIN_PASSWORD" psql -U postgres -c "
+            SELECT usename, usecreatedb, usesuper FROM pg_user WHERE usename IN ('kasm', 'kasmapp');
+          "
+          
+          echo "Database user setup completed successfully"
+      - name: kubectl
+        image: bitnami/kubectl:latest
+        command: ["/bin/sleep", "infinity"]

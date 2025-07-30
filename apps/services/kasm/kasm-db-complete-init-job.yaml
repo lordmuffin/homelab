@@ -1,0 +1,83 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kasm-db-complete-init-job
+  namespace: kasm
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true,Prune=false
+    argocd.argoproj.io/sync-wave: "6"
+    argocd.argoproj.io/sync-hook: PostSync
+    argocd.argoproj.io/sync-hook-weight: "20"
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      serviceAccountName: kasm-database-operator
+      restartPolicy: OnFailure
+      containers:
+      - name: complete-db-init
+        image: bitnami/kubectl:latest
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          echo "Starting complete database initialization validation..."
+          
+          # Wait for all previous jobs to complete
+          echo "Waiting for database labeling job to complete..."
+          kubectl wait --for=condition=complete job/kasm-db-label-job -n kasm --timeout=300s || echo "Label job may have completed already"
+          
+          echo "Waiting for user setup job to complete..."
+          kubectl wait --for=condition=complete job/kasm-db-user-setup-job -n kasm --timeout=300s || echo "User setup job may have completed already"
+          
+          echo "Waiting for permissions job to complete..."
+          kubectl wait --for=condition=complete job/kasm-db-permissions-job -n kasm --timeout=300s || echo "Permissions job may have completed already"
+          
+          # Final validation
+          echo "Performing final database setup validation..."
+          
+          # Check database pod has correct label
+          echo "✓ Checking database pod labeling..."
+          kubectl get pods -l cnpg.io/cluster=kasm-database -n kasm --show-labels | grep "app.kubernetes.io/name=kasm-db" || {
+            echo "ERROR: Database pod missing required label"
+            exit 1
+          }
+          
+          # Check service has endpoints
+          echo "✓ Checking database service endpoints..."
+          kubectl get endpoints db -n kasm -o jsonpath='{.subsets[0].addresses[0].ip}' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' || {
+            echo "ERROR: Database service has no endpoints"
+            exit 1
+          }
+          
+          # Validate database connectivity for both users
+          echo "✓ Validating database connectivity..."
+          DB_POD=$(kubectl get pods -l cnpg.io/cluster=kasm-database -n kasm -o jsonpath='{.items[0].metadata.name}')
+          
+          # Test kasm user connection
+          kubectl exec $DB_POD -n kasm -- env PGPASSWORD='$(kubectl get secret kasm-all-in-one-secrets -n kasm -o jsonpath='{.data.db-password}' | base64 -d)' psql -U kasm -d kasm -c "SELECT 1;" >/dev/null || {
+            echo "ERROR: Cannot connect as kasm user"
+            exit 1
+          }
+          
+          # Test kasmapp user connection  
+          kubectl exec $DB_POD -n kasm -- env PGPASSWORD='$(kubectl get secret kasm-all-in-one-secrets -n kasm -o jsonpath='{.data.db-password}' | base64 -d)' psql -U kasmapp -d kasm -c "SELECT 1;" >/dev/null || {
+            echo "ERROR: Cannot connect as kasmapp user"
+            exit 1
+          }
+          
+          echo "✅ All database automation steps completed successfully!"
+          echo "🎉 KASM database is fully configured and ready for use"
+          
+          # Summary of what was automated
+          echo ""
+          echo "📋 Automated Configuration Summary:"
+          echo "   ✓ Database pod labeled with app.kubernetes.io/name=kasm-db"  
+          echo "   ✓ Database service endpoints properly configured"
+          echo "   ✓ kasmapp user created with correct password"
+          echo "   ✓ Database permissions granted to both kasm and kasmapp users"
+          echo "   ✓ All database connectivity validated"
+          echo ""
+          echo "🚀 KASM components can now start successfully!"

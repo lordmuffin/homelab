@@ -9,8 +9,8 @@ metadata:
     argocd.argoproj.io/sync-hook: PostSync
     argocd.argoproj.io/sync-hook-weight: "5"
 spec:
-  backoffLimit: 3
-  ttlSecondsAfterFinished: 300
+  backoffLimit: 5
+  ttlSecondsAfterFinished: 600
   template:
     spec:
       serviceAccountName: kasm-database-operator
@@ -22,13 +22,19 @@ spec:
         - /bin/bash
         - -c
         - |
+          set -e
+          echo "Starting database pod labeling automation..."
+          
           echo "Waiting for database pod to be ready..."
-          kubectl wait --for=condition=Ready pod -l cnpg.io/cluster=kasm-database -n kasm --timeout=300s
+          kubectl wait --for=condition=Ready pod -l cnpg.io/cluster=kasm-database -n kasm --timeout=600s
           
           echo "Adding required label to database pod..."
           kubectl label pod -l cnpg.io/cluster=kasm-database -n kasm app.kubernetes.io/name=kasm-db --overwrite
           
           echo "Verifying label was added..."
           kubectl get pods -l cnpg.io/cluster=kasm-database -n kasm --show-labels
+          
+          echo "Verifying service can find database endpoints..."
+          kubectl get endpoints db -n kasm -o wide
           
           echo "Database pod labeling completed successfully"

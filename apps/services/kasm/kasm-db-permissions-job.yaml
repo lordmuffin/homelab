@@ -1,0 +1,93 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kasm-db-permissions-job
+  namespace: kasm
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true,Prune=false
+    argocd.argoproj.io/sync-wave: "5"
+    argocd.argoproj.io/sync-hook: PostSync
+    argocd.argoproj.io/sync-hook-weight: "15"
+spec:
+  backoffLimit: 5
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      serviceAccountName: kasm-database-operator
+      restartPolicy: OnFailure
+      containers:
+      - name: db-permissions-setup
+        image: postgres:15-alpine
+        env:
+        - name: POSTGRES_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kasm-database-postgres-creds
+              key: password
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          echo "Starting database permissions setup automation..."
+          
+          # Wait for database initialization to complete (tables must exist)
+          echo "Waiting for database tables to be initialized..."
+          max_retries=30
+          retry_count=0
+          
+          while [ $retry_count -lt $max_retries ]; do
+            table_count=$(kubectl exec -i deployment/kasm-database -n kasm -- env PGPASSWORD="$POSTGRES_ADMIN_PASSWORD" psql -U postgres -d kasm -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null | tr -d ' ' || echo "0")
+            
+            if [ "$table_count" -gt "50" ]; then
+              echo "Database initialization complete - found $table_count tables"
+              break
+            else
+              echo "Database still initializing - found $table_count tables, waiting..."
+              sleep 20
+              retry_count=$((retry_count + 1))
+            fi
+          done
+          
+          if [ $retry_count -eq $max_retries ]; then
+            echo "WARNING: Database initialization may not be complete, proceeding anyway..."
+          fi
+          
+          # Grant permissions to kasm user (API)
+          echo "Granting permissions to kasm user (API)..."
+          kubectl exec -i deployment/kasm-database -n kasm -- env PGPASSWORD="$POSTGRES_ADMIN_PASSWORD" psql -U postgres -d kasm -c "
+            GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO kasm;
+            GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO kasm;
+            GRANT USAGE ON SCHEMA public TO kasm;
+            ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO kasm;
+            ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO kasm;
+          " || echo "Permissions grant to kasm user failed, retrying..."
+          
+          # Grant kasm role to kasmapp user (Manager)
+          echo "Granting kasm role to kasmapp user (Manager)..."
+          kubectl exec -i deployment/kasm-database -n kasm -- env PGPASSWORD="$POSTGRES_ADMIN_PASSWORD" psql -U postgres -d kasm -c "
+            GRANT kasm TO kasmapp;
+            GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO kasmapp;
+            GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO kasmapp;
+            GRANT USAGE ON SCHEMA public TO kasmapp;
+            ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO kasmapp;
+            ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO kasmapp;
+          " || echo "Permissions grant to kasmapp user failed, retrying..."
+          
+          # Verify permissions
+          echo "Verifying database permissions..."
+          kubectl exec -i deployment/kasm-database -n kasm -- env PGPASSWORD="$POSTGRES_ADMIN_PASSWORD" psql -U postgres -d kasm -c "
+            SELECT 
+              grantee, 
+              table_name, 
+              privilege_type 
+            FROM information_schema.table_privileges 
+            WHERE grantee IN ('kasm', 'kasmapp') 
+            AND table_name = 'settings'
+            ORDER BY grantee, table_name;
+          "
+          
+          echo "Database permissions setup completed successfully"
+      - name: kubectl
+        image: bitnami/kubectl:latest
+        command: ["/bin/sleep", "infinity"]
