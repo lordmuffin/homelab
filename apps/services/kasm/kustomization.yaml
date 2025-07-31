@@ -26,6 +26,7 @@ resources:
   - ingressroute.yaml  # Keep IngressRoute for Traefik-specific routing
   
   # Wave 1: Secret synchronization (PreSync)
+  - kasm-secret-sync-rbac.yaml
   - kasm-secret-sync-job-v2.yaml
   
   # Wave 2: Database initialization jobs
