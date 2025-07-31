@@ -91,6 +91,14 @@ spec:
     namespace: kasm
     jsonPointers:
     - /data
+  # RDP Gateway ConfigMap (Helm-generated)
+  - group: ""
+    kind: ConfigMap
+    name: rdp-gateway-configmap
+    namespace: kasm
+    jsonPointers:
+    - /metadata/annotations
+    - /data
   # Namespace finalizers
   - group: ""
     kind: Namespace
@@ -135,6 +143,8 @@ spec:
     - Prune=true
     - RespectIgnoreDifferences=true
     - ServerSideApply=true  # Use server-side apply for better conflict resolution
+    - SkipDryRunOnMissingResource=true  # Skip dry run for missing resources
+    - Replace=true  # Force replace resources on conflicts
     retry:
       limit: 5
       backoff:
