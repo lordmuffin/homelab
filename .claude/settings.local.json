@@ -48,7 +48,8 @@
       "Bash(kustomize build:*)",
       "Bash(kubectl kustomize:*)",
       "Bash(kubectl create:*)",
-      "Bash(argocd app sync:*)"
+      "Bash(argocd app sync:*)",
+      "Bash(git pull:*)"
     ],
     "deny": []
   },
