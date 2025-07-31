@@ -142,9 +142,9 @@ spec:
     - ApplyOutOfSyncOnly=false
     - Prune=true
     - RespectIgnoreDifferences=true
-    - ServerSideApply=true  # Use server-side apply for better conflict resolution
     - SkipDryRunOnMissingResource=true  # Skip dry run for missing resources
     - Replace=true  # Force replace resources on conflicts
+    - CreateNamespace=true
     retry:
       limit: 5
       backoff:
