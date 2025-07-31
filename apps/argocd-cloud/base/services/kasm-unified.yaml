@@ -136,6 +136,15 @@ spec:
     - /spec/template/spec/containers/*/env
     - /spec/template/spec/containers/*/volumeMounts
     - /spec/template/spec/volumes
+  # PersistentVolumeClaims (immutable after creation)
+  - group: ""
+    kind: PersistentVolumeClaim
+    name: "*"
+    namespace: kasm
+    jsonPointers:
+    - /spec/volumeName
+    - /spec/storageClassName
+    - /status
 
   syncPolicy:
     automated:
