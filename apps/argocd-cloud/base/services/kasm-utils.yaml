@@ -36,10 +36,7 @@ spec:
     name: kasm
     jsonPointers:
     - /metadata/finalizers
-  - group: ""
-    kind: Ingress
-    name: kasm-ingress
-    namespace: kasm
+  # REMOVED: kasm-ingress - no longer managed by kasm-utils
   - group: "onepassword.com"
     kind: OnePasswordItem
     name: "*"

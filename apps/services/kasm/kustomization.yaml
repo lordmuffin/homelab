@@ -3,8 +3,8 @@ kind: Kustomization
 
 resources:
   - persistent-volume.yaml
-  - ingress.yaml
-  - ingressroute.yaml
+  # - ingress.yaml  # REMOVED: This conflicts with Helm chart ingress
+  - ingressroute.yaml  # Keep IngressRoute for Traefik-specific routing
   - rbac.yaml
   - onepassword-items.yaml
   - secrets.yaml

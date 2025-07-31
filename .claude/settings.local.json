@@ -41,7 +41,14 @@
       "Bash(kubectl label:*)",
       "Bash(nslookup:*)",
       "Bash(echo)",
-      "Bash(dig:*)"
+      "Bash(dig:*)",
+      "Bash(/dev/null)",
+      "Bash(pkill:*)",
+      "Bash(true)",
+      "Bash(kustomize build:*)",
+      "Bash(kubectl kustomize:*)",
+      "Bash(kubectl create:*)",
+      "Bash(argocd app sync:*)"
     ],
     "deny": []
   },
