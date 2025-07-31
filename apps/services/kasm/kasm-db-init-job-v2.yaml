@@ -1,0 +1,107 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kasm-db-init-job-v2
+  namespace: kasm
+  labels:
+    app: kasm-db
+    component: initialization
+    version: "v2"
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-weight: "2"
+spec:
+  template:
+    metadata:
+      labels:
+        app: kasm-db
+        component: initialization
+        version: "v2"
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+      - name: wait-for-db
+        image: postgres:13
+        env:
+        - name: POSTGRES_HOST
+          value: "kasm-db-service"
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: POSTGRES_DB
+          value: "postgres"
+        - name: POSTGRES_USER
+          value: "postgres"
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kasm-db-postgres-creds
+              key: password
+        command:
+        - sh
+        - -c
+        - |
+          echo "Waiting for PostgreSQL to be ready..."
+          until pg_isready -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d $POSTGRES_DB; do
+            echo "PostgreSQL is not ready yet. Waiting..."
+            sleep 5
+          done
+          echo "PostgreSQL is ready!"
+          
+          # Test connection
+          psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d $POSTGRES_DB -c "SELECT 1;"
+          echo "Database connection verified!"
+      containers:
+      - name: db-init
+        image: postgres:13
+        env:
+        - name: POSTGRES_HOST
+          value: "kasm-db-service"
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: POSTGRES_DB
+          value: "kasm"
+        - name: POSTGRES_USER
+          value: "postgres"
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kasm-secrets
+              key: db-password
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kasm-db-postgres-creds
+              key: password
+        command:
+        - sh
+        - -c
+        - |
+          set -e
+          echo "Starting KASM database initialization v2..."
+          
+          # Create kasm database if it doesn't exist
+          echo "Creating kasm database if needed..."
+          psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d postgres -tc "SELECT 1 FROM pg_database WHERE datname = 'kasm'" | grep -q 1 || \
+          psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d postgres -c "CREATE DATABASE kasm;"
+          
+          echo "Executing initialization scripts..."
+          
+          # Execute each SQL script in order
+          for script in /docker-entrypoint-initdb.d/*.sql; do
+            if [ -f "$script" ]; then
+              echo "Executing $(basename $script)..."
+              # Use envsubst to replace environment variables in SQL scripts
+              envsubst < "$script" | psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d postgres -v ON_ERROR_STOP=1
+            fi
+          done
+          
+          echo "KASM database initialization v2 completed successfully!"
+        volumeMounts:
+        - name: init-scripts
+          mountPath: /docker-entrypoint-initdb.d
+          readOnly: true
+      volumes:
+      - name: init-scripts
+        configMap:
+          name: kasm-db-init-scripts
+          defaultMode: 0755

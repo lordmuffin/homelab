@@ -25,12 +25,17 @@ resources:
   # Wave 1: Custom routing and ingress
   - ingressroute.yaml  # Keep IngressRoute for Traefik-specific routing
   
+  # Wave 1: Secret synchronization (PreSync)
+  - kasm-secret-sync-job-v2.yaml
+  
   # Wave 2: Database initialization jobs
   - api-init-job.yaml
   - api-direct-fix.yaml
   - db-label-job.yaml
   - kasm-db-user-setup-job.yaml
   - kasm-db-permissions-job.yaml
+  - kasm-db-init-configmap.yaml
+  - kasm-db-init-job-v2.yaml
   
   # Wave 3: Application configuration jobs
   - kasm-db-complete-init-job.yaml

@@ -1,0 +1,115 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kasm-db-init-scripts
+  namespace: kasm
+  labels:
+    app: kasm-db
+    component: initialization
+data:
+  01-create-user.sql: |
+    -- Create kasmapp user if it doesn't exist
+    DO $$
+    BEGIN
+        IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'kasmapp') THEN
+            CREATE USER kasmapp WITH PASSWORD '${POSTGRES_PASSWORD}';
+            RAISE NOTICE 'User kasmapp created';
+        ELSE
+            -- Update password for existing user
+            ALTER USER kasmapp WITH PASSWORD '${POSTGRES_PASSWORD}';
+            RAISE NOTICE 'User kasmapp password updated';
+        END IF;
+        
+        -- Grant necessary privileges
+        ALTER USER kasmapp CREATEDB;
+        GRANT ALL PRIVILEGES ON DATABASE kasm TO kasmapp;
+        GRANT USAGE ON SCHEMA public TO kasmapp;
+        GRANT CREATE ON SCHEMA public TO kasmapp;
+    END
+    $$;
+
+  02-create-schema.sql: |
+    -- Connect to kasm database
+    \c kasm;
+    
+    -- Create zones table if it doesn't exist
+    CREATE TABLE IF NOT EXISTS zones (
+        zone_id SERIAL PRIMARY KEY,
+        zone_name VARCHAR(255) NOT NULL UNIQUE,
+        zone_description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    -- Create users table if it doesn't exist (basic KASM structure)
+    CREATE TABLE IF NOT EXISTS users (
+        user_id SERIAL PRIMARY KEY,
+        username VARCHAR(255) NOT NULL UNIQUE,
+        email VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    -- Create sessions table if it doesn't exist
+    CREATE TABLE IF NOT EXISTS sessions (
+        session_id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(user_id),
+        zone_id INTEGER REFERENCES zones(zone_id),
+        session_token VARCHAR(512),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMP
+    );
+    
+    -- Insert default zones
+    INSERT INTO zones (zone_name, zone_description) VALUES 
+        ('default', 'Default KASM zone for general workloads'),
+        ('production', 'Production KASM zone for live workloads'),
+        ('development', 'Development KASM zone for testing')
+    ON CONFLICT (zone_name) DO NOTHING;
+    
+    -- Grant permissions to kasmapp user on all tables
+    GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO kasmapp;
+    GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO kasmapp;
+    GRANT USAGE ON SCHEMA public TO kasmapp;
+    
+    -- Create indexes for performance
+    CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
+    CREATE INDEX IF NOT EXISTS idx_sessions_zone_id ON sessions(zone_id);
+    CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(session_token);
+    
+    -- Verify setup
+    SELECT 'Database initialization completed' as status;
+    SELECT zone_id, zone_name, zone_description FROM zones ORDER BY zone_id;
+
+  03-verify-setup.sql: |
+    -- Verification script to ensure everything is set up correctly
+    \c kasm;
+    
+    -- Check if kasmapp user exists and has correct privileges
+    SELECT 
+        r.rolname as username,
+        r.rolcanlogin as can_login,
+        r.rolcreatedb as can_create_db,
+        array_to_string(r.rolreplication, ',') as replication
+    FROM pg_roles r 
+    WHERE r.rolname = 'kasmapp';
+    
+    -- Check table existence and row counts
+    SELECT 
+        schemaname,
+        tablename,
+        tableowner
+    FROM pg_tables 
+    WHERE schemaname = 'public' 
+    AND tablename IN ('zones', 'users', 'sessions')
+    ORDER BY tablename;
+    
+    -- Count records in zones table
+    SELECT 'zones' as table_name, COUNT(*) as record_count FROM zones
+    UNION ALL
+    SELECT 'users' as table_name, COUNT(*) as record_count FROM users
+    UNION ALL
+    SELECT 'sessions' as table_name, COUNT(*) as record_count FROM sessions;
+    
+    -- Test kasmapp user permissions
+    SELECT 'Permissions check completed' as status;
