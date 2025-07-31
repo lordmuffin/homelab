@@ -5,6 +5,7 @@ metadata:
   namespace: kasm
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -13,6 +14,7 @@ metadata:
   namespace: kasm
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 rules:
   - apiGroups: [""]
     resources: ["pods", "pods/exec", "services", "configmaps", "secrets", "persistentvolumeclaims"]

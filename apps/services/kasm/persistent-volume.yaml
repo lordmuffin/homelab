@@ -5,12 +5,14 @@ metadata:
   namespace: kasm
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   accessModes:
     - ReadWriteMany
   resources:
     requests:
       storage: 20Gi
+  storageClassName: ssd
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -19,9 +21,11 @@ metadata:
   namespace: kasm
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   accessModes:
     - ReadWriteMany
   resources:
     requests:
       storage: 5Gi
+  storageClassName: ssd

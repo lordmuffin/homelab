@@ -144,7 +144,17 @@ spec:
     jsonPointers:
     - /spec/volumeName
     - /spec/storageClassName
+    - /spec
     - /status
+  # RBAC resources
+  - group: "rbac.authorization.k8s.io"
+    kind: Role
+    name: "*"
+    namespace: kasm
+  - group: "rbac.authorization.k8s.io"  
+    kind: RoleBinding
+    name: "*"
+    namespace: kasm
 
   syncPolicy:
     automated:
