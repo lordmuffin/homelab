@@ -76,45 +76,5 @@ patches:
       name: kasm-share-deployment
       namespace: kasm
 
-# Patch annotations to ensure they run after Helm deployment
-patchesStrategicMerge:
-  - |
-    apiVersion: apps/v1
-    kind: Deployment
-    metadata:
-      name: kasm-api-deployment
-      annotations:
-        argocd.argoproj.io/sync-wave: "2"
-    $patch: replace
-  - |
-    apiVersion: apps/v1
-    kind: Deployment
-    metadata:
-      name: kasm-manager-deployment
-      annotations:
-        argocd.argoproj.io/sync-wave: "2"
-    $patch: replace
-  - |
-    apiVersion: apps/v1
-    kind: Deployment
-    metadata:
-      name: kasm-guac-deployment
-      annotations:
-        argocd.argoproj.io/sync-wave: "2"
-    $patch: replace
-  - |
-    apiVersion: apps/v1
-    kind: Deployment
-    metadata:
-      name: kasm-proxy-deployment
-      annotations:
-        argocd.argoproj.io/sync-wave: "2"
-    $patch: replace
-  - |
-    apiVersion: apps/v1
-    kind: Deployment
-    metadata:
-      name: kasm-share-deployment
-      annotations:
-        argocd.argoproj.io/sync-wave: "2"
-    $patch: replace
+# Note: Strategic merge patches removed as they conflict with multiple sources
+# The patches above handle container modifications, sync waves handled per resource
