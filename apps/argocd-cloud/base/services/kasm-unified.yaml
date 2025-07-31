@@ -136,23 +136,22 @@ spec:
     - /spec/template/spec/containers/*/env
     - /spec/template/spec/containers/*/volumeMounts
     - /spec/template/spec/volumes
-  # PersistentVolumeClaims (immutable after creation)
+  # PersistentVolumeClaims (completely ignore - managed by Helm)
   - group: ""
     kind: PersistentVolumeClaim
     name: "*"
     namespace: kasm
-    jsonPointers:
-    - /spec/volumeName
-    - /spec/storageClassName
-    - /spec
-    - /status
-  # RBAC resources
+  # RBAC resources (completely ignore - managed by Helm)
   - group: "rbac.authorization.k8s.io"
     kind: Role
     name: "*"
     namespace: kasm
   - group: "rbac.authorization.k8s.io"  
     kind: RoleBinding
+    name: "*"
+    namespace: kasm
+  - group: ""
+    kind: ServiceAccount
     name: "*"
     namespace: kasm
 

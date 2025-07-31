@@ -11,9 +11,7 @@ commonAnnotations:
   app.kubernetes.io/part-of: kasm-unified
 
 resources:
-  # Wave -1: Prerequisites (storage, RBAC, secrets)
-  - persistent-volume.yaml
-  - rbac.yaml
+  # Wave -1: Prerequisites (secrets only - PVCs and RBAC managed by Helm)
   - onepassword-items.yaml
   - secrets.yaml
   - base/db.yaml
