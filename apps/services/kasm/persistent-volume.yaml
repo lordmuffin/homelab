@@ -3,6 +3,8 @@ kind: PersistentVolumeClaim
 metadata:
   name: kasm-profiles
   namespace: kasm
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
 spec:
   accessModes:
     - ReadWriteMany
@@ -15,6 +17,8 @@ kind: PersistentVolumeClaim
 metadata:
   name: kasm-uploads
   namespace: kasm
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
 spec:
   accessModes:
     - ReadWriteMany

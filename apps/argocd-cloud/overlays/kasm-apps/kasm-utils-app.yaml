@@ -1,0 +1,87 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kasm-utils
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: apps
+  source:
+    repoURL: 'https://github.com/lordmuffin/homelab.git'
+    path: apps/services/kasm
+    targetRevision: main
+
+  destination:
+    namespace: kasm
+    name: in-cluster
+
+  # Only manage resources that don't conflict with base Helm chart
+  ignoreDifferences:
+  - group: ""
+    kind: Secret
+    name: kasm-secrets
+    namespace: kasm
+    jsonPointers:
+    - /data
+    - /stringData
+  - group: ""
+    kind: ConfigMap
+    name: kasm-db-configmap
+    namespace: kasm
+  - group: ""
+    kind: ConfigMap
+    name: kasm-db-data-sql
+    namespace: kasm
+  - group: ""
+    kind: Secret
+    name: kasm-db-cert
+    namespace: kasm
+  - group: ""
+    kind: Namespace
+    name: kasm
+    jsonPointers:
+    - /metadata/finalizers
+  - group: "onepassword.com"
+    kind: OnePasswordItem
+    name: "*"
+    namespace: kasm
+  # Ignore Job status changes
+  - group: "batch"
+    kind: Job
+    name: "*"
+    namespace: kasm
+    jsonPointers:
+    - /status
+    - /metadata/labels
+  # Ignore Deployment changes for patches
+  - group: "apps"
+    kind: Deployment
+    name: "*"
+    namespace: kasm
+    jsonPointers:
+    - /spec/template/spec/containers/*/env
+    - /spec/template/spec/containers/*/volumeMounts
+    - /spec/template/spec/volumes
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: true
+    syncOptions:
+    - Validate=false
+    - CreateNamespace=true
+    - PrunePropagationPolicy=foreground
+    - PruneLast=true
+    - ApplyOutOfSyncOnly=false
+    - Prune=true
+    - RespectIgnoreDifferences=true
+    - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 15m

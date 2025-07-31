@@ -1,24 +1,44 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
+# Namespace for all resources
+namespace: kasm
+
+# Common annotations applied to all resources
+commonAnnotations:
+  # Managed by ArgoCD unified application
+  app.kubernetes.io/managed-by: argocd
+  app.kubernetes.io/part-of: kasm-unified
+
 resources:
+  # Wave -1: Prerequisites (storage, RBAC, secrets)
   - persistent-volume.yaml
-  # - ingress.yaml  # REMOVED: This conflicts with Helm chart ingress
-  - ingressroute.yaml  # Keep IngressRoute for Traefik-specific routing
   - rbac.yaml
   - onepassword-items.yaml
   - secrets.yaml
   - base/db.yaml
-  # - kasm-db-init-job.yaml  # REMOVED: This conflicts with Helm chart job
+  
+  # Wave 0: Core application resources (handled by Helm)
+  # Helm chart resources are deployed automatically with wave 0
+  
+  # Wave 1: Custom routing and ingress
+  - ingressroute.yaml  # Keep IngressRoute for Traefik-specific routing
+  
+  # Wave 2: Database initialization jobs
   - api-init-job.yaml
   - api-direct-fix.yaml
   - db-label-job.yaml
   - kasm-db-user-setup-job.yaml
   - kasm-db-permissions-job.yaml
+  
+  # Wave 3: Application configuration jobs
   - kasm-db-complete-init-job.yaml
   - kasm-secrets-sync-job.yaml
+  
+  # Wave 4: Post-deployment fixes
   - kasm-admin-password-fix-job.yaml
 
+# Wave 2: Container patches (applied after Helm deployment)
 patches:
   - path: api-container-patch.yaml
     target:
@@ -55,3 +75,46 @@ patches:
       kind: Deployment
       name: kasm-share-deployment
       namespace: kasm
+
+# Patch annotations to ensure they run after Helm deployment
+patchesStrategicMerge:
+  - |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: kasm-api-deployment
+      annotations:
+        argocd.argoproj.io/sync-wave: "2"
+    $patch: replace
+  - |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: kasm-manager-deployment
+      annotations:
+        argocd.argoproj.io/sync-wave: "2"
+    $patch: replace
+  - |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: kasm-guac-deployment
+      annotations:
+        argocd.argoproj.io/sync-wave: "2"
+    $patch: replace
+  - |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: kasm-proxy-deployment
+      annotations:
+        argocd.argoproj.io/sync-wave: "2"
+    $patch: replace
+  - |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: kasm-share-deployment
+      annotations:
+        argocd.argoproj.io/sync-wave: "2"
+    $patch: replace

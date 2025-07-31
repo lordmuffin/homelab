@@ -1,0 +1,106 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kasm-base
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: apps
+  source:
+    repoURL: 'https://github.com/kasmtech/kasm-helm.git'
+    path: kasm-single-zone
+    targetRevision: release/1.17.0
+    helm:
+      values: |
+        global:
+          namespace: "kasm"
+          clusterDomain: "cluster.local"
+          ingressClassName: "traefik"
+          hostname: "kasm.lab.apj.dev"
+          image:
+            pullPolicy: IfNotPresent
+            restartPolicy: Always
+          # Using empty passwords as secrets are managed externally
+          kasmPasswords:
+            redisPassword: ""
+            dbPassword: ""
+            managerToken: ""
+            serviceToken: ""
+            adminPassword: ""
+            userPassword: ""
+
+        kasmCerts:
+          ingress:
+            name: "lab-apj-dev-tls"
+            create: false
+          kasmProxy:
+            name: "lab-apj-dev-tls"
+            create: false
+          rdpGateway:
+            name: "lab-apj-dev-tls"
+            create: false
+          db:
+            name: "kasm-db-cert"
+            create: true
+
+        kasmApp:
+          name: "kasm"
+          zoneName: "default"
+          applyHardening: true
+          deploymentSize: "small"
+
+  destination:
+    namespace: kasm
+    name: in-cluster
+
+  # Ignore differences in resources that will be managed by utils
+  ignoreDifferences:
+  - group: ""
+    kind: Secret
+    name: kasm-secrets
+    namespace: kasm
+    jsonPointers:
+    - /data
+    - /stringData
+  - group: ""
+    kind: Secret
+    name: kasm-db-cert
+    namespace: kasm
+  - group: ""
+    kind: ConfigMap
+    name: kasm-db-configmap
+    namespace: kasm
+  - group: ""
+    kind: ConfigMap
+    name: kasm-db-data-sql
+    namespace: kasm
+  - group: ""
+    kind: Namespace
+    name: kasm
+    jsonPointers:
+    - /metadata/finalizers
+  - group: "onepassword.com"
+    kind: OnePasswordItem
+    name: "*"
+    namespace: kasm
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: true
+    syncOptions:
+    - Validate=false
+    - CreateNamespace=true
+    - PrunePropagationPolicy=foreground
+    - PruneLast=true
+    - ApplyOutOfSyncOnly=false
+    - Prune=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 20s
+        factor: 2
+        maxDuration: 15m

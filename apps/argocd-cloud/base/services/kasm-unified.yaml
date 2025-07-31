@@ -1,0 +1,143 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kasm-unified
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: apps
+  # Multiple sources approach - first source is Helm chart, second is utilities
+  sources:
+    # Source 1: KASM Helm Chart (base deployment)
+    - repoURL: 'https://github.com/kasmtech/kasm-helm.git'
+      path: kasm-single-zone
+      targetRevision: release/1.17.0
+      helm:
+        values: |
+          global:
+            namespace: "kasm"
+            clusterDomain: "cluster.local"
+            ingressClassName: "traefik"
+            hostname: "kasm.lab.apj.dev"
+            image:
+              pullPolicy: IfNotPresent
+              restartPolicy: Always
+            # Using empty passwords as secrets are managed externally
+            # Empty passwords to prevent Helm from managing these
+            kasmPasswords:
+              redisPassword: ""
+              dbPassword: ""
+              managerToken: ""
+              serviceToken: ""
+              adminPassword: ""
+              userPassword: ""
+
+          kasmCerts:
+            ingress:
+              name: "lab-apj-dev-tls"
+              create: false
+            kasmProxy:
+              name: "lab-apj-dev-tls"
+              create: false
+            rdpGateway:
+              name: "lab-apj-dev-tls"
+              create: false
+            db:
+              name: "kasm-db-cert"
+              create: true
+
+          kasmApp:
+            name: "kasm"
+            zoneName: "default"
+            applyHardening: true
+            deploymentSize: "small"
+    
+    # Source 2: Utilities and Patches (from your git repo)
+    - repoURL: 'https://github.com/lordmuffin/homelab.git'
+      path: apps/services/kasm
+      targetRevision: main
+
+  destination:
+    namespace: kasm
+    name: in-cluster
+
+  # Comprehensive ignoreDifferences to prevent sync conflicts
+  ignoreDifferences:
+  # Secrets managed externally
+  - group: ""
+    kind: Secret
+    name: kasm-secrets
+    namespace: kasm
+    jsonPointers:
+    - /data
+    - /stringData
+  - group: ""
+    kind: Secret
+    name: kasm-db-cert
+    namespace: kasm
+    jsonPointers:
+    - /data
+    - /stringData
+  # ConfigMaps that may be updated by jobs
+  - group: ""
+    kind: ConfigMap
+    name: kasm-db-configmap
+    namespace: kasm
+    jsonPointers:
+    - /data
+  - group: ""
+    kind: ConfigMap
+    name: kasm-db-data-sql
+    namespace: kasm
+    jsonPointers:
+    - /data
+  # Namespace finalizers
+  - group: ""
+    kind: Namespace
+    name: kasm
+    jsonPointers:
+    - /metadata/finalizers
+  # OnePassword resources
+  - group: "onepassword.com"
+    kind: OnePasswordItem
+    name: "*"
+    namespace: kasm
+  # Jobs that may be recreated
+  - group: "batch"
+    kind: Job
+    name: "*"
+    namespace: kasm
+    jsonPointers:
+    - /spec/template/metadata/labels
+    - /metadata/labels
+    - /status
+  # Deployments that may be patched
+  - group: "apps"
+    kind: Deployment
+    name: "*"
+    namespace: kasm
+    jsonPointers:
+    - /spec/template/spec/containers/*/env
+    - /spec/template/spec/containers/*/volumeMounts
+    - /spec/template/spec/volumes
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: true
+    syncOptions:
+    - Validate=false
+    - CreateNamespace=true
+    - PrunePropagationPolicy=foreground
+    - PruneLast=true
+    - ApplyOutOfSyncOnly=false
+    - Prune=true
+    - RespectIgnoreDifferences=true
+    - ServerSideApply=true  # Use server-side apply for better conflict resolution
+    retry:
+      limit: 5
+      backoff:
+        duration: 30s  # Increased for better stability
+        factor: 2
+        maxDuration: 15m
