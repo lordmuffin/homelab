@@ -9,7 +9,7 @@ resources:
   - onepassword-items.yaml
   - secrets.yaml
   - base/db.yaml
-  - kasm-db-init-job.yaml
+  # - kasm-db-init-job.yaml  # REMOVED: This conflicts with Helm chart job
   - api-init-job.yaml
   - api-direct-fix.yaml
   - db-label-job.yaml
