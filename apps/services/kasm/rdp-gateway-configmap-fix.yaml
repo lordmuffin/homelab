@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rdp-gateway-configmap
+  namespace: kasm
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+    argocd.argoproj.io/sync-options: Replace=true,Force=true
+data:
+  # Basic RDP Gateway configuration
+  # This provides a minimal working configuration to override the problematic Helm-generated one
+  gateway.conf: |
+    # RDP Gateway Configuration
+    [rdp]
+    port=3389
+    bind=0.0.0.0
+    
+    [ssl]
+    port=5555
+    bind=0.0.0.0
+    
+    [logging]
+    level=info
+  
+  nginx.conf: |
+    # Basic nginx configuration for RDP gateway
+    server {
+        listen 9443 ssl;
+        server_name _;
+        
+        location / {
+            proxy_pass http://localhost:3389;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
+    }

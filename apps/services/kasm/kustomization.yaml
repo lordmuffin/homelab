@@ -18,6 +18,9 @@ resources:
   - secrets.yaml
   - base/db.yaml
   
+  # Wave 0: ConfigMap fixes (before Helm deployment)
+  - rdp-gateway-configmap-fix.yaml
+  
   # Wave 0: Core application resources (handled by Helm)
   # Helm chart resources are deployed automatically with wave 0
   

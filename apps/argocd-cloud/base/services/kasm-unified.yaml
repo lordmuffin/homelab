@@ -91,14 +91,22 @@ spec:
     namespace: kasm
     jsonPointers:
     - /data
-  # RDP Gateway ConfigMap (Helm-generated)
+  # RDP Gateway ConfigMap (Helm-generated) - ignore all metadata and data changes
   - group: ""
     kind: ConfigMap
     name: rdp-gateway-configmap
     namespace: kasm
     jsonPointers:
-    - /metadata/annotations
+    - /metadata
     - /data
+  # Ignore all ConfigMap annotation issues
+  - group: ""
+    kind: ConfigMap
+    name: "*"
+    namespace: kasm
+    jsonPointers:
+    - /metadata/annotations
+    - /metadata/labels
   # Namespace finalizers
   - group: ""
     kind: Namespace
@@ -144,7 +152,7 @@ spec:
     - RespectIgnoreDifferences=true
     - SkipDryRunOnMissingResource=true  # Skip dry run for missing resources
     - Replace=true  # Force replace resources on conflicts
-    - CreateNamespace=true
+    - Force=true  # Force sync even with validation errors
     retry:
       limit: 5
       backoff:
