@@ -9,7 +9,7 @@ spec:
   entryPoints:
     - websecure
   routes:
-    - match: Host(`traefik.labs.andrewpjackson.com`)
+    - match: Host(`traefik.lab.apj.dev`)
       kind: Rule
       middlewares:
         - name: traefik-forward-auth
@@ -18,4 +18,4 @@ spec:
         - name: api@internal
           kind: TraefikService
   tls:
-    secretName: labs-andrewpjackson-com-tls
+    secretName: lab-apj-dev-tls
