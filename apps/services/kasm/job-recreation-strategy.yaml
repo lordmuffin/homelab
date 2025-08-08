@@ -1,0 +1,152 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kasm-failed-job-cleanup
+  namespace: kasm
+  labels:
+    app: kasm-cleanup
+    component: job-recreation
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-weight: "-1"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels:
+        app: kasm-cleanup
+        component: job-recreation
+    spec:
+      serviceAccountName: kasm-secret-sync
+      restartPolicy: OnFailure
+      containers:
+      - name: job-cleanup
+        image: bitnami/kubectl:latest
+        env:
+        - name: NAMESPACE
+          value: "kasm"
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          echo "=== KASM Failed Job Cleanup ==="
+          
+          # Function to check and cleanup failed jobs
+          cleanup_failed_job() {
+            local job="$1"
+            echo "Checking job: $job"
+            
+            if kubectl get job "$job" -n $NAMESPACE >/dev/null 2>&1; then
+              # Check job status
+              local status=$(kubectl get job "$job" -n $NAMESPACE -o jsonpath='{.status.conditions[?(@.type=="Failed")].status}' | tr -d '\n')
+              local succeeded=$(kubectl get job "$job" -n $NAMESPACE -o jsonpath='{.status.succeeded}' | tr -d '\n')
+              
+              if [ "$status" = "True" ] || [ -z "$succeeded" ]; then
+                echo "Job $job is failed or incomplete, cleaning up..."
+                
+                # Delete associated pods first
+                kubectl delete pods -n $NAMESPACE -l job-name="$job" --ignore-not-found=true
+                
+                # Delete the job
+                kubectl delete job "$job" -n $NAMESPACE --ignore-not-found=true
+                
+                echo "✓ Cleaned up failed job: $job"
+              else
+                echo "✓ Job $job is healthy, skipping"
+              fi
+            else
+              echo "! Job $job not found, skipping"
+            fi
+          }
+          
+          # Jobs that commonly fail and need cleanup
+          JOBS_TO_CHECK=(
+            "kasm-admin-password-fix-job"
+            "kasm-db-permissions-job"
+            "kasm-db-user-setup-job"
+            "kasm-db-complete-init-job"
+            "kasm-secrets-sync-job"
+            "kasm-secret-alias-job"
+            "kasm-db-init-job"
+            "kasm-db-init-job-v2"
+          )
+          
+          echo "Cleaning up failed jobs..."
+          for job in "${JOBS_TO_CHECK[@]}"; do
+            cleanup_failed_job "$job"
+          done
+          
+          # Clean up old completed jobs older than 1 hour
+          echo "Cleaning up old completed jobs..."
+          kubectl get jobs -n $NAMESPACE -o json | jq -r '
+            .items[] |
+            select(.status.succeeded == 1) |
+            select(.status.completionTime != null) |
+            select((now - (.status.completionTime | fromdateiso8601)) > 3600) |
+            .metadata.name
+          ' | while read job; do
+            if [ -n "$job" ]; then
+              echo "Cleaning up old completed job: $job"
+              kubectl delete job "$job" -n $NAMESPACE --ignore-not-found=true
+            fi
+          done
+          
+          echo "✅ Job cleanup completed!"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kasm-job-recreation-config
+  namespace: kasm
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+data:
+  job-recreation.yaml: |
+    # KASM Job Recreation Strategy Configuration
+    
+    # Jobs that should be recreated if they fail
+    recreate_on_failure:
+      - name: "kasm-admin-password-fix-job"
+        priority: "high" 
+        dependencies: ["kasm-db-init-job-v3"]
+        timeout: 300
+        
+      - name: "kasm-db-permissions-job"
+        priority: "high"
+        dependencies: ["kasm-db-init-job-v3"]  
+        timeout: 300
+        
+      - name: "kasm-db-user-setup-job"
+        priority: "high"
+        dependencies: ["kasm-db-init-job-v3"]
+        timeout: 300
+        
+      - name: "kasm-db-complete-init-job"
+        priority: "medium"
+        dependencies: ["kasm-db-permissions-job", "kasm-db-user-setup-job"]
+        timeout: 600
+        
+      - name: "kasm-secrets-sync-job"
+        priority: "medium"
+        dependencies: ["kasm-secret-alias-sync-job"]
+        timeout: 300
+    
+    # Jobs that should not be recreated (one-time only)
+    no_recreate:
+      - "kasm-secret-alias-sync-job"
+      - "kasm-db-init-job-v3"
+      - "kasm-db-connectivity-test"
+    
+    # Deployment restart strategy
+    deployment_restart:
+      enabled: true
+      wait_for_jobs: true
+      restart_order:
+        - "kasm-api-deployment"
+        - "kasm-manager-deployment"
+        - "kasm-guac-deployment"
+        - "kasm-proxy-deployment"
+        - "kasm-share-deployment"

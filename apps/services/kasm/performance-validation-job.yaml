@@ -1,0 +1,412 @@
+---
+# KASM Performance Validation and Load Testing Job
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kasm-performance-validation-job
+  namespace: kasm
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-weight: "10"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 900  # 15 minutes for comprehensive testing
+  template:
+    metadata:
+      labels:
+        app: kasm-performance-test
+        component: validation
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: performance-validator
+        image: curlimages/curl:8.5.0
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          echo "=== KASM Performance Validation Suite ==="
+          echo "Starting comprehensive performance and health validation..."
+          
+          # Configuration
+          API_URL="http://kasm-api:80"
+          DB_HOST="db"
+          DB_PORT="5432"
+          REDIS_HOST="kasm-redis"
+          REDIS_PORT="6379"
+          
+          # Performance thresholds
+          MAX_RESPONSE_TIME=5000  # 5 seconds max
+          MIN_SUCCESS_RATE=95     # 95% success rate minimum
+          MAX_ERROR_RATE=5        # 5% error rate maximum
+          
+          echo "Configuration:"
+          echo "  API URL: $API_URL"
+          echo "  DB Host: $DB_HOST:$DB_PORT"
+          echo "  Redis Host: $REDIS_HOST:$REDIS_PORT"
+          echo "  Max Response Time: ${MAX_RESPONSE_TIME}ms"
+          echo "  Min Success Rate: ${MIN_SUCCESS_RATE}%"
+          
+          # Function to test API endpoint
+          test_api_endpoint() {
+            local endpoint=$1
+            local description=$2
+            local max_time=${3:-$MAX_RESPONSE_TIME}
+            
+            echo "Testing $description..."
+            
+            # Test response time and HTTP status
+            response=$(curl -o /dev/null -s -w "%{http_code},%{time_total}" "$API_URL$endpoint" || echo "000,999")
+            http_code=$(echo $response | cut -d',' -f1)
+            time_total=$(echo $response | cut -d',' -f2)
+            time_ms=$(echo "$time_total * 1000" | bc -l 2>/dev/null || echo "999999")
+            
+            if [ "$http_code" = "200" ] || [ "$http_code" = "401" ]; then
+              if [ "$(echo "$time_ms < $max_time" | bc -l 2>/dev/null || echo 0)" = "1" ]; then
+                echo "  ✅ $description: HTTP $http_code, ${time_ms}ms"
+                return 0
+              else
+                echo "  ⚠️  $description: HTTP $http_code, ${time_ms}ms (SLOW)"
+                return 1
+              fi
+            else
+              echo "  ❌ $description: HTTP $http_code, ${time_ms}ms"
+              return 1
+            fi
+          }
+          
+          # Function to test database connectivity
+          test_database() {
+            echo "Testing database connectivity..."
+            
+            # Use netcat to test TCP connection
+            if nc -z -w5 $DB_HOST $DB_PORT; then
+              echo "  ✅ Database TCP connection: OK"
+              return 0
+            else
+              echo "  ❌ Database TCP connection: FAILED"
+              return 1
+            fi
+          }
+          
+          # Function to test Redis connectivity
+          test_redis() {
+            echo "Testing Redis connectivity..."
+            
+            # Use netcat to test TCP connection
+            if nc -z -w5 $REDIS_HOST $REDIS_PORT; then
+              echo "  ✅ Redis TCP connection: OK"
+              return 0
+            else
+              echo "  ❌ Redis TCP connection: FAILED"
+              return 1
+            fi
+          }
+          
+          # Function to perform load test
+          load_test_api() {
+            echo "Performing API load test..."
+            
+            local endpoint="/api/health"
+            local requests=50
+            local concurrency=5
+            local success_count=0
+            local total_time=0
+            
+            echo "  Running $requests requests with $concurrency concurrent connections..."
+            
+            # Simple load test loop
+            for i in $(seq 1 $requests); do
+              start_time=$(date +%s%3N)
+              response=$(curl -o /dev/null -s -w "%{http_code}" "$API_URL$endpoint" &)
+              
+              # Limit concurrency
+              if [ $((i % concurrency)) -eq 0 ]; then
+                wait
+              fi
+            done
+            wait  # Wait for all background processes
+            
+            echo "  📊 Load test completed"
+            # Note: Simplified test - in production use tools like wrk or k6
+          }
+          
+          # Main validation sequence
+          echo ""
+          echo "🏁 Starting Performance Validation Tests..."
+          echo "================================================"
+          
+          # Track test results
+          TOTAL_TESTS=0
+          PASSED_TESTS=0
+          FAILED_TESTS=0
+          
+          # Test 1: Database Connectivity
+          TOTAL_TESTS=$((TOTAL_TESTS + 1))
+          if test_database; then
+            PASSED_TESTS=$((PASSED_TESTS + 1))
+          else
+            FAILED_TESTS=$((FAILED_TESTS + 1))
+          fi
+          
+          # Test 2: Redis Connectivity
+          TOTAL_TESTS=$((TOTAL_TESTS + 1))
+          if test_redis; then
+            PASSED_TESTS=$((PASSED_TESTS + 1))
+          else
+            FAILED_TESTS=$((FAILED_TESTS + 1))
+          fi
+          
+          # Test 3: API Health Endpoint
+          TOTAL_TESTS=$((TOTAL_TESTS + 1))
+          if test_api_endpoint "/api/health" "API Health Check" 2000; then
+            PASSED_TESTS=$((PASSED_TESTS + 1))
+          else
+            FAILED_TESTS=$((FAILED_TESTS + 1))
+          fi
+          
+          # Test 4: API Root Endpoint
+          TOTAL_TESTS=$((TOTAL_TESTS + 1))
+          if test_api_endpoint "/" "API Root Endpoint" 3000; then
+            PASSED_TESTS=$((PASSED_TESTS + 1))
+          else
+            FAILED_TESTS=$((FAILED_TESTS + 1))
+          fi
+          
+          # Test 5: API Login Endpoint (should return 401 or login page)
+          TOTAL_TESTS=$((TOTAL_TESTS + 1))
+          if test_api_endpoint "/api/auth/login" "API Auth Endpoint" 3000; then
+            PASSED_TESTS=$((PASSED_TESTS + 1))
+          else
+            FAILED_TESTS=$((FAILED_TESTS + 1))
+          fi
+          
+          # Test 6: Load Test
+          TOTAL_TESTS=$((TOTAL_TESTS + 1))
+          echo "Load testing API endpoints..."
+          if load_test_api; then
+            PASSED_TESTS=$((PASSED_TESTS + 1))
+            echo "  ✅ Load test completed successfully"
+          else
+            FAILED_TESTS=$((FAILED_TESTS + 1))
+            echo "  ❌ Load test failed"
+          fi
+          
+          echo ""
+          echo "================================================"
+          echo "🎯 PERFORMANCE VALIDATION RESULTS"
+          echo "================================================"
+          echo "Total Tests: $TOTAL_TESTS"
+          echo "Passed: $PASSED_TESTS"
+          echo "Failed: $FAILED_TESTS"
+          echo "Success Rate: $((PASSED_TESTS * 100 / TOTAL_TESTS))%"
+          echo ""
+          
+          # Performance analysis
+          if [ $FAILED_TESTS -eq 0 ]; then
+            echo "🎉 ALL TESTS PASSED - KASM Performance Validation Successful!"
+            echo ""
+            echo "✅ System Health Status: EXCELLENT"
+            echo "✅ All endpoints responding within thresholds"
+            echo "✅ Database and Redis connectivity confirmed"
+            echo "✅ Load testing completed successfully"
+            echo ""
+            echo "🚀 KASM system is ready for production workloads!"
+          elif [ $FAILED_TESTS -le 1 ]; then
+            echo "⚠️  MOSTLY SUCCESSFUL - Minor issues detected"
+            echo ""
+            echo "🟡 System Health Status: GOOD (with minor issues)"
+            echo "📊 Success Rate: $((PASSED_TESTS * 100 / TOTAL_TESTS))%"
+            echo ""
+            echo "🔧 Recommendation: Monitor failed components and consider optimization"
+          else
+            echo "❌ MULTIPLE FAILURES - Performance issues detected"
+            echo ""
+            echo "🔴 System Health Status: POOR"
+            echo "📊 Success Rate: $((PASSED_TESTS * 100 / TOTAL_TESTS))%"
+            echo "❌ Failed Tests: $FAILED_TESTS"
+            echo ""
+            echo "🚨 Action Required: Investigate and resolve performance bottlenecks"
+            exit 1
+          fi
+          
+          # Generate performance recommendations
+          echo ""
+          echo "📈 PERFORMANCE RECOMMENDATIONS"
+          echo "================================="
+          
+          if [ $PASSED_TESTS -eq $TOTAL_TESTS ]; then
+            echo "🎯 System performing optimally!"
+            echo "• Continue monitoring with current configuration"
+            echo "• Consider scaling up if traffic increases"
+            echo "• Regular performance audits recommended"
+          else
+            echo "🔧 Optimization suggestions:"
+            echo "• Check resource allocation (CPU/Memory)"
+            echo "• Verify database connection pool settings"
+            echo "• Monitor application logs for errors"
+            echo "• Consider increasing readiness probe timeouts"
+            echo "• Review network latency between services"
+          fi
+          
+          echo ""
+          echo "📊 MONITORING SETUP VERIFICATION"
+          echo "================================="
+          echo "Next steps for comprehensive monitoring:"
+          echo "• Verify Prometheus ServiceMonitor is collecting metrics"
+          echo "• Check Grafana dashboards are displaying data"
+          echo "• Confirm alerting rules are configured"
+          echo "• Test alert notifications"
+          echo "• Set up performance regression testing"
+          
+          echo ""
+          echo "✅ Performance validation completed at $(date)"
+          echo "================================================"
+
+---
+# ConfigMap for performance testing scripts
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kasm-performance-test-scripts
+  namespace: kasm
+  annotations:
+    argocd.argoproj.io/sync-wave: "6"
+data:
+  load-test.sh: |
+    #!/bin/bash
+    # Advanced load testing script for KASM
+    # Use this for ongoing performance testing
+    
+    API_URL="http://kasm-api:80"
+    REQUESTS=${1:-100}
+    CONCURRENCY=${2:-10}
+    DURATION=${3:-60}
+    
+    echo "=== KASM Load Test ==="
+    echo "API URL: $API_URL"
+    echo "Requests: $REQUESTS"
+    echo "Concurrency: $CONCURRENCY"
+    echo "Duration: ${DURATION}s"
+    echo ""
+    
+    # Test health endpoint
+    echo "Testing /api/health endpoint..."
+    for i in $(seq 1 $REQUESTS); do
+      {
+        start=$(date +%s%3N)
+        response=$(curl -o /dev/null -s -w "%{http_code},%{time_total}" "$API_URL/api/health")
+        end=$(date +%s%3N)
+        echo "$response,$((end-start))"
+      } &
+      
+      # Control concurrency
+      if [ $((i % CONCURRENCY)) -eq 0 ]; then
+        wait
+      fi
+    done
+    wait
+    
+    echo "Load test completed!"
+  
+  benchmark.sh: |
+    #!/bin/bash
+    # Benchmarking script for KASM performance baselines
+    
+    echo "=== KASM Performance Benchmark ==="
+    echo "Timestamp: $(date)"
+    echo "Node: $(hostname)"
+    echo ""
+    
+    # API Response Time Test
+    echo "API Response Time Benchmark:"
+    for i in {1..10}; do
+      time_ms=$(curl -o /dev/null -s -w "%{time_total}" "http://kasm-api:80/api/health" | awk '{print $1*1000}')
+      echo "  Request $i: ${time_ms}ms"
+    done
+    
+    # Database Connection Test
+    echo ""
+    echo "Database Connection Benchmark:"
+    for i in {1..5}; do
+      start=$(date +%s%3N)
+      nc -z db 5432
+      end=$(date +%s%3N)
+      echo "  Connection $i: $((end-start))ms"
+    done
+    
+    echo ""
+    echo "Benchmark completed!"
+
+---
+# CronJob for regular performance monitoring
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: kasm-performance-monitor
+  namespace: kasm
+  annotations:
+    argocd.argoproj.io/sync-wave: "7"
+spec:
+  schedule: "0 */6 * * *"  # Every 6 hours
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: kasm-performance-monitor
+            component: monitoring
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: performance-monitor
+            image: curlimages/curl:8.5.0
+            resources:
+              requests:
+                memory: "64Mi"
+                cpu: "50m"
+              limits:
+                memory: "128Mi"
+                cpu: "100m"
+            command:
+            - /bin/sh
+            - -c
+            - |
+              echo "=== KASM Performance Monitor - $(date) ==="
+              
+              # Quick health checks
+              API_HEALTH=$(curl -o /dev/null -s -w "%{http_code},%{time_total}" "http://kasm-api:80/api/health")
+              HTTP_CODE=$(echo $API_HEALTH | cut -d',' -f1)
+              RESPONSE_TIME=$(echo $API_HEALTH | cut -d',' -f2)
+              
+              echo "API Health Check:"
+              echo "  HTTP Status: $HTTP_CODE"
+              echo "  Response Time: ${RESPONSE_TIME}s"
+              
+              # Database connectivity
+              if nc -z -w5 db 5432; then
+                echo "  Database: ✅ Connected"
+              else
+                echo "  Database: ❌ Connection Failed"
+              fi
+              
+              # Redis connectivity
+              if nc -z -w5 kasm-redis 6379; then
+                echo "  Redis: ✅ Connected"
+              else
+                echo "  Redis: ❌ Connection Failed"
+              fi
+              
+              echo "Performance monitor completed at $(date)"

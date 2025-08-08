@@ -1,0 +1,277 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kasm-db-init-job-v3
+  namespace: kasm
+  labels:
+    app: kasm-db
+    component: initialization
+    version: "v3"
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-weight: "3"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 5
+  activeDeadlineSeconds: 900
+  template:
+    metadata:
+      labels:
+        app: kasm-db
+        component: initialization
+        version: "v3"
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+      - name: wait-for-database
+        image: postgres:13
+        env:
+        - name: POSTGRES_HOST
+          value: "db"
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: POSTGRES_ADMIN_DB
+          value: "postgres"
+        - name: POSTGRES_TARGET_DB
+          value: "kasm"
+        - name: POSTGRES_USER
+          value: "postgres"
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kasm-db-postgres-creds
+              key: admin-password
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          echo "=== Database Readiness Check v3 ==="
+          
+          # Wait for PostgreSQL service to be ready
+          echo "Waiting for PostgreSQL service readiness..."
+          timeout 300 bash -c 'until pg_isready -h $POSTGRES_HOST -p $POSTGRES_PORT; do echo "Waiting for PostgreSQL..."; sleep 5; done'
+          echo "✓ PostgreSQL service is ready"
+          
+          # Test admin connection
+          echo "Testing admin database connection..."
+          timeout 60 bash -c 'until psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d $POSTGRES_ADMIN_DB -c "SELECT 1;" > /dev/null 2>&1; do echo "Waiting for admin connection..."; sleep 3; done'
+          echo "✓ Admin database connection verified"
+          
+          # Check if target database exists
+          if psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d $POSTGRES_ADMIN_DB -tc "SELECT 1 FROM pg_database WHERE datname = '$POSTGRES_TARGET_DB'" | grep -q 1; then
+            echo "✓ Target database '$POSTGRES_TARGET_DB' exists"
+          else
+            echo "! Target database '$POSTGRES_TARGET_DB' not found, will be created"
+          fi
+          
+          echo "✅ Database readiness check completed"
+      containers:
+      - name: db-initializer-v3
+        image: postgres:13
+        env:
+        - name: POSTGRES_HOST
+          value: "db"
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: POSTGRES_ADMIN_DB
+          value: "postgres"
+        - name: POSTGRES_TARGET_DB
+          value: "kasm"
+        - name: POSTGRES_ADMIN_USER
+          value: "postgres"
+        - name: POSTGRES_APP_USER
+          value: "kasmapp"
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kasm-db-postgres-creds
+              key: admin-password
+        - name: POSTGRES_APP_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kasm-db-postgres-creds
+              key: db-password
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          echo "=== KASM Database Initialization v3 ==="
+          echo "Target Database: $POSTGRES_TARGET_DB"
+          echo "Application User: $POSTGRES_APP_USER"
+          
+          # Function to execute SQL with error handling
+          execute_sql() {
+            local db="$1"
+            local sql="$2"
+            local description="$3"
+            
+            echo "Executing: $description"
+            if psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_ADMIN_USER -d "$db" -v ON_ERROR_STOP=1 -c "$sql"; then
+              echo "✓ $description completed"
+            else
+              echo "✗ $description failed"
+              return 1
+            fi
+          }
+          
+          # Create database if it doesn't exist
+          echo "Creating database if needed..."
+          execute_sql "$POSTGRES_ADMIN_DB" "
+            SELECT 'CREATE DATABASE $POSTGRES_TARGET_DB'
+            WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '$POSTGRES_TARGET_DB')\\gexec
+          " "Database creation check"
+          
+          # Create application user if it doesn't exist
+          echo "Creating application user if needed..."
+          execute_sql "$POSTGRES_ADMIN_DB" "
+            DO \\$\\$
+            BEGIN
+              IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '$POSTGRES_APP_USER') THEN
+                CREATE USER $POSTGRES_APP_USER WITH PASSWORD '$POSTGRES_APP_PASSWORD';
+                RAISE NOTICE 'User $POSTGRES_APP_USER created';
+              ELSE
+                ALTER USER $POSTGRES_APP_USER WITH PASSWORD '$POSTGRES_APP_PASSWORD';
+                RAISE NOTICE 'User $POSTGRES_APP_USER password updated';
+              END IF;
+            END
+            \\$\\$;
+          " "Application user creation/update"
+          
+          # Grant database ownership and privileges
+          echo "Granting database privileges..."
+          execute_sql "$POSTGRES_ADMIN_DB" "
+            GRANT ALL PRIVILEGES ON DATABASE $POSTGRES_TARGET_DB TO $POSTGRES_APP_USER;
+            ALTER DATABASE $POSTGRES_TARGET_DB OWNER TO $POSTGRES_APP_USER;
+          " "Database ownership and privileges"
+          
+          # Connect to target database and set up schema permissions
+          echo "Setting up schema permissions..."
+          PGPASSWORD=\"$POSTGRES_APP_PASSWORD\" execute_sql "$POSTGRES_TARGET_DB" "
+            GRANT ALL ON SCHEMA public TO $POSTGRES_APP_USER;
+            GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO $POSTGRES_APP_USER;
+            GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO $POSTGRES_APP_USER;
+            ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO $POSTGRES_APP_USER;
+            ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO $POSTGRES_APP_USER;
+          " "Schema permissions setup"
+          
+          # Execute initialization scripts if available
+          if [ -d "/docker-entrypoint-initdb.d" ] && [ "$(ls -A /docker-entrypoint-initdb.d/*.sql 2>/dev/null)" ]; then
+            echo "Executing initialization scripts..."
+            for script in /docker-entrypoint-initdb.d/*.sql; do
+              if [ -f "$script" ]; then
+                echo "Processing script: $(basename $script)"
+                PGPASSWORD=\"$POSTGRES_APP_PASSWORD\" psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_APP_USER -d $POSTGRES_TARGET_DB -v ON_ERROR_STOP=1 -f "$script"
+                echo "✓ Script $(basename $script) executed successfully"
+              fi
+            done
+          else
+            echo "! No initialization scripts found in /docker-entrypoint-initdb.d"
+          fi
+          
+          # Final connectivity test
+          echo "Performing final connectivity test..."
+          PGPASSWORD=\"$POSTGRES_APP_PASSWORD\" execute_sql "$POSTGRES_TARGET_DB" "
+            SELECT 
+              current_database() as database,
+              current_user as user,
+              version() as postgresql_version;
+          " "Final connectivity verification"
+          
+          echo "✅ KASM Database Initialization v3 completed successfully!"
+          echo "Database: $POSTGRES_TARGET_DB"
+          echo "User: $POSTGRES_APP_USER" 
+          echo "Connection: postgresql://$POSTGRES_APP_USER@$POSTGRES_HOST:$POSTGRES_PORT/$POSTGRES_TARGET_DB"
+        volumeMounts:
+        - name: init-scripts
+          mountPath: /docker-entrypoint-initdb.d
+          readOnly: true
+      volumes:
+      - name: init-scripts
+        configMap:
+          name: kasm-db-init-scripts
+          defaultMode: 0755
+          optional: true
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kasm-db-connectivity-test
+  namespace: kasm
+  labels:
+    app: kasm-db
+    component: connectivity-test
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-weight: "4"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels:
+        app: kasm-db
+        component: connectivity-test
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: connectivity-tester
+        image: postgres:13
+        env:
+        - name: POSTGRES_HOST
+          value: "db"
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: POSTGRES_DB
+          value: "kasm"
+        - name: POSTGRES_USER
+          value: "kasmapp"
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kasm-db-postgres-creds
+              key: db-password
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          echo "=== Database Connectivity Test ==="
+          
+          # Test application user connection
+          echo "Testing application database connection..."
+          psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d $POSTGRES_DB -c "
+            SELECT 
+              'Database: ' || current_database() as info
+            UNION ALL
+            SELECT 'User: ' || current_user
+            UNION ALL  
+            SELECT 'Connected: ' || now()::text;
+          "
+          
+          # Test basic operations
+          echo "Testing basic database operations..."
+          psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d $POSTGRES_DB -v ON_ERROR_STOP=1 -c "
+            -- Test table creation
+            CREATE TABLE IF NOT EXISTS connectivity_test (
+              id SERIAL PRIMARY KEY,
+              test_time TIMESTAMP DEFAULT NOW(),
+              status TEXT DEFAULT 'OK'
+            );
+            
+            -- Test insert
+            INSERT INTO connectivity_test (status) VALUES ('Connection Test Passed');
+            
+            -- Test select
+            SELECT 'Test ID: ' || id::text || ', Status: ' || status as result 
+            FROM connectivity_test 
+            ORDER BY test_time DESC 
+            LIMIT 1;
+            
+            -- Cleanup
+            DROP TABLE connectivity_test;
+          "
+          
+          echo "✅ Database connectivity test completed successfully!"

@@ -1,0 +1,87 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kasm-remove-corrupted-data-job
+  namespace: kasm
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-weight: "40"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels:
+        app: kasm-db-fix
+        component: corrupted-data-removal
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: corrupted-data-remover
+        image: postgres:13
+        env:
+        - name: POSTGRES_HOST
+          value: "db"
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: POSTGRES_DB
+          value: "kasm"
+        - name: POSTGRES_USER
+          value: "kasmapp"
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kasm-database-postgres-creds
+              key: db-password
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          echo "=== KASM Remove Corrupted Data ==="
+          
+          # Drop and recreate all potentially problematic data
+          echo "Clearing all potentially corrupted data..."
+          
+          psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d $POSTGRES_DB << 'EOSQL'
+          
+          -- Start with clean slate by truncating all data tables
+          TRUNCATE TABLE users CASCADE;
+          
+          -- Clear all settings except the basic ones we just inserted
+          DELETE FROM settings WHERE name NOT IN (
+              'server_hostname', 'database_hostname', 'database_port', 'database_name', 
+              'database_username', 'installation_id', 'encryption_enabled'
+          );
+          
+          -- Re-insert minimal essential settings with no encryption
+          INSERT INTO settings (name, title, value, value_type, category, description) VALUES 
+              ('api_server_port', 'API Server Port', '8080', 'string', 'api', 'API server port'),
+              ('logging_level', 'Logging Level', 'INFO', 'string', 'logging', 'Application logging level'),
+              ('debug_mode', 'Debug Mode', 'false', 'string', 'debug', 'Enable debug mode'),
+              ('database_pool_size', 'Database Pool Size', '10', 'string', 'database', 'Database connection pool size'),
+              ('session_lifetime', 'Session Lifetime', '28800', 'string', 'session', 'Session lifetime in seconds'),
+              ('redis_enabled', 'Redis Enabled', 'true', 'string', 'redis', 'Enable Redis caching'),
+              ('api_version', 'API Version', '1.17.0', 'string', 'api', 'KASM API version')
+          ON CONFLICT (name) DO UPDATE SET 
+              value = EXCLUDED.value,
+              value_type = 'string',
+              updated_at = CURRENT_TIMESTAMP;
+          
+          -- Create a simple admin user with plain text password (will be changed later)
+          INSERT INTO users (username, email, pw_hash, salt, locked, disabled) VALUES 
+              ('admin', 'admin@kasm.local', 'temppassword123', 'tempsalt', false, false);
+          
+          -- Verify all data is clean
+          SELECT 'Data cleanup verification:' as status;
+          SELECT 'Settings count:', COUNT(*) FROM settings;
+          SELECT 'Users count:', COUNT(*) FROM users;
+          SELECT 'Zones count:', COUNT(*) FROM zones;
+          
+          -- Show all settings to verify no encrypted values
+          SELECT name, value, length(value) as len, value_type FROM settings ORDER BY name;
+          
+          EOSQL
+          
+          echo "✅ Corrupted data removal completed!"

@@ -12,12 +12,10 @@ data:
     DO $$
     BEGIN
         IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'kasmapp') THEN
-            CREATE USER kasmapp WITH PASSWORD '${POSTGRES_PASSWORD}';
+            CREATE USER kasmapp;
             RAISE NOTICE 'User kasmapp created';
         ELSE
-            -- Update password for existing user
-            ALTER USER kasmapp WITH PASSWORD '${POSTGRES_PASSWORD}';
-            RAISE NOTICE 'User kasmapp password updated';
+            RAISE NOTICE 'User kasmapp already exists';
         END IF;
         
         -- Grant necessary privileges
@@ -32,40 +30,90 @@ data:
     -- Connect to kasm database
     \c kasm;
     
-    -- Create zones table if it doesn't exist
-    CREATE TABLE IF NOT EXISTS zones (
-        zone_id SERIAL PRIMARY KEY,
-        zone_name VARCHAR(255) NOT NULL UNIQUE,
-        zone_description TEXT,
+    -- Create settings table (CRITICAL for KASM API)
+    CREATE TABLE IF NOT EXISTS settings (
+        setting_id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL UNIQUE,
+        title VARCHAR(255) NOT NULL,
+        value TEXT,
+        value_type VARCHAR(50) DEFAULT 'string',
+        category VARCHAR(100) DEFAULT 'general',
+        services_restart INTEGER DEFAULT 0,
+        description TEXT,
+        sanitize INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
+    
+    -- Create zones table if it doesn't exist (use existing structure)
+    -- Note: zones table already exists with UUID primary key, just ensure compatibility
     
     -- Create users table if it doesn't exist (basic KASM structure)
     CREATE TABLE IF NOT EXISTS users (
         user_id SERIAL PRIMARY KEY,
         username VARCHAR(255) NOT NULL UNIQUE,
         email VARCHAR(255),
+        password_hash VARCHAR(255),
+        enabled INTEGER DEFAULT 1,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
     
-    -- Create sessions table if it doesn't exist
+    -- Create sessions table if it doesn't exist (use UUID for zone_id to match existing zones table)
     CREATE TABLE IF NOT EXISTS sessions (
         session_id SERIAL PRIMARY KEY,
         user_id INTEGER REFERENCES users(user_id),
-        zone_id INTEGER REFERENCES zones(zone_id),
+        zone_id UUID REFERENCES zones(zone_id),
         session_token VARCHAR(512),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         expires_at TIMESTAMP
     );
     
-    -- Insert default zones
-    INSERT INTO zones (zone_name, zone_description) VALUES 
-        ('default', 'Default KASM zone for general workloads'),
-        ('production', 'Production KASM zone for live workloads'),
-        ('development', 'Development KASM zone for testing')
-    ON CONFLICT (zone_name) DO NOTHING;
+    -- Create workspaces table for KASM workspaces
+    CREATE TABLE IF NOT EXISTS workspaces (
+        workspace_id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        friendly_name VARCHAR(255),
+        description TEXT,
+        docker_registry VARCHAR(255),
+        docker_image VARCHAR(255),
+        enabled INTEGER DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    -- Create workspace_registry table for registry management
+    CREATE TABLE IF NOT EXISTS workspace_registry (
+        registry_id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL UNIQUE,
+        hostname VARCHAR(255) NOT NULL,
+        username VARCHAR(255),
+        password VARCHAR(255),
+        enabled INTEGER DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    -- Insert essential KASM settings
+    INSERT INTO settings (name, title, value, value_type, category, description) VALUES 
+        ('server_hostname', 'Server Hostname', 'kasm.lab.apj.dev', 'string', 'general', 'The hostname of the KASM server'),
+        ('database_hostname', 'Database Hostname', 'db', 'string', 'database', 'PostgreSQL database hostname'),
+        ('database_port', 'Database Port', '5432', 'integer', 'database', 'PostgreSQL database port'),
+        ('database_name', 'Database Name', 'kasm', 'string', 'database', 'PostgreSQL database name'),
+        ('database_username', 'Database Username', 'kasmapp', 'string', 'database', 'PostgreSQL database username'),
+        ('session_timeout', 'Session Timeout', '3600', 'integer', 'session', 'Session timeout in seconds'),
+        ('max_sessions_per_user', 'Max Sessions Per User', '5', 'integer', 'session', 'Maximum concurrent sessions per user'),
+        ('enable_sharing', 'Enable Sharing', '1', 'boolean', 'sharing', 'Enable workspace sharing features'),
+        ('default_zone', 'Default Zone', 'default', 'string', 'zone', 'Default zone for new workspaces')
+    ON CONFLICT (name) DO NOTHING;
+    
+    -- Insert default zones (only if zones table is empty)
+    -- Note: zones table already exists, just ensure it has basic data
+    
+    -- Insert default workspace registry (Docker Hub)
+    INSERT INTO workspace_registry (name, hostname, enabled) VALUES 
+        ('Docker Hub', 'registry-1.docker.io', 1),
+        ('Local Registry', 'localhost:5000', 0)
+    ON CONFLICT (name) DO NOTHING;
     
     -- Grant permissions to kasmapp user on all tables
     GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO kasmapp;
@@ -73,13 +121,18 @@ data:
     GRANT USAGE ON SCHEMA public TO kasmapp;
     
     -- Create indexes for performance
+    CREATE INDEX IF NOT EXISTS idx_settings_name ON settings(name);
+    CREATE INDEX IF NOT EXISTS idx_settings_category ON settings(category);
     CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
     CREATE INDEX IF NOT EXISTS idx_sessions_zone_id ON sessions(zone_id);
     CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(session_token);
+    CREATE INDEX IF NOT EXISTS idx_workspaces_enabled ON workspaces(enabled);
+    CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
     
     -- Verify setup
-    SELECT 'Database initialization completed' as status;
-    SELECT zone_id, zone_name, zone_description FROM zones ORDER BY zone_id;
+    SELECT 'KASM database initialization completed' as status;
+    SELECT zone_id, zone_name FROM zones ORDER BY zone_name;
+    SELECT setting_id, name, title, value FROM settings ORDER BY category, name;
 
   03-verify-setup.sql: |
     -- Verification script to ensure everything is set up correctly
@@ -101,15 +154,26 @@ data:
         tableowner
     FROM pg_tables 
     WHERE schemaname = 'public' 
-    AND tablename IN ('zones', 'users', 'sessions')
+    AND tablename IN ('settings', 'zones', 'users', 'sessions', 'workspaces', 'workspace_registry')
     ORDER BY tablename;
     
-    -- Count records in zones table
+    -- Count records in all tables
+    SELECT 'settings' as table_name, COUNT(*) as record_count FROM settings
+    UNION ALL
     SELECT 'zones' as table_name, COUNT(*) as record_count FROM zones
     UNION ALL
     SELECT 'users' as table_name, COUNT(*) as record_count FROM users
     UNION ALL
-    SELECT 'sessions' as table_name, COUNT(*) as record_count FROM sessions;
+    SELECT 'sessions' as table_name, COUNT(*) as record_count FROM sessions
+    UNION ALL
+    SELECT 'workspaces' as table_name, COUNT(*) as record_count FROM workspaces
+    UNION ALL
+    SELECT 'workspace_registry' as table_name, COUNT(*) as record_count FROM workspace_registry;
+    
+    -- Verify critical settings exist
+    SELECT name, title, value, category FROM settings WHERE name IN (
+        'server_hostname', 'database_hostname', 'database_port', 'database_name', 'database_username'
+    ) ORDER BY name;
     
     -- Test kasmapp user permissions
-    SELECT 'Permissions check completed' as status;
+    SELECT 'KASM Database verification completed successfully' as status;

@@ -11,43 +11,64 @@ commonAnnotations:
   app.kubernetes.io/part-of: kasm-unified
 
 resources:
-  # Wave -1: Prerequisites (secrets only - PVCs and RBAC managed by Helm)
+  # Wave -2: Job cleanup and recreation strategy (PreSync)
+  - job-recreation-strategy.yaml
+  
+  # Wave -1: Prerequisites (secrets and configuration)
   - onepassword-items.yaml
   - secrets.yaml
   - base/db.yaml
+  - fix-secret-alias.yaml  # Enhanced secret alias with comprehensive field mapping
   
-  # Wave 0: ConfigMap fixes (before Helm deployment)
+  # Wave 0: ConfigMaps and preparation
   - rdp-gateway-configmap-fix.yaml
+  - kasm-db-init-configmap.yaml
+  - deployment-restart-patches.yaml  # Contains restart scripts and configurations
   
   # Wave 0: Core application resources (handled by Helm)
   # Helm chart resources are deployed automatically with wave 0
   
-  # Wave 1: Custom routing and ingress
-  - ingressroute.yaml  # Keep IngressRoute for Traefik-specific routing
-  
-  # Wave 1: Secret synchronization (PreSync)
+  # Wave 1: RBAC and Secret Synchronization (PreSync/PostSync)
   - kasm-secret-sync-rbac.yaml
   - kasm-secret-sync-job-v2.yaml
+  - ingressroute.yaml  # Keep IngressRoute for Traefik-specific routing
   
-  # Wave 2: Database initialization jobs
+  # Wave 2: Database initialization (PostSync - critical path)
+  - kasm-db-init-job-v3.yaml  # Enhanced v3 with complete user setup and error handling
+  - kasm-db-health-check-job.yaml  # Database health verification
+  
+  # Wave 3: Legacy database jobs (maintained for compatibility)
   - api-init-job.yaml
   - api-direct-fix.yaml
   - db-label-job.yaml
   - kasm-db-user-setup-job.yaml
   - kasm-db-permissions-job.yaml
-  - kasm-db-init-configmap.yaml
-  - kasm-db-init-job-v2.yaml
+  - kasm-db-init-job-v2.yaml  # Keep v2 as fallback
   
-  # Wave 3: Application configuration jobs
+  # Wave 4: Application configuration and completion
   - kasm-db-complete-init-job.yaml
   - kasm-secrets-sync-job.yaml
+  - kasm-api-configuration-fix.yaml  # Fixed API deployment with proper logging
   
-  # Wave 4: Post-deployment fixes
+  # Wave 5: Post-deployment fixes and validation
   - kasm-admin-password-fix-job.yaml
+  - kasm-validation-job.yaml  # Complete stack validation and health checks
+  
+  # Wave 6: Performance optimization and monitoring
+  - performance-optimization-patches.yaml  # Resource limits, HPA, monitoring
+  - database-performance-tuning.yaml      # PostgreSQL performance tuning
+  - performance-validation-job.yaml       # Performance testing and validation
 
 # Wave 2: Container patches (applied after Helm deployment)
 patches:
   - path: api-container-patch.yaml
+    target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: kasm-api-deployment
+      namespace: kasm
+  - path: kasm-api-env-fix-patch.yaml
     target:
       group: apps
       version: v1

@@ -24,18 +24,18 @@ spec:
         image: postgres:13
         env:
         - name: POSTGRES_HOST
-          value: "kasm-db-service"
+          value: "db"
         - name: POSTGRES_PORT
           value: "5432"
         - name: POSTGRES_DB
           value: "postgres"
         - name: POSTGRES_USER
-          value: "postgres"
+          value: "kasmapp"
         - name: PGPASSWORD
           valueFrom:
             secretKeyRef:
               name: kasm-db-postgres-creds
-              key: password
+              key: db-password
         command:
         - sh
         - -c
@@ -55,13 +55,13 @@ spec:
         image: postgres:13
         env:
         - name: POSTGRES_HOST
-          value: "kasm-db-service"
+          value: "db"
         - name: POSTGRES_PORT
           value: "5432"
         - name: POSTGRES_DB
           value: "kasm"
         - name: POSTGRES_USER
-          value: "postgres"
+          value: "kasmapp"
         - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -71,7 +71,7 @@ spec:
           valueFrom:
             secretKeyRef:
               name: kasm-db-postgres-creds
-              key: password
+              key: db-password
         command:
         - sh
         - -c
@@ -90,8 +90,8 @@ spec:
           for script in /docker-entrypoint-initdb.d/*.sql; do
             if [ -f "$script" ]; then
               echo "Executing $(basename $script)..."
-              # Use envsubst to replace environment variables in SQL scripts
-              envsubst < "$script" | psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d postgres -v ON_ERROR_STOP=1
+              # Execute script directly (no variable substitution needed in current scripts)
+              psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d postgres -v ON_ERROR_STOP=1 -f "$script"
             fi
           done
           

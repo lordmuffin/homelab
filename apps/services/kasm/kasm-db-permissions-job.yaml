@@ -13,7 +13,7 @@ spec:
   ttlSecondsAfterFinished: 600
   template:
     spec:
-      serviceAccountName: kasm-database-operator
+      serviceAccountName: kasm-secret-sync-v2
       restartPolicy: OnFailure
       containers:
       - name: db-permissions-setup
@@ -23,7 +23,7 @@ spec:
           valueFrom:
             secretKeyRef:
               name: kasm-database-postgres-creds
-              key: password
+              key: admin-password
         command:
         - /bin/bash
         - -c
@@ -37,7 +37,7 @@ spec:
           retry_count=0
           
           while [ $retry_count -lt $max_retries ]; do
-            table_count=$(kubectl exec -i deployment/kasm-database -n kasm -- env PGPASSWORD="$POSTGRES_ADMIN_PASSWORD" psql -U postgres -d kasm -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null | tr -d ' ' || echo "0")
+            table_count=$(kubectl exec -i kasm-database-1 -n kasm -- env PGPASSWORD="$POSTGRES_ADMIN_PASSWORD" psql -U postgres -d kasm -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null | tr -d ' ' || echo "0")
             
             if [ "$table_count" -gt "50" ]; then
               echo "Database initialization complete - found $table_count tables"
@@ -55,7 +55,7 @@ spec:
           
           # Grant comprehensive permissions to kasm user (used by both API and Manager)
           echo "Granting comprehensive permissions to kasm user..."
-          kubectl exec -i deployment/kasm-database -n kasm -- env PGPASSWORD="$POSTGRES_ADMIN_PASSWORD" psql -U postgres -d kasm -c "
+          kubectl exec -i kasm-database-1 -n kasm -- env PGPASSWORD="$POSTGRES_ADMIN_PASSWORD" psql -U postgres -d kasm -c "
             GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO kasm;
             GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO kasm;
             GRANT USAGE ON SCHEMA public TO kasm;
@@ -65,7 +65,7 @@ spec:
           
           # Verify permissions
           echo "Verifying database permissions..."
-          kubectl exec -i deployment/kasm-database -n kasm -- env PGPASSWORD="$POSTGRES_ADMIN_PASSWORD" psql -U postgres -d kasm -c "
+          kubectl exec -i kasm-database-1 -n kasm -- env PGPASSWORD="$POSTGRES_ADMIN_PASSWORD" psql -U postgres -d kasm -c "
             SELECT 
               grantee, 
               table_name, 

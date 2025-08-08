@@ -1,0 +1,127 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kasm-database-cleanup-fix-job
+  namespace: kasm
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-weight: "25"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      labels:
+        app: kasm-db-fix
+        component: cleanup
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: db-cleanup-fixer
+        image: postgres:13
+        env:
+        - name: POSTGRES_HOST
+          value: "db"
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: POSTGRES_DB
+          value: "kasm"
+        - name: POSTGRES_USER
+          value: "kasmapp"
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kasm-database-postgres-creds
+              key: db-password
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          echo "=== KASM Database Cleanup Fix ==="
+          
+          # Check if there are any existing rows with encrypted data that might be corrupted
+          echo "Checking for corrupted encrypted data..."
+          
+          psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d $POSTGRES_DB << 'EOSQL'
+          
+          -- First, let's see what tables exist and their structure
+          \dt
+          
+          -- Check if there are any tables with encrypted columns that might be causing issues
+          -- Look for common KASM tables that might have encrypted data
+          
+          -- Check settings table for any encrypted values
+          SELECT name, title, value_type, LENGTH(value) as value_length, 
+                 CASE WHEN value ~ '^[A-Za-z0-9+/]*={0,2}$' AND LENGTH(value) % 4 = 0 
+                      THEN 'Valid Base64' 
+                      ELSE 'Invalid Base64' 
+                 END as base64_status
+          FROM settings 
+          WHERE value_type = 'encrypted' OR value LIKE '%=%' OR LENGTH(value) > 50
+          ORDER BY name;
+          
+          -- Check users table for encrypted passwords
+          SELECT user_id, username, 
+                 CASE WHEN LENGTH(password_hash) > 0 
+                      THEN 'Has Password' 
+                      ELSE 'No Password' 
+                 END as password_status,
+                 LENGTH(password_hash) as password_length
+          FROM users 
+          WHERE password_hash IS NOT NULL AND password_hash != ''
+          ORDER BY user_id;
+          
+          -- Look for any other potentially encrypted columns
+          SELECT table_name, column_name, data_type 
+          FROM information_schema.columns 
+          WHERE table_schema = 'public' 
+            AND (column_name LIKE '%password%' 
+                 OR column_name LIKE '%secret%' 
+                 OR column_name LIKE '%token%'
+                 OR column_name LIKE '%key%'
+                 OR column_name LIKE '%encrypted%')
+          ORDER BY table_name, column_name;
+          
+          EOSQL
+          
+          echo "Database structure analysis completed."
+          
+          # Now let's clean up any potentially corrupted encrypted data
+          echo "Cleaning up potentially corrupted encrypted data..."
+          
+          psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d $POSTGRES_DB << 'EOSQL'
+          
+          -- Clean up settings that might have invalid encrypted values
+          UPDATE settings 
+          SET value = '', value_type = 'string' 
+          WHERE value_type = 'encrypted' 
+            AND (value = '' OR value IS NULL OR NOT (value ~ '^[A-Za-z0-9+/]*={0,2}$' AND LENGTH(value) % 4 = 0));
+          
+          -- Ensure all essential settings exist with non-encrypted values
+          INSERT INTO settings (name, title, value, value_type, category, description) VALUES 
+              ('installation_id', 'Installation ID', 'kasm-' || extract(epoch from now())::text, 'string', 'system', 'Unique installation identifier'),
+              ('encryption_enabled', 'Encryption Enabled', '0', 'boolean', 'security', 'Enable database field encryption'),
+              ('api_startup_mode', 'API Startup Mode', 'safe', 'string', 'api', 'API startup mode to avoid encryption issues')
+          ON CONFLICT (name) DO UPDATE SET 
+              value = EXCLUDED.value,
+              value_type = EXCLUDED.value_type,
+              updated_at = CURRENT_TIMESTAMP;
+          
+          -- Create a minimal admin user if none exists (unencrypted for now)
+          INSERT INTO users (username, password_hash, enabled) VALUES 
+              ('admin', 'unencrypted_temp_password', 1)
+          ON CONFLICT (username) DO UPDATE SET 
+              password_hash = 'unencrypted_temp_password',
+              enabled = 1;
+          
+          -- Verify the cleanup
+          SELECT 'Database cleanup completed' as status;
+          SELECT name, value, value_type FROM settings WHERE name LIKE '%encryption%' OR name LIKE '%installation%';
+          SELECT username, 'password_present' as password_status FROM users WHERE username = 'admin';
+          
+          EOSQL
+          
+          echo "✅ Database cleanup fix completed!"
+          echo "API should now start without encryption-related errors."

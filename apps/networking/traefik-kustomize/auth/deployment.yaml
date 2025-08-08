@@ -55,7 +55,7 @@ spec:
         - name: LOG_LEVEL
           value: debug
         - name: WHITELIST
-          value: "/webhook,/form,/webhook-test,/test-webhook,/service-worker.js,/manifest.json,/favicon.ico,/robots.txt,/static/*,/.well-known/*,/assets/*,/css/*,/js/*,/img/*,/images/*"
+          value: "/webhook,/form,/webhook-test,/test-webhook,/service-worker.js,/manifest.json,/favicon.ico,/robots.txt,/static/*,/.well-known/*,/assets/*,/css/*,/js/*,/img/*,/images/*,/_oauth"
         - name: COOKIE_SECURE
           value: "true"
         - name: INSECURE_COOKIE

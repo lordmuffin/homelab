@@ -1,0 +1,133 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kasm-db-init-job-v3-final
+  namespace: kasm
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true,Prune=false
+    argocd.argoproj.io/sync-wave: "3"
+    argocd.argoproj.io/sync-hook: PostSync
+    argocd.argoproj.io/sync-hook-weight: "5"
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      serviceAccountName: kasm-secret-sync-v2
+      restartPolicy: OnFailure
+      containers:
+      - name: db-init-final
+        image: postgres:15-alpine
+        env:
+        - name: POSTGRES_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kasm-database-postgres-creds
+              key: admin-password
+        - name: KASMAPP_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kasm-database-postgres-creds
+              key: db-password
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          echo "🚀 Starting FINAL KASM database initialization..."
+          
+          # Wait for database to be ready
+          echo "Waiting for database to be ready..."
+          while ! kubectl exec kasm-database-1 -n kasm -- psql -U postgres -c "SELECT 1;" >/dev/null 2>&1; do
+            echo "Waiting for database..."
+            sleep 5
+          done
+          
+          echo "✅ Database is ready. Creating KASM schema..."
+          
+          # Create the zones table that API is waiting for
+          kubectl exec -i kasm-database-1 -n kasm -- env PGPASSWORD="$POSTGRES_ADMIN_PASSWORD" psql -U postgres -d kasm -c "
+            CREATE TABLE IF NOT EXISTS zones (
+              zone_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+              zone_name VARCHAR(255) NOT NULL UNIQUE,
+              zone_hostname VARCHAR(255) NOT NULL,
+              zone_port INTEGER DEFAULT 443,
+              zone_ssl BOOLEAN DEFAULT true,
+              zone_enabled BOOLEAN DEFAULT true,
+              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            
+            -- Insert default zones (API expects at least 2)
+            INSERT INTO zones (zone_name, zone_hostname) VALUES 
+              ('default', 'kasm.lab.apj.dev'),
+              ('primary', 'kasm.lab.apj.dev')
+            ON CONFLICT (zone_name) DO NOTHING;
+            
+            -- Create settings table
+            CREATE TABLE IF NOT EXISTS settings (
+              setting_id SERIAL PRIMARY KEY,
+              name VARCHAR(255) NOT NULL UNIQUE,
+              title VARCHAR(255) NOT NULL,
+              value TEXT,
+              value_type VARCHAR(50) DEFAULT 'string',
+              category VARCHAR(100) DEFAULT 'general',
+              services_restart INTEGER DEFAULT 0,
+              description TEXT,
+              sanitize INTEGER DEFAULT 0,
+              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            
+            -- Create users table
+            CREATE TABLE IF NOT EXISTS users (
+              user_id SERIAL PRIMARY KEY,
+              username VARCHAR(255) NOT NULL UNIQUE,
+              email VARCHAR(255),
+              pw_hash VARCHAR(255),
+              salt VARCHAR(255),
+              locked BOOLEAN DEFAULT false,
+              disabled BOOLEAN DEFAULT false,
+              failed_pw_attempts INTEGER DEFAULT 0,
+              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            
+            -- Grant all permissions to kasmapp user
+            GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO kasmapp;
+            GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO kasmapp;
+            
+            -- Create indexes
+            CREATE INDEX IF NOT EXISTS idx_zones_name ON zones(zone_name);
+            CREATE INDEX IF NOT EXISTS idx_zones_enabled ON zones(zone_enabled);
+            CREATE INDEX IF NOT EXISTS idx_settings_name ON settings(name);
+            CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+          " || {
+            echo "❌ Database schema creation failed"
+            exit 1
+          }
+          
+          # Verify zones table has data
+          echo "🔍 Verifying zones table..."
+          ZONE_COUNT=\$(kubectl exec kasm-database-1 -n kasm -- env PGPASSWORD=\"\$POSTGRES_ADMIN_PASSWORD\" psql -U postgres -d kasm -t -c \"SELECT COUNT(*) FROM zones;\" | tr -d ' ')
+          
+          if [ \"\$ZONE_COUNT\" -ge 2 ]; then
+            echo \"✅ Zones table has \$ZONE_COUNT records - API will now start!\"
+          else
+            echo \"❌ Zones table only has \$ZONE_COUNT records\"
+            exit 1
+          fi
+          
+          # Verify kasmapp user can access zones
+          echo "🔍 Testing kasmapp user access..."
+          kubectl exec kasm-database-1 -n kasm -- env PGPASSWORD=\"\$KASMAPP_PASSWORD\" psql -U kasmapp -d kasm -c \"SELECT zone_id, zone_name FROM zones;\" || {
+            echo \"❌ kasmapp user cannot access zones table\"
+            exit 1
+          }
+          
+          echo "🎉 KASM database initialization completed successfully!"
+          echo "🚀 API should now start - zones table ready with \$ZONE_COUNT records"
+          
+      - name: kubectl
+        image: bitnami/kubectl:latest
+        command: ["/bin/sleep", "infinity"]

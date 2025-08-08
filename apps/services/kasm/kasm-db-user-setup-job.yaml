@@ -13,7 +13,7 @@ spec:
   ttlSecondsAfterFinished: 600
   template:
     spec:
-      serviceAccountName: kasm-database-operator
+      serviceAccountName: kasm-secret-sync-v2
       restartPolicy: OnFailure
       containers:
       - name: db-user-setup
@@ -23,11 +23,11 @@ spec:
           valueFrom:
             secretKeyRef:
               name: kasm-database-postgres-creds
-              key: password
+              key: admin-password
         - name: KASM_DB_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: kasm-all-in-one-secrets
+              name: kasm-database-postgres-creds
               key: db-password
         command:
         - /bin/bash
@@ -38,7 +38,7 @@ spec:
           
           # Wait for database to be ready
           echo "Waiting for database pod to be ready..."
-          while ! kubectl get pod -l cnpg.io/cluster=kasm-database -n kasm --field-selector=status.phase=Running >/dev/null 2>&1; do
+          while ! kubectl get pod kasm-database-1 -n kasm --field-selector=status.phase=Running >/dev/null 2>&1; do
             echo "Waiting for database pod..."
             sleep 10
           done
@@ -54,14 +54,14 @@ spec:
           
           # Ensure kasm user has correct password (standardizing on kasm user only)
           echo "Updating kasm user password..."
-          kubectl exec -i deployment/kasm-database -n kasm -- env PGPASSWORD="$POSTGRES_ADMIN_PASSWORD" psql -U postgres -c "
+          kubectl exec -i kasm-database-1 -n kasm -- env PGPASSWORD="$POSTGRES_ADMIN_PASSWORD" psql -U postgres -c "
             ALTER USER kasm WITH PASSWORD '$KASM_DB_PASSWORD';
             GRANT ALL PRIVILEGES ON DATABASE kasm TO kasm;
           " || echo "User update failed, retrying..."
           
           # Verify user configuration
           echo "Verifying kasm user configuration..."
-          kubectl exec -i deployment/kasm-database -n kasm -- env PGPASSWORD="$POSTGRES_ADMIN_PASSWORD" psql -U postgres -c "
+          kubectl exec -i kasm-database-1 -n kasm -- env PGPASSWORD="$POSTGRES_ADMIN_PASSWORD" psql -U postgres -c "
             SELECT usename, usecreatedb, usesuper FROM pg_user WHERE usename = 'kasm';
           "
           

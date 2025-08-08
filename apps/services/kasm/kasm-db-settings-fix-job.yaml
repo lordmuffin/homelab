@@ -1,0 +1,93 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kasm-db-settings-fix-job
+  namespace: kasm
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-weight: "5"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels:
+        app: kasm-db
+        component: settings-fix
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: db-settings-fixer
+        image: postgres:13
+        env:
+        - name: POSTGRES_HOST
+          value: "db"
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: POSTGRES_DB
+          value: "kasm"
+        - name: POSTGRES_USER
+          value: "kasmapp"
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kasm-database-postgres-creds
+              key: db-password
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          echo "=== KASM Database Settings Fix ==="
+          
+          # Insert essential KASM settings
+          echo "Adding essential KASM settings..."
+          psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d $POSTGRES_DB << 'EOSQL'
+          
+          -- Insert or update essential KASM settings
+          INSERT INTO settings (name, title, value, value_type, category, description) VALUES 
+              ('server_hostname', 'Server Hostname', 'kasm.lab.apj.dev', 'string', 'general', 'The hostname of the KASM server'),
+              ('database_hostname', 'Database Hostname', 'db', 'string', 'database', 'PostgreSQL database hostname'),
+              ('database_port', 'Database Port', '5432', 'integer', 'database', 'PostgreSQL database port'),
+              ('database_name', 'Database Name', 'kasm', 'string', 'database', 'PostgreSQL database name'),
+              ('database_username', 'Database Username', 'kasmapp', 'string', 'database', 'PostgreSQL database username'),
+              ('session_timeout', 'Session Timeout', '3600', 'integer', 'session', 'Session timeout in seconds'),
+              ('max_sessions_per_user', 'Max Sessions Per User', '5', 'integer', 'session', 'Maximum concurrent sessions per user'),
+              ('enable_sharing', 'Enable Sharing', '1', 'boolean', 'sharing', 'Enable workspace sharing features'),
+              ('default_zone', 'Default Zone', 'default', 'string', 'zone', 'Default zone for new workspaces'),
+              ('api_server_port', 'API Server Port', '8080', 'integer', 'api', 'API server listening port'),
+              ('redis_hostname', 'Redis Hostname', 'kasm-redis-deployment', 'string', 'redis', 'Redis server hostname'),
+              ('redis_port', 'Redis Port', '6379', 'integer', 'redis', 'Redis server port'),
+              ('log_level', 'Log Level', 'INFO', 'string', 'logging', 'Application logging level'),
+              ('enable_file_logging', 'Enable File Logging', '0', 'boolean', 'logging', 'Enable file-based logging'),
+              ('enable_stdout_logging', 'Enable Stdout Logging', '1', 'boolean', 'logging', 'Enable stdout logging')
+          ON CONFLICT (name) DO UPDATE SET 
+              value = EXCLUDED.value,
+              updated_at = CURRENT_TIMESTAMP;
+          
+          -- Verify settings were inserted
+          SELECT 'Settings inserted/updated:' as status;
+          SELECT name, title, value FROM settings WHERE name IN (
+              'server_hostname', 
+              'database_hostname', 
+              'database_port', 
+              'database_name', 
+              'database_username',
+              'log_level',
+              'enable_file_logging',
+              'enable_stdout_logging'
+          ) ORDER BY name;
+          
+          EOSQL
+          
+          echo "✅ Essential KASM settings have been configured"
+          
+          # Verify the fix worked
+          SETTINGS_COUNT=$(psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d $POSTGRES_DB -tc "SELECT count(*) FROM settings WHERE name IN ('server_hostname', 'database_hostname');")
+          if [ "$SETTINGS_COUNT" -ge 2 ]; then
+            echo "✅ Settings verification passed: $SETTINGS_COUNT essential settings found"
+          else
+            echo "❌ Settings verification failed: only $SETTINGS_COUNT essential settings found"
+            exit 1
+          fi

@@ -1,0 +1,132 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kasm-db-health-check-job
+  namespace: kasm
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-weight: "1"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 5
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      labels:
+        app: kasm-db
+        component: health-check
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: db-health-checker
+        image: postgres:13
+        env:
+        - name: POSTGRES_HOST
+          value: "db"
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: POSTGRES_DB
+          value: "kasm"
+        - name: POSTGRES_USER
+          value: "kasmapp"
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kasm-database-postgres-creds
+              key: db-password
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          echo "=== KASM Database Health Check ==="
+          
+          # Test basic connectivity
+          echo "1. Testing PostgreSQL connectivity..."
+          timeout 60 bash -c 'until pg_isready -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER; do echo "Waiting for PostgreSQL..."; sleep 5; done'
+          echo "✅ PostgreSQL is accepting connections"
+          
+          # Test authentication
+          echo "2. Testing database authentication..."
+          psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d $POSTGRES_DB -c "SELECT 1;" > /dev/null
+          echo "✅ Database authentication successful"
+          
+          # Test required tables exist
+          echo "3. Checking required tables..."
+          REQUIRED_TABLES="zones settings users workspaces workspace_registry sessions"
+          for table in $REQUIRED_TABLES; do
+            if psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d $POSTGRES_DB -tc "SELECT to_regclass('public.$table');" | grep -q "$table"; then
+              echo "✅ Table '$table' exists"
+            else
+              echo "❌ Table '$table' missing"
+              exit 1
+            fi
+          done
+          
+          # Test data integrity
+          echo "4. Checking data integrity..."
+          
+          # Check zones table has data
+          ZONE_COUNT=$(psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d $POSTGRES_DB -tc "SELECT count(*) FROM zones;")
+          if [ "$ZONE_COUNT" -ge 1 ]; then
+            echo "✅ Zones table has $ZONE_COUNT zones"
+          else
+            echo "❌ Zones table is empty"
+            exit 1
+          fi
+          
+          # Check settings table has essential settings
+          SETTINGS_COUNT=$(psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d $POSTGRES_DB -tc "SELECT count(*) FROM settings WHERE name IN ('server_hostname', 'database_hostname');")
+          if [ "$SETTINGS_COUNT" -ge 2 ]; then
+            echo "✅ Settings table has essential configurations"
+          else
+            echo "❌ Settings table missing essential configurations"
+            exit 1
+          fi
+          
+          # Test database permissions
+          echo "5. Testing database permissions..."
+          
+          # Test SELECT permission
+          psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d $POSTGRES_DB -c "SELECT * FROM zones LIMIT 1;" > /dev/null
+          echo "✅ SELECT permission verified"
+          
+          # Test INSERT permission (with rollback)
+          psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d $POSTGRES_DB -c "BEGIN; INSERT INTO settings (name, title, value) VALUES ('health_check_test', 'Health Check Test', 'test'); ROLLBACK;" > /dev/null
+          echo "✅ INSERT permission verified"
+          
+          # Performance check
+          echo "6. Testing database performance..."
+          START_TIME=$(date +%s%N)
+          psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d $POSTGRES_DB -c "SELECT count(*) FROM zones JOIN settings ON true;" > /dev/null
+          END_TIME=$(date +%s%N)
+          DURATION=$(( ($END_TIME - $START_TIME) / 1000000 ))
+          echo "✅ Query performance: ${DURATION}ms"
+          
+          if [ "$DURATION" -gt 5000 ]; then
+            echo "⚠️  Query took longer than 5 seconds, may indicate performance issues"
+          fi
+          
+          # Final summary
+          echo "7. Database health summary:"
+          echo "   - Connection: ✅ Healthy"
+          echo "   - Authentication: ✅ Working"
+          echo "   - Tables: ✅ Present ($REQUIRED_TABLES)"
+          echo "   - Data: ✅ Populated (zones: $ZONE_COUNT, settings: $SETTINGS_COUNT)"
+          echo "   - Permissions: ✅ Correct"
+          echo "   - Performance: ✅ Acceptable (${DURATION}ms)"
+          
+          echo "🎉 KASM Database Health Check PASSED"
+          
+          # Store health check results
+          echo "8. Storing health check results..."
+          psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d $POSTGRES_DB -c "
+            INSERT INTO settings (name, title, value, category, description) VALUES 
+            ('last_health_check', 'Last Health Check', '$(date -u +"%Y-%m-%d %H:%M:%S UTC")', 'monitoring', 'Last successful database health check')
+            ON CONFLICT (name) DO UPDATE SET 
+              value = EXCLUDED.value,
+              updated_at = CURRENT_TIMESTAMP;
+          " > /dev/null
+          
+          echo "✅ Health check timestamp stored in database"
+          echo "=== Health check completed successfully ==="

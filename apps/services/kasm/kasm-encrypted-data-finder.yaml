@@ -1,0 +1,136 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kasm-encrypted-data-finder-job
+  namespace: kasm
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-weight: "30"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels:
+        app: kasm-db-fix
+        component: encrypted-data-finder
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: encrypted-data-finder
+        image: postgres:13
+        env:
+        - name: POSTGRES_HOST
+          value: "db"
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: POSTGRES_DB
+          value: "kasm"
+        - name: POSTGRES_USER
+          value: "kasmapp"
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kasm-database-postgres-creds
+              key: db-password
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          echo "=== KASM Encrypted Data Finder ==="
+          
+          # Find and examine all data that might be encrypted
+          psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d $POSTGRES_DB << 'EOSQL'
+          
+          -- Check zones table for any encrypted data
+          SELECT 'zones table data:' as info;
+          SELECT zone_id, zone_name, length(zone_id::text) as id_length FROM zones;
+          
+          -- Check settings table for any encrypted or suspicious data
+          SELECT 'settings table suspicious data:' as info;
+          SELECT name, title, value, length(value) as value_length, value_type 
+          FROM settings 
+          WHERE length(value) > 10 OR value LIKE '%=%' OR value_type = 'encrypted'
+          ORDER BY name;
+          
+          -- Check sessions table
+          SELECT 'sessions table data:' as info;
+          SELECT session_id, user_id, zone_id, 
+                 CASE WHEN session_token IS NULL THEN 'NULL'
+                      WHEN length(session_token) = 0 THEN 'EMPTY'
+                      WHEN length(session_token) < 20 THEN 'SHORT: ' || session_token
+                      ELSE 'LONG: ' || length(session_token)::text || ' chars'
+                 END as token_status
+          FROM sessions LIMIT 10;
+          
+          -- Check users table structure and data
+          SELECT 'users table structure:' as info;
+          \d users
+          
+          SELECT 'users table data:' as info;
+          SELECT * FROM users LIMIT 5;
+          
+          -- Check workspaces for encrypted data
+          SELECT 'workspaces table suspicious data:' as info;
+          SELECT workspace_id, name, docker_registry, docker_image 
+          FROM workspaces 
+          WHERE length(docker_registry) > 30 OR length(docker_image) > 50 
+          LIMIT 5;
+          
+          -- Check workspace_registry for encrypted passwords
+          SELECT 'workspace_registry passwords:' as info;
+          SELECT registry_id, name, hostname, username,
+                 CASE WHEN password IS NULL THEN 'NULL'
+                      WHEN length(password) = 0 THEN 'EMPTY'
+                      WHEN length(password) < 20 THEN 'SHORT: ' || password
+                      ELSE 'LONG: ' || length(password)::text || ' chars'
+                 END as password_status
+          FROM workspace_registry;
+          
+          EOSQL
+          
+          echo "=== Data analysis complete. Looking for 13-character corrupted strings... ==="
+          
+          # Specifically look for the problematic 13-character encrypted string
+          psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d $POSTGRES_DB << 'EOSQL'
+          
+          -- Search all text columns for 13-character strings that might be the corrupted encryption
+          SELECT 'Searching for 13-character suspicious strings...' as info;
+          
+          -- Check settings table
+          SELECT 'settings', name, value FROM settings WHERE length(value) = 13;
+          
+          -- Check workspace_registry passwords
+          SELECT 'workspace_registry', name, password FROM workspace_registry WHERE length(password) = 13;
+          
+          -- Check sessions tokens
+          SELECT 'sessions', session_id, session_token FROM sessions WHERE length(session_token) = 13;
+          
+          -- Generic search using information_schema
+          DO $$
+          DECLARE
+              rec RECORD;
+              query TEXT;
+              result_count INTEGER;
+          BEGIN
+              FOR rec IN 
+                  SELECT table_name, column_name 
+                  FROM information_schema.columns 
+                  WHERE table_schema = 'public' 
+                    AND data_type IN ('character varying', 'text', 'character')
+              LOOP
+                  query := format('SELECT COUNT(*) FROM %I WHERE length(%I) = 13 AND %I IS NOT NULL AND %I != ''''', 
+                                  rec.table_name, rec.column_name, rec.column_name, rec.column_name);
+                  EXECUTE query INTO result_count;
+                  
+                  IF result_count > 0 THEN
+                      RAISE NOTICE 'Found % 13-character strings in %.%', result_count, rec.table_name, rec.column_name;
+                  END IF;
+              END LOOP;
+          END $$;
+          
+          EOSQL
+          
+          echo "✅ Encrypted data analysis completed!"

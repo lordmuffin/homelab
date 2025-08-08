@@ -24,14 +24,14 @@ spec:
         - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: kasm-db-postgres-creds
-              key: password
+              name: kasm-database-postgres-creds
+              key: db-password
         command:
         - /bin/bash
         - -c
         args:
         - |
-          while [ ! $(PGPASSWORD=$POSTGRES_PASSWORD psql -U kasm -d kasm -h kasm-database-rw -t -c "select zone_id from zones" 2>/dev/null | wc -l) -ge 2 ]; do 
+          while [ ! $(PGPASSWORD=$POSTGRES_PASSWORD psql -U kasmapp -d kasm -h db -t -c "select zone_id from zones" 2>/dev/null | wc -l) -ge 2 ]; do 
             echo "Waiting for DB to initialize..."; 
             sleep 5; 
           done
@@ -45,8 +45,64 @@ spec:
         - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: kasm-db-postgres-creds
-              key: password
+              name: kasm-database-postgres-creds
+              key: db-password
+        - name: INSTALLATION_ID
+          value: "kasm-lab-dev"
+        - name: DATABASE_SECRET_KEY
+          value: "development-key-only"
+        - name: DISABLE_ENCRYPTION
+          value: "true"
+        - name: NO_ENCRYPTION
+          value: "true"
+        - name: SKIP_DB_ENCRYPTION
+          value: "true"
+        - name: DATABASE_HOSTNAME
+          value: "db"
+        - name: DATABASE_PORT
+          value: "5432"
+        - name: DATABASE_NAME
+          value: "kasm"
+        - name: DATABASE_USERNAME
+          value: "kasmapp"
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kasm-database-postgres-creds
+              key: redis-password
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: LOG_CONFIG_FILE
+          value: "/opt/kasm/current/conf/app/api.logging.yaml"
+        - name: NO_KASM_LOG_HANDLER
+          value: "true"
+        - name: USE_BASIC_LOGGING
+          value: "true"
+        - name: BYPASS_LOG_CONFIG
+          value: "true"
+        - name: LOG_FORMAT
+          value: "json"
+        - name: LOG_HANDLER
+          value: "console"
+        - name: LOG_OUTPUT
+          value: "stdout"
+        - name: SIMPLE_LOGGING
+          value: "true"
+        - name: DISABLE_FILE_LOGGING
+          value: "true"
+        - name: API_SERVER_ID
+          value: "kasm-api-1"
+        - name: POSTGRES_HOST
+          value: "db"
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: POSTGRES_DB
+          value: "kasm"
+        - name: DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kasm-database-postgres-creds
+              key: db-password
         # Updated readiness probe timeout for better reliability
         readinessProbe:
           timeoutSeconds: 30  # Increased from 10s

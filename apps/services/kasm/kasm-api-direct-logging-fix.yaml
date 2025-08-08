@@ -1,0 +1,135 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kasm-api-direct-logging-fix-job
+  namespace: kasm
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-weight: "15"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      labels:
+        app: kasm-api-fix
+        component: logging-fix
+    spec:
+      serviceAccountName: kasm-secret-sync
+      restartPolicy: OnFailure
+      containers:
+      - name: api-logging-fixer
+        image: bitnami/kubectl:latest
+        env:
+        - name: NAMESPACE
+          value: "kasm"
+        - name: DEPLOYMENT_NAME
+          value: "kasm-api-deployment"
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          echo "=== KASM API Direct Logging Fix ==="
+          
+          # Wait for deployment
+          timeout 120 bash -c 'until kubectl get deployment $DEPLOYMENT_NAME -n $NAMESPACE >/dev/null 2>&1; do echo "Waiting for deployment..."; sleep 5; done'
+          
+          # Get current deployment configuration
+          echo "Getting current deployment configuration..."
+          kubectl get deployment $DEPLOYMENT_NAME -n $NAMESPACE -o yaml > /tmp/deployment.yaml
+          
+          # Scale down deployment
+          echo "Scaling down deployment..."
+          kubectl scale deployment $DEPLOYMENT_NAME -n $NAMESPACE --replicas=0
+          
+          # Wait for pods to terminate
+          echo "Waiting for pods to terminate..."
+          sleep 15
+          
+          # Apply comprehensive environment variable fix using kubectl patch
+          echo "Applying comprehensive environment variable patch..."
+          kubectl patch deployment $DEPLOYMENT_NAME -n $NAMESPACE --type='merge' --patch='
+          {
+            "spec": {
+              "template": {
+                "spec": {
+                  "containers": [
+                    {
+                      "name": "kasm-api-container",
+                      "env": [
+                        {"name": "START_SERVICES", "value": "true"},
+                        {"name": "KUBERNETES_SERVICE_HOST", "value": "true"},
+                        {"name": "POSTGRES_PASSWORD", "valueFrom": {"secretKeyRef": {"name": "kasm-database-postgres-creds", "key": "db-password"}}},
+                        {"name": "INSTALLATION_ID", "valueFrom": {"secretKeyRef": {"name": "kasm-database-postgres-creds", "key": "encryption-secret"}}},
+                        {"name": "DATABASE_HOSTNAME", "value": "db"},
+                        {"name": "DATABASE_PORT", "value": "5432"},
+                        {"name": "DATABASE_NAME", "value": "kasm"},
+                        {"name": "DATABASE_USERNAME", "value": "kasmapp"},
+                        {"name": "REDIS_PASSWORD", "valueFrom": {"secretKeyRef": {"name": "kasm-database-postgres-creds", "key": "redis-password"}}},
+                        {"name": "LOG_LEVEL", "value": "INFO"},
+                        {"name": "LOG_CONFIG_FILE", "value": ""},
+                        {"name": "API_SERVER_ID", "value": "kasm-api-1"},
+                        {"name": "POSTGRES_HOST", "value": "db"},
+                        {"name": "POSTGRES_PORT", "value": "5432"},
+                        {"name": "POSTGRES_DB", "value": "kasm"},
+                        {"name": "DATABASE_PASSWORD", "valueFrom": {"secretKeyRef": {"name": "kasm-database-postgres-creds", "key": "db-password"}}},
+                        {"name": "PYTHONPATH", "value": "/opt/kasm/current"},
+                        {"name": "LOGGING_LEVEL", "value": "INFO"},
+                        {"name": "DEBUG", "value": "false"},
+                        {"name": "GUNICORN_WORKERS", "value": "2"},
+                        {"name": "GUNICORN_TIMEOUT", "value": "120"},
+                        {"name": "SERVER_HOSTNAME", "value": "kasm.lab.apj.dev"},
+                        {"name": "DISABLE_FILE_BASED_LOGGING", "value": "true"},
+                        {"name": "FORCE_CONSOLE_LOGGING", "value": "true"},
+                        {"name": "KASM_LOG_TO_STDOUT", "value": "true"},
+                        {"name": "NO_LOG_CONFIG_FILE", "value": "true"}
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }'
+          
+          # Scale back up
+          echo "Scaling up deployment..."
+          kubectl scale deployment $DEPLOYMENT_NAME -n $NAMESPACE --replicas=1
+          
+          # Wait for new pod to start
+          echo "Waiting for new pod to start..."
+          kubectl rollout status deployment/$DEPLOYMENT_NAME -n $NAMESPACE --timeout=300s
+          
+          # Monitor pod status
+          echo "Monitoring pod status..."
+          for i in {1..30}; do
+            POD_NAME=$(kubectl get pods -l app.kubernetes.io/name=kasm-api -n $NAMESPACE -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+            if [ -n "$POD_NAME" ]; then
+              POD_STATUS=$(kubectl get pod $POD_NAME -n $NAMESPACE -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+              READY=$(kubectl get pod $POD_NAME -n $NAMESPACE -o jsonpath='{.status.containerStatuses[0].ready}' 2>/dev/null || echo "false")
+              echo "Attempt $i: Pod $POD_NAME status: $POD_STATUS, ready: $READY"
+              
+              if [ "$POD_STATUS" = "Running" ] && [ "$READY" = "true" ]; then
+                echo "🎉 API pod is now running and ready!"
+                
+                # Test the API endpoint
+                echo "Testing API endpoint..."
+                if kubectl exec $POD_NAME -n $NAMESPACE -- curl -s http://localhost:8080/api/public/get_info >/dev/null 2>&1; then
+                  echo "✅ API endpoint is responding!"
+                else
+                  echo "⚠️  API endpoint test failed, but pod is running"
+                fi
+                break
+              fi
+              
+              if [ "$POD_STATUS" = "Failed" ] || [ "$POD_STATUS" = "CrashLoopBackOff" ]; then
+                echo "❌ Pod failed to start. Checking logs..."
+                kubectl logs $POD_NAME -n $NAMESPACE --previous 2>/dev/null || echo "No previous logs"
+                break
+              fi
+            fi
+            sleep 10
+          done
+          
+          echo "✅ API deployment logging fix completed!"

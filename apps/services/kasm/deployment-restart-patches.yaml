@@ -1,0 +1,154 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kasm-deployment-restart-job
+  namespace: kasm
+  labels:
+    app: kasm-restart
+    component: deployment-restart
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-weight: "5"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      labels:
+        app: kasm-restart
+        component: deployment-restart
+    spec:
+      serviceAccountName: kasm-secret-sync
+      restartPolicy: OnFailure
+      containers:
+      - name: deployment-restarter
+        image: bitnami/kubectl:latest
+        env:
+        - name: NAMESPACE
+          value: "kasm"
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          echo "=== KASM Deployment Restart Job ==="
+          
+          # Function to restart deployment with annotation
+          restart_deployment() {
+            local deployment="$1"
+            echo "Restarting deployment: $deployment"
+            
+            if kubectl get deployment "$deployment" -n $NAMESPACE >/dev/null 2>&1; then
+              # Add restart annotation
+              kubectl annotate deployment "$deployment" -n $NAMESPACE \
+                kubectl.kubernetes.io/restartedAt="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+                --overwrite
+              
+              # Wait for rollout to complete
+              kubectl rollout status deployment "$deployment" -n $NAMESPACE --timeout=300s
+              echo "✓ Deployment $deployment restarted successfully"
+            else
+              echo "! Deployment $deployment not found, skipping"
+            fi
+          }
+          
+          # Function to delete and recreate failed jobs
+          recreate_job() {
+            local job="$1"
+            echo "Recreating job: $job"
+            
+            if kubectl get job "$job" -n $NAMESPACE >/dev/null 2>&1; then
+              # Delete the job and its pods
+              kubectl delete job "$job" -n $NAMESPACE --ignore-not-found=true
+              
+              # Wait a moment for cleanup
+              sleep 5
+              
+              echo "✓ Job $job deleted for recreation"
+            else
+              echo "! Job $job not found, skipping"
+            fi
+          }
+          
+          # List of deployments to restart
+          DEPLOYMENTS=(
+            "kasm-api-deployment"
+            "kasm-manager-deployment"
+            "kasm-guac-deployment"
+            "kasm-proxy-deployment"
+            "kasm-share-deployment"
+          )
+          
+          # List of jobs to recreate if they failed
+          JOBS=(
+            "kasm-admin-password-fix-job"
+            "kasm-db-permissions-job"
+            "kasm-db-user-setup-job"
+            "kasm-db-complete-init-job"
+          )
+          
+          echo "Starting deployment restarts..."
+          for deployment in "${DEPLOYMENTS[@]}"; do
+            restart_deployment "$deployment"
+          done
+          
+          echo "Starting job recreation..."
+          for job in "${JOBS[@]}"; do
+            recreate_job "$job"
+          done
+          
+          echo "✅ Deployment restart job completed successfully!"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kasm-restart-script
+  namespace: kasm
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+data:
+  restart.sh: |
+    #!/bin/bash
+    set -e
+    
+    # KASM Deployment Restart Script
+    # Use this script to manually restart KASM deployments
+    
+    NAMESPACE=${NAMESPACE:-kasm}
+    
+    echo "=== Manual KASM Restart Script ==="
+    echo "Namespace: $NAMESPACE"
+    
+    # Check if deployments are healthy first
+    echo "Checking deployment status..."
+    kubectl get deployments -n $NAMESPACE -o wide
+    
+    # Restart deployments with annotation method
+    DEPLOYMENTS=(
+      "kasm-api-deployment"
+      "kasm-manager-deployment" 
+      "kasm-guac-deployment"
+      "kasm-proxy-deployment"
+      "kasm-share-deployment"
+    )
+    
+    for deployment in "${DEPLOYMENTS[@]}"; do
+      if kubectl get deployment "$deployment" -n $NAMESPACE >/dev/null 2>&1; then
+        echo "Restarting $deployment..."
+        kubectl annotate deployment "$deployment" -n $NAMESPACE \
+          kubectl.kubernetes.io/restartedAt="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+          --overwrite
+        
+        echo "Waiting for $deployment rollout..."
+        kubectl rollout status deployment "$deployment" -n $NAMESPACE --timeout=300s
+        echo "✓ $deployment restarted"
+      else
+        echo "! $deployment not found"
+      fi
+    done
+    
+    echo "Final status check..."
+    kubectl get pods -n $NAMESPACE
+    
+    echo "✅ Manual restart completed!"

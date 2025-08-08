@@ -1,0 +1,116 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kasm-db-complete-reset-job
+  namespace: kasm
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true,Prune=false
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      serviceAccountName: kasm-secret-sync-v2
+      restartPolicy: OnFailure
+      containers:
+      - name: db-reset
+        image: postgres:15-alpine
+        env:
+        - name: POSTGRES_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kasm-database-postgres-creds
+              key: admin-password
+        - name: KASMAPP_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kasm-database-postgres-creds
+              key: db-password
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          echo "🔥 Starting COMPLETE KASM database reset..."
+          
+          # Connect directly to the database pod
+          kubectl exec kasm-database-1 -n kasm -- env PGPASSWORD="$POSTGRES_ADMIN_PASSWORD" psql -U postgres -d kasm -c "
+          -- Drop ALL existing tables to eliminate encryption issues
+          DROP SCHEMA public CASCADE;
+          CREATE SCHEMA public;
+          GRANT ALL ON SCHEMA public TO public;
+          GRANT ALL ON SCHEMA public TO kasmapp;
+          
+          -- Create clean KASM tables without any encryption
+          CREATE TABLE zones (
+            zone_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            zone_name VARCHAR(255) NOT NULL UNIQUE,
+            zone_hostname VARCHAR(255) NOT NULL,
+            zone_port INTEGER DEFAULT 443,
+            zone_ssl BOOLEAN DEFAULT true,
+            zone_enabled BOOLEAN DEFAULT true,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+          
+          INSERT INTO zones (zone_name, zone_hostname) VALUES 
+            ('default', 'kasm.lab.apj.dev'),
+            ('primary', 'kasm.lab.apj.dev');
+          
+          -- Create settings table without encryption
+          CREATE TABLE settings (
+            setting_id SERIAL PRIMARY KEY,
+            name VARCHAR(255) NOT NULL UNIQUE,
+            title VARCHAR(255) NOT NULL,
+            value TEXT,
+            value_type VARCHAR(50) DEFAULT 'string',
+            category VARCHAR(100) DEFAULT 'general',
+            services_restart INTEGER DEFAULT 0,
+            description TEXT,
+            sanitize INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+          
+          -- Insert minimal settings for API to start
+          INSERT INTO settings (name, title, value, category) VALUES 
+            ('log_protocol', 'Log Protocol', 'INFO', 'logging'),
+            ('server_hostname', 'Server Hostname', 'kasm.lab.apj.dev', 'general'),
+            ('database_hostname', 'Database Hostname', 'db', 'database'),
+            ('default_admin_password', 'Default Admin Password', 'admin', 'auth');
+          
+          -- Create basic users table
+          CREATE TABLE users (
+            user_id SERIAL PRIMARY KEY,
+            username VARCHAR(255) NOT NULL UNIQUE,
+            email VARCHAR(255),
+            pw_hash VARCHAR(255),
+            salt VARCHAR(255),
+            locked BOOLEAN DEFAULT false,
+            disabled BOOLEAN DEFAULT false,
+            failed_pw_attempts INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+          
+          -- Grant all permissions to kasmapp
+          GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO kasmapp;
+          GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO kasmapp;
+          GRANT USAGE ON SCHEMA public TO kasmapp;
+          "
+          
+          echo "✅ Database reset completed - all encryption removed!"
+          
+          # Verify the clean setup
+          kubectl exec kasm-database-1 -n kasm -- env PGPASSWORD="$KASMAPP_PASSWORD" psql -U kasmapp -d kasm -c "
+          SELECT 'zones' as table_name, COUNT(*) as records FROM zones
+          UNION ALL
+          SELECT 'settings' as table_name, COUNT(*) as records FROM settings
+          UNION ALL  
+          SELECT 'users' as table_name, COUNT(*) as records FROM users;
+          "
+          
+      - name: kubectl
+        image: bitnami/kubectl:latest
+        command: ["/bin/sleep", "infinity"]

@@ -1,0 +1,280 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kasm-api-logging-config
+  namespace: kasm
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+data:
+  api.logging.yaml: |
+    version: 1
+    disable_existing_loggers: false
+    formatters:
+      default:
+        format: '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
+        datefmt: '%Y-%m-%d %H:%M:%S'
+      detailed:
+        format: '%(asctime)s [%(levelname)s] %(name)s.%(funcName)s:%(lineno)d: %(message)s'
+        datefmt: '%Y-%m-%d %H:%M:%S'
+    handlers:
+      console:
+        class: logging.StreamHandler
+        level: INFO
+        formatter: default
+        stream: ext://sys.stdout
+      file:
+        class: logging.handlers.RotatingFileHandler
+        level: INFO
+        formatter: detailed
+        filename: /opt/kasm/current/log/api.log
+        maxBytes: 10485760
+        backupCount: 5
+        encoding: utf8
+    loggers:
+      gunicorn:
+        level: INFO
+        handlers: [console, file]
+        propagate: false
+      gunicorn.error:
+        level: INFO
+        handlers: [console, file]
+        propagate: false
+      gunicorn.access:
+        level: INFO
+        handlers: [console, file]
+        propagate: false
+      sqlalchemy:
+        level: WARNING
+        handlers: [console, file]
+        propagate: false
+      sqlalchemy.engine:
+        level: WARNING
+        handlers: [console, file]
+        propagate: false
+    root:
+      level: INFO
+      handlers: [console, file]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kasm-api-deployment-fixed
+  namespace: kasm
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true,Prune=false
+    argocd.argoproj.io/sync-wave: "3"
+    argocd.argoproj.io/compare-options: IgnoreExtraneous
+    argocd.argoproj.io/sync-hook: Sync
+    argocd.argoproj.io/sync-hook-weight: "15"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kasm-api-fixed
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kasm-api-fixed
+    spec:
+      initContainers:
+      - name: db-is-ready
+        image: kasmweb/api:1.17.0
+        env:
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kasm-database-postgres-creds
+              key: db-password
+        command:
+        - /bin/bash
+        - -c
+        - |
+          echo "=== DB Readiness Check ==="
+          echo "Testing database connection..."
+          while ! PGPASSWORD=$POSTGRES_PASSWORD psql -U kasmapp -d kasm -h db -t -c "SELECT 1;" 2>/dev/null; do 
+            echo "Database not ready, waiting..."; 
+            sleep 5; 
+          done
+          echo "Testing zones table..."
+          while [ $(PGPASSWORD=$POSTGRES_PASSWORD psql -U kasmapp -d kasm -h db -t -c "SELECT count(*) FROM zones;" 2>/dev/null | tr -d ' ') -lt 2 ]; do 
+            echo "Zones table not ready, waiting..."; 
+            sleep 5; 
+          done
+          echo "Database is ready with $(PGPASSWORD=$POSTGRES_PASSWORD psql -U kasmapp -d kasm -h db -t -c "SELECT count(*) FROM zones;" | tr -d ' ') zones"
+      containers:
+      - name: kasm-api-container
+        image: kasmweb/api:1.17.0
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        env:
+        # Core service configuration
+        - name: START_SERVICES
+          value: "true"
+        - name: KUBERNETES_SERVICE_HOST
+          value: "true"
+        
+        # Database configuration
+        - name: DATABASE_HOSTNAME
+          value: "db"
+        - name: DATABASE_PORT
+          value: "5432"
+        - name: DATABASE_NAME
+          value: "kasm"
+        - name: DATABASE_USERNAME
+          value: "kasmapp"
+        - name: DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kasm-database-postgres-creds
+              key: db-password
+        - name: POSTGRES_HOST
+          value: "db"
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: POSTGRES_DB
+          value: "kasm"
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kasm-database-postgres-creds
+              key: db-password
+        
+        # Authentication and encryption
+        - name: INSTALLATION_ID
+          valueFrom:
+            secretKeyRef:
+              name: kasm-database-postgres-creds
+              key: encryption-secret
+        
+        # Redis configuration
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kasm-database-postgres-creds
+              key: redis-password
+        
+        # Logging configuration (CRITICAL FIX)
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: LOG_CONFIG_FILE
+          value: "/opt/kasm/current/conf/app/api.logging.yaml"
+        - name: PYTHONPATH
+          value: "/opt/kasm/current"
+        - name: LOGGING_LEVEL
+          value: "INFO"
+        - name: DEBUG
+          value: "false"
+        
+        # API server configuration
+        - name: API_SERVER_ID
+          value: "kasm-api-1"
+        - name: SERVER_HOSTNAME
+          value: "kasm.lab.apj.dev"
+        - name: API_SERVER_PORT
+          value: "8080"
+        - name: API_SERVER_HOST
+          value: "0.0.0.0"
+        
+        # Session and security configuration
+        - name: SESSION_TIMEOUT
+          value: "3600"
+        - name: MAX_SESSIONS_PER_USER
+          value: "5"
+        - name: ENABLE_SHARING
+          value: "true"
+        
+        # Gunicorn configuration
+        - name: GUNICORN_WORKERS
+          value: "2"
+        - name: GUNICORN_TIMEOUT
+          value: "120"
+        - name: GUNICORN_BIND
+          value: "0.0.0.0:8080"
+        
+        # Create log directory (fix for logging errors)
+        command:
+        - "/bin/bash"
+        - "-c"
+        - |
+          set -e
+          echo "=== KASM API Startup Fix ==="
+          
+          # Ensure log directory exists with proper permissions
+          mkdir -p /opt/kasm/current/log
+          chmod 755 /opt/kasm/current/log
+          
+          # Ensure config directory exists
+          mkdir -p /opt/kasm/current/conf/app
+          
+          # Copy logging config to expected location
+          cp /config/api.logging.yaml /opt/kasm/current/conf/app/api.logging.yaml
+          
+          # Set proper ownership
+          chown -R kasm:kasm /opt/kasm/current/log /opt/kasm/current/conf
+          
+          echo "Starting KASM API server..."
+          exec python api_server/server.py
+        
+        volumeMounts:
+        - name: logging-config
+          mountPath: /config
+          readOnly: true
+        - name: log-volume
+          mountPath: /opt/kasm/current/log
+        
+        # Improved health checks
+        readinessProbe:
+          httpGet:
+            path: /api/public/get_info
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 30
+          failureThreshold: 5
+          successThreshold: 1
+        
+        livenessProbe:
+          httpGet:
+            path: /api/public/get_info
+            port: 8080
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 30
+          failureThreshold: 3
+        
+        # Resource limits
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+      
+      volumes:
+      - name: logging-config
+        configMap:
+          name: kasm-api-logging-config
+          defaultMode: 0644
+      - name: log-volume
+        emptyDir: {}
+      
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kasm-api-service-fixed
+  namespace: kasm
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  selector:
+    app.kubernetes.io/name: kasm-api-fixed
+  ports:
+  - name: http
+    protocol: TCP
+    port: 8080
+    targetPort: 8080
+  type: ClusterIP

@@ -1,0 +1,100 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kasm-api-deployment
+  namespace: kasm
+spec:
+  template:
+    spec:
+      containers:
+      - name: kasm-api-container
+        env:
+        # Core service configuration
+        - name: START_SERVICES
+          value: "true"
+        - name: KUBERNETES_SERVICE_HOST
+          value: "true"
+        
+        # Database configuration
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kasm-database-postgres-creds
+              key: db-password
+        - name: INSTALLATION_ID
+          valueFrom:
+            secretKeyRef:
+              name: kasm-database-postgres-creds
+              key: encryption-secret
+        - name: DATABASE_HOSTNAME
+          value: "db"
+        - name: DATABASE_PORT
+          value: "5432"
+        - name: DATABASE_NAME
+          value: "kasm"
+        - name: DATABASE_USERNAME
+          value: "kasmapp"
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kasm-database-postgres-creds
+              key: redis-password
+        
+        # CRITICAL LOGGING FIXES
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: LOG_CONFIG_FILE
+          value: "/opt/kasm/current/conf/app/api.logging.yaml"
+        - name: API_SERVER_ID
+          value: "kasm-api-1"
+        - name: POSTGRES_HOST
+          value: "db"
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: POSTGRES_DB
+          value: "kasm"
+        - name: DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kasm-database-postgres-creds
+              key: db-password
+        
+        # Additional logging environment variables to prevent NoneType errors
+        - name: PYTHONPATH
+          value: "/opt/kasm/current"
+        - name: LOGGING_LEVEL
+          value: "INFO"
+        - name: DEBUG
+          value: "false"
+        - name: GUNICORN_WORKERS
+          value: "2"
+        - name: GUNICORN_TIMEOUT
+          value: "120"
+        - name: SERVER_HOSTNAME
+          value: "kasm.lab.apj.dev"
+        
+        # Force logging to stdout to avoid file permission issues
+        - name: FORCE_STDOUT_LOGGING
+          value: "true"
+        - name: DISABLE_FILE_LOGGING
+          value: "true"
+        
+        # Updated readiness probe timeout for better reliability
+        readinessProbe:
+          httpGet:
+            path: /api/public/get_info
+            port: 8080
+          initialDelaySeconds: 45
+          periodSeconds: 15
+          timeoutSeconds: 30
+          failureThreshold: 5
+          successThreshold: 1
+        
+        livenessProbe:
+          httpGet:
+            path: /api/public/get_info
+            port: 8080
+          initialDelaySeconds: 90
+          periodSeconds: 30
+          timeoutSeconds: 30
+          failureThreshold: 3
