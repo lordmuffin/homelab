@@ -53,9 +53,17 @@ spec:
               name: auth-labs-andrewpjackson-com-apptoken-1password
               key: jwtsecret
         - name: LOG_LEVEL
-          value: trace
+          value: debug
         - name: WHITELIST
-          value: "/webhook,/form,/webhook-test,/test-webhook"
+          value: "/webhook,/form,/webhook-test,/test-webhook,/service-worker.js,/manifest.json,/favicon.ico,/robots.txt,/static/*,/.well-known/*,/assets/*,/css/*,/js/*,/img/*,/images/*"
+        - name: COOKIE_SECURE
+          value: "true"
+        - name: INSECURE_COOKIE
+          value: "false"
+        - name: URL_PATH
+          value: "/_oauth"
+        - name: MATCH_WHITELIST_OR_DOMAIN
+          value: "true"
         resources:
           limits:
             memory: "512Mi"
