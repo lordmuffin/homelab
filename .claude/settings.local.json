@@ -14,7 +14,8 @@
       "Bash(kubectl apply:*)",
       "Bash(mv:*)",
       "Bash(rm:*)",
-      "Bash(kubectl describe:*)"
+      "Bash(kubectl describe:*)",
+      "Bash(git add:*)"
     ],
     "deny": []
   }
