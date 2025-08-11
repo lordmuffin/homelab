@@ -2,7 +2,19 @@
   "permissions": {
     "allow": [
       "mcp__ruv-swarm",
-      "mcp__claude-flow"
+      "mcp__claude-flow",
+      "Bash(kubectl get pods:*)",
+      "Bash(kubectl logs:*)",
+      "Bash(curl:*)",
+      "Bash(kubectl get deployment:*)",
+      "Bash(kubectl get:*)",
+      "Bash(nslookup:*)",
+      "Bash(kubectl exec:*)",
+      "Bash(kubectl delete:*)",
+      "Bash(kubectl apply:*)",
+      "Bash(mv:*)",
+      "Bash(rm:*)",
+      "Bash(kubectl describe:*)"
     ],
     "deny": []
   }
