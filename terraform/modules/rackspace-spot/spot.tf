@@ -107,8 +107,8 @@ output "prod_kubeconfig" {
 # Lab cloud-homelab resources
 #--------------------------------------------------------------
 # Lab environment cloudspace resource
-resource "spot_cloudspace" "lab-cloud-homelab" {
-  cloudspace_name = "lab-cloud-homelab"
+resource "spot_cloudspace" "cloud-homelab" {
+  cloudspace_name = "cloud-homelab"
   region             = "us-central-ord-1"
   hacontrol_plane    = false
   preemption_webhook = "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX"
@@ -119,7 +119,7 @@ resource "spot_cloudspace" "lab-cloud-homelab" {
 
 # XLarge node pool for lab environment (min 1, max 2)
 resource "spot_spotnodepool" "lab-xlarge-pool" {
-  cloudspace_name = resource.spot_cloudspace.lab-cloud-homelab.cloudspace_name
+  cloudspace_name = resource.spot_cloudspace.cloud-homelab.cloudspace_name
   server_class = "gp.vs1.xlarge-ord"
   bid_price    = 0.020  # Lower bid price for lab environment
 
@@ -137,7 +137,7 @@ resource "spot_spotnodepool" "lab-xlarge-pool" {
 
 # Medium node pool for lab environment (min 3, max 6)
 resource "spot_spotnodepool" "lab-medium-pool" {
-  cloudspace_name = resource.spot_cloudspace.lab-cloud-homelab.cloudspace_name
+  cloudspace_name = resource.spot_cloudspace.cloud-homelab.cloudspace_name
   server_class = "gp.vs1.medium-ord"
   bid_price    = 0.015  # Lower bid price for lab environment
 
@@ -153,12 +153,12 @@ resource "spot_spotnodepool" "lab-medium-pool" {
   }
 }
 
-data "spot_kubeconfig" "lab-cloud-homelab" {
-  cloudspace_name = resource.spot_cloudspace.lab-cloud-homelab.name
+data "spot_kubeconfig" "cloud-homelab" {
+  cloudspace_name = resource.spot_cloudspace.cloud-homelab.name
 }
 
 output "lab_kubeconfig" {
-  value = data.spot_kubeconfig.lab-cloud-homelab.raw
+  value = data.spot_kubeconfig.cloud-homelab.raw
 }
 
 #--------------------------------------------------------------

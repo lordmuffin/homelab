@@ -1,0 +1,46 @@
+# Example Terraform variables file for Proxmox K3s deployment
+# Copy this file to terraform.tfvars and update with your values
+
+# Rackspace Spot API key
+api_key = "your-rackspace-spot-api-key"
+
+# Proxmox authentication
+proxmox_password = "your-proxmox-password"
+
+# SSH keys for VM access and provisioning
+ssh_private_key = "your-ssh-private-key-content"
+ssh_public_key  = "your-ssh-public-key-content"
+
+# Proxmox providers (customize endpoints and node names)
+proxmox_providers = [
+  {
+    name        = "pve_provider"
+    node_name   = "pve"
+    endpoint    = "https://192.168.1.13:8006/"
+    username    = "terraform@pve"
+    insecure    = true
+    hostpcis    = ""
+  },
+  {
+    name        = "pve2_provider"
+    node_name   = "pve2"
+    endpoint    = "https://192.168.1.14:8006/"
+    username    = "terraform@pve"
+    insecure    = true
+    hostpcis    = "gpu"
+  }
+]
+
+# VM configurations for K3s cluster
+proxmox_vms = [
+  # See modules/proxmox-k3s/examples/dev.tfvars for complete example
+]
+
+# K3s configuration
+template_vm_id = 8006
+k3s_version    = "v1.28.2+k3s1"
+k3s_options    = "--flannel-backend=none --no-flannel --disable-kube-proxy --disable servicelb --disable-network-policy"
+
+# VM defaults
+vm_user     = "ubuntu"
+vm_password = "ubuntu"

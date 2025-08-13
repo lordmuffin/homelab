@@ -15,7 +15,9 @@
       "Bash(mv:*)",
       "Bash(rm:*)",
       "Bash(kubectl describe:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(mkdir:*)",
+      "Bash(find:*)"
     ],
     "deny": []
   }
