@@ -1,7 +1,15 @@
+locals {
+  all_vms = merge(
+    proxmox_virtual_environment_vm.k3s_nodes_pve,
+    proxmox_virtual_environment_vm.k3s_nodes_pve2,
+    proxmox_virtual_environment_vm.k3s_nodes_pve_nas_01
+  )
+}
+
 output "vm_details" {
   description = "Details of all created VMs"
   value = {
-    for key, vm in proxmox_virtual_environment_vm.k3s_nodes : key => {
+    for key, vm in local.all_vms : key => {
       id          = vm.id
       name        = vm.name
       node_name   = vm.node_name
@@ -9,7 +17,6 @@ output "vm_details" {
       vm_type     = local.vm_instances[key].vm_type
       environment = local.vm_instances[key].environment
       ip_address  = local.vm_instances[key].ip_address
-      status      = vm.status
     }
   }
 }
@@ -17,14 +24,14 @@ output "vm_details" {
 output "server_ips" {
   description = "IP addresses of K3s server nodes"
   value = [
-    for vm in local.server_vms : vm.ip_address
+    for vm in values(local.server_vms) : vm.ip_address
   ]
 }
 
 output "agent_ips" {
   description = "IP addresses of K3s agent nodes"
   value = [
-    for vm in local.agent_vms : vm.ip_address
+    for vm in values(local.agent_vms) : vm.ip_address
   ]
 }
 
@@ -41,7 +48,7 @@ output "cluster_endpoint" {
 output "vm_ids" {
   description = "Map of VM names to their Proxmox VM IDs"
   value = {
-    for key, vm in proxmox_virtual_environment_vm.k3s_nodes : vm.name => vm.vm_id
+    for key, vm in local.all_vms : vm.name => vm.vm_id
   }
 }
 
@@ -53,7 +60,7 @@ output "kubeconfig_path" {
 output "gpu_agents" {
   description = "Details of GPU-enabled agent nodes"
   value = {
-    for key, vm in proxmox_virtual_environment_vm.k3s_nodes : key => {
+    for key, vm in local.all_vms : key => {
       name       = vm.name
       ip_address = local.vm_instances[key].ip_address
       node_name  = vm.node_name

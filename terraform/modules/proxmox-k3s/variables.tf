@@ -1,4 +1,4 @@
-variable "providers" {
+variable "proxmox_providers" {
   description = "List of Proxmox provider configurations"
   type = list(object({
     name        = string
