@@ -1,39 +1,56 @@
-#--------------------------------------------------------------
-# Cloudspace and node pool configurations
-#--------------------------------------------------------------
+# Cloudspace resource with configurable HA control plane
+resource "spot_cloudspace" "main" {
+  cloudspace_name    = var.cloudspace_name
+  region             = var.region
+  hacontrol_plane    = var.ha_control_plane
+  preemption_webhook = var.preemption_webhook
+  wait_until_ready   = var.wait_until_ready
+  kubernetes_version = var.kubernetes_version
+  cni                = var.cni
 
-#--------------------------------------------------------------
-# Existing cloud-homelab resources
-#--------------------------------------------------------------
-# Example of cloudspace resource.
-resource "spot_cloudspace" "cloud-homelab" {
-  cloudspace_name = "cloud-homelab"
-  # You can find the available region names in the `regions` data source.
-  region             = "us-central-ord-1"
-  hacontrol_plane    = false
-  preemption_webhook = "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX"
-  wait_until_ready   = true
-  kubernetes_version = "1.31.1"
-  cni                = "cilium"
+  # Add common labels
+  dynamic "labels" {
+    for_each = var.common_labels
+    content {
+      key   = labels.key
+      value = labels.value
+    }
+  }
 }
 
-# Creates a spot node pool with an autoscaling pool of 3-8 servers of class gp.vs1.xlarge-ord (Extra Large).
-resource "spot_spotnodepool" "autoscaling-bid" {
-  cloudspace_name = resource.spot_cloudspace.cloud-homelab.cloudspace_name
-  # You can find the available server classes in the `serverclasses` data source.
-  server_class = "gp.vs1.xlarge-ord"
-  bid_price    = 0.025
+# Create worker node pools based on configuration
+resource "spot_spotnodepool" "worker_pools" {
+  for_each = { for idx, pool in var.worker_node_pools : pool.name => pool }
 
+  cloudspace_name = resource.spot_cloudspace.main.cloudspace_name
+  server_class    = each.value.server_class
+  bid_price       = each.value.bid_price
 
-  # desired_server_count = 3
+  # Use desired_nodes if specified, otherwise use min_nodes
+  desired_server_count = each.value.desired_nodes != null ? each.value.desired_nodes : each.value.min_nodes
 
   autoscaling = {
-    min_nodes = 3
-    max_nodes = 6
+    min_nodes = each.value.min_nodes
+    max_nodes = each.value.max_nodes
   }
 
-  labels = {
-    "managed-by"         = "terraform"
+  # Merge common labels with pool-specific labels
+  labels = merge(
+    var.common_labels,
+    each.value.labels != null ? each.value.labels : {},
+    {
+      "pool-name" = each.value.name
+    }
+  )
+
+  # Add taints if specified
+  dynamic "taints" {
+    for_each = each.value.taints != null ? each.value.taints : []
+    content {
+      key    = taints.value.key
+      value  = taints.value.value
+      effect = taints.value.effect
+    }
   }
 }
 

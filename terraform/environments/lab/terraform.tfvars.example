@@ -1,0 +1,77 @@
+# Lab Environment Configuration Example
+# Copy this file to terraform.tfvars and fill in your values
+
+# Required: Rackspace Spot authentication token
+# rackspace_spot_token = "your-rackspace-spot-token"
+
+# Cluster Configuration
+lab_cloudspace_name = "lab-homelab"
+region             = "us-central-ord-1"
+kubernetes_version = "1.31.1"
+cni               = "cilium"
+
+# Cost Optimization: Disable HA control plane for maximum savings (optional)
+ha_control_plane = true  # Set to false to save costs (single control plane)
+
+# Optional: Slack webhook for preemption notifications (less critical for lab)
+# preemption_webhook = "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+
+# General Worker Nodes - Cost-optimized for lab workloads
+general_worker_server_class   = "gp.vs1.large-ord"      # 2 vCPU, 8GB RAM (smaller than prod)
+general_worker_bid_price      = 0.015                   # $0.015/hour (40% lower than prod)
+general_worker_min_nodes      = 2                       # Minimum for basic HA
+general_worker_max_nodes      = 5                       # Moderate scale-up capacity
+general_worker_desired_nodes  = 3                       # Good starting point
+
+# Experimental Worker Nodes - For testing and development
+experimental_worker_server_class   = "gp.vs1.medium-ord"    # 1 vCPU, 4GB RAM (minimal resources)
+experimental_worker_bid_price      = 0.010                  # $0.010/hour (very low cost)
+experimental_worker_min_nodes      = 0                      # Can scale to zero when not needed
+experimental_worker_max_nodes      = 3                      # Limited for cost control
+experimental_worker_desired_nodes  = 1                      # Start with one for experiments
+
+# Network Configuration - More permissive for easier development
+enable_network_policies     = false          # Disabled for easier testing
+lab_network_policy_mode    = "permissive"   # Options: permissive, restrictive, disabled
+
+# Namespace Management
+create_dev_namespace  = true   # Create 'development' namespace
+create_test_namespace = true   # Create 'testing' namespace
+
+# Development Features
+enable_experimental_features = true   # Enable experimental K8s features
+enable_debug_mode           = true   # Enable additional logging
+
+# Cost Management
+auto_shutdown_enabled = false  # Future feature for off-hours shutdown
+cost_alert_threshold  = 50     # Alert when monthly costs exceed $50
+
+# Resource Tagging
+common_labels = {
+  "managed-by"   = "terraform"
+  "team"         = "platform"
+  "cost-center"  = "development"
+  "environment"  = "lab"
+}
+
+# Example Lab Usage Scenarios:
+#
+# 1. Minimal Cost Setup (Single control plane, minimal workers):
+#    ha_control_plane = false
+#    general_worker_desired_nodes = 2
+#    experimental_worker_desired_nodes = 0
+#    Estimated cost: ~$22/month
+#
+# 2. Development Setup (HA control plane, moderate workers):
+#    ha_control_plane = true
+#    general_worker_desired_nodes = 3
+#    experimental_worker_desired_nodes = 1
+#    Estimated cost: ~$40/month
+#
+# 3. Testing Setup (Full features for prod validation):
+#    ha_control_plane = true
+#    general_worker_desired_nodes = 4
+#    experimental_worker_desired_nodes = 2
+#    enable_network_policies = true
+#    lab_network_policy_mode = "restrictive"
+#    Estimated cost: ~$55/month
