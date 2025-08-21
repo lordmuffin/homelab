@@ -18,7 +18,7 @@ spec:
     - match: Host(`tandoor.lab.apj.dev`)
       kind: Rule
       middlewares:
-        - name: traefik-forward-auth
+        - name: whitelist-auth
           namespace: traefik
       services:
         - name: tandoor-internal
