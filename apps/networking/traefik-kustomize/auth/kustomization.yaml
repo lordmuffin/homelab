@@ -5,3 +5,4 @@ resources:
 - service.yaml
 - middleware.yaml
 - auth-callback-route.yaml
+- auth-general-route.yaml
