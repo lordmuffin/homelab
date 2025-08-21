@@ -17,9 +17,6 @@ spec:
   routes:
     - match: Host(`tandoor.lab.apj.dev`)
       kind: Rule
-      middlewares:
-        - name: whitelist-auth
-          namespace: traefik
       services:
         - name: tandoor-internal
           port: 80
