@@ -4,4 +4,4 @@ resources:
 - deployment.yaml
 - service.yaml
 - middleware.yaml
-- auth-general-route.yaml
+- auth-callback-route.yaml
