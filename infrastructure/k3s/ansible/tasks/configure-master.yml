@@ -1,0 +1,89 @@
+# Configure K3s master nodes
+---
+- name: Set master node hostname
+  hostname:
+    name: "{{ ansible_hostname }}"
+
+- name: Add master node to /etc/hosts
+  lineinfile:
+    path: /etc/hosts
+    line: "{{ ansible_host | default(ansible_default_ipv4.address) }} {{ ansible_hostname }}"
+    state: present
+
+- name: Create audit policy file
+  copy:
+    dest: /etc/rancher/k3s/audit-policy.yaml
+    content: |
+      apiVersion: audit.k8s.io/v1
+      kind: Policy
+      rules:
+      - level: RequestResponse
+        namespaces: ["default", "kube-system", "monitoring"]
+        resources:
+        - group: ""
+          resources: ["pods", "services"]
+        - group: "apps"
+          resources: ["deployments", "replicasets"]
+      - level: Metadata
+        omitStages:
+        - RequestReceived
+    owner: root
+    group: root
+    mode: '0600'
+
+- name: Create containerd configuration for masters
+  copy:
+    dest: /etc/rancher/k3s/containerd.config.toml
+    content: |
+      version = 2
+      
+      [plugins."io.containerd.grpc.v1.cri"]
+        enable_selinux = false
+        sandbox_image = "rancher/mirrored-pause:3.6"
+      
+      [plugins."io.containerd.grpc.v1.cri".containerd]
+        snapshotter = "overlayfs"
+        disable_snapshot_annotations = true
+      
+      [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+        runtime_type = "io.containerd.runc.v2"
+      
+      [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
+        SystemdCgroup = true
+        
+      [plugins."io.containerd.grpc.v1.cri".registry]
+        [plugins."io.containerd.grpc.v1.cri".registry.mirrors]
+          [plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
+            endpoint = ["https://registry-1.docker.io"]
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Configure firewall for master nodes
+  ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+    comment: "K3s master {{ item }}"
+  loop:
+    - "22"     # SSH - CRITICAL: Must be first to prevent lockout
+    - "6443"   # API server
+    - "2379"   # etcd client
+    - "2380"   # etcd peer
+    - "10250"  # kubelet
+    - "10251"  # scheduler
+    - "10252"  # controller-manager
+  when: ansible_os_family == "Debian"
+
+- name: Enable and start ufw
+  ufw:
+    state: enabled
+  when: ansible_os_family == "Debian"
+
+- name: Wait for K3s server to be ready
+  wait_for:
+    port: 6443
+    host: "{{ ansible_default_ipv4.address }}"
+    delay: 30
+    timeout: 300
+  when: k3s_server_started is defined and k3s_server_started.changed

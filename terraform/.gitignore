@@ -1,0 +1,18 @@
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# Local override files
+local.tfvars
+terraform.tfvars.local
+override.tf
+override.tf.json
+
+# Sensitive files
+*.pem
+*.key
+
+# Generated files
+modules/proxmox-kairos/generated/

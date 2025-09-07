@@ -1,0 +1,222 @@
+# Global variables for K3s HA cluster
+# Integrates with existing homelab configuration
+
+# Cluster identification
+k3s_cluster_name: "homelab-k3s"
+k3s_cluster_init: true
+
+# K3s version and download configuration
+k3s_version: "v1.28.5+k3s1"
+k3s_download_url: "https://github.com/k3s-io/k3s/releases/download/{{ k3s_version }}/k3s"
+k3s_install_script_url: "https://get.k3s.io"
+
+# Network configuration
+k3s_cluster_cidr: "10.42.0.0/16"
+k3s_service_cidr: "10.43.0.0/16"
+k3s_cluster_dns: "10.43.0.10"
+
+# High Availability configuration
+k3s_datastore_endpoint: ""  # Empty for embedded etcd
+k3s_embedded_etcd: true
+k3s_etcd_expose_metrics: true
+
+# Security configuration
+k3s_token_file: "/var/lib/rancher/k3s/server/node-token"
+k3s_disable_components:
+  - traefik      # We'll use existing Traefik setup
+  - servicelb    # We'll use MetalLB
+  - local-storage  # We'll use Longhorn
+
+# Node configuration
+k3s_node_labels:
+  masters:
+    - "node-role.kubernetes.io/control-plane=true"
+    - "node.kubernetes.io/instance-type=master"
+  workers:
+    - "node-role.kubernetes.io/worker=true"
+    - "node.kubernetes.io/instance-type=worker"
+  gpu_workers:
+    - "node-role.kubernetes.io/worker=true"
+    - "node.kubernetes.io/instance-type=gpu-worker"
+    - "nvidia.com/gpu=true"
+    - "workload.type=ai"
+
+k3s_node_taints:
+  masters:
+    - "CriticalAddonsOnly=true:NoExecute"
+  gpu_workers:
+    - "nvidia.com/gpu=true:NoSchedule"
+
+# Kubelet configuration
+k3s_kubelet_args:
+  - "--max-pods=250"
+  - "--node-status-update-frequency=5s"
+  - "--image-gc-high-threshold=85"
+  - "--image-gc-low-threshold=80"
+  - "--container-log-max-files=3"
+  - "--container-log-max-size=10Mi"
+
+# API Server configuration
+k3s_kube_apiserver_args:
+  - "--audit-log-maxage=30"
+  - "--audit-log-maxbackup=3"
+  - "--audit-log-maxsize=100"
+  - "--enable-admission-plugins=NodeRestriction,ResourceQuota,LimitRanger"
+  - "--anonymous-auth=false"
+  - "--authorization-mode=Node,RBAC"
+
+# Controller Manager configuration
+k3s_kube_controller_manager_args:
+  - "--bind-address=0.0.0.0"
+  - "--node-monitor-period=5s"
+  - "--node-monitor-grace-period=40s"
+  - "--pod-eviction-timeout=5m"
+  - "--terminated-pod-gc-threshold=50"
+
+# Scheduler configuration
+k3s_kube_scheduler_args:
+  - "--bind-address=0.0.0.0"
+
+# Proxy configuration
+k3s_kube_proxy_args:
+  - "--metrics-bind-address=0.0.0.0:10249"
+  - "--proxy-mode=iptables"
+
+# Container runtime configuration
+k3s_containerd_config: |
+  [plugins."io.containerd.grpc.v1.cri"]
+    enable_selinux = false
+    sandbox_image = "rancher/mirrored-pause:3.6"
+  [plugins."io.containerd.grpc.v1.cri".containerd]
+    snapshotter = "overlayfs"
+    disable_snapshot_annotations = true
+  [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+    runtime_type = "io.containerd.runc.v2"
+  [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
+    SystemdCgroup = true
+
+# GPU configuration for GPU workers
+k3s_gpu_config:
+  nvidia_device_plugin_enabled: true
+  nvidia_runtime_class: "nvidia"
+  nvidia_default_runtime: "nvidia"
+
+# Storage configuration
+longhorn_storage_classes:
+  - name: "longhorn-nvme-critical"
+    replicas: 3
+    node_selector: "storage.type=nvme"
+    reclaim_policy: "Retain"
+    volume_binding_mode: "WaitForFirstConsumer"
+  - name: "longhorn-ssd-standard"
+    replicas: 2
+    node_selector: "storage.type=ssd"
+    reclaim_policy: "Delete"
+    volume_binding_mode: "WaitForFirstConsumer"
+  - name: "longhorn-bulk"
+    replicas: 2
+    reclaim_policy: "Delete"
+    volume_binding_mode: "WaitForFirstConsumer"
+
+# MetalLB configuration
+metallb_config:
+  address_pools:
+    - name: "homelab-pool"
+      protocol: "layer2"
+      addresses:
+        - "10.10.200.100-10.10.200.200"
+
+# Integration with existing homelab services
+homelab_integration:
+  prometheus_enabled: true
+  grafana_enabled: true
+  argocd_enabled: true
+  traefik_enabled: true
+  longhorn_enabled: true
+  metallb_enabled: true
+
+# Monitoring configuration
+monitoring_config:
+  namespace: "monitoring"
+  prometheus:
+    storage_class: "longhorn-ssd-standard"
+    storage_size: "50Gi"
+    retention: "30d"
+  grafana:
+    storage_class: "longhorn-ssd-standard"
+    storage_size: "10Gi"
+  alertmanager:
+    storage_class: "longhorn-ssd-standard"
+    storage_size: "10Gi"
+
+# Backup configuration
+backup_config:
+  enabled: true
+  provider: "backblaze"
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  retention: "30d"
+  s3_endpoint: "{{ backblaze_s3_endpoint | default('s3.us-west-004.backblazeb2.com') }}"
+  s3_bucket: "{{ backblaze_bucket | default('homelab-backups') }}"
+
+# Network policies
+network_policies_enabled: true
+default_deny_ingress: false  # Start permissive, tighten later
+default_deny_egress: false
+
+# Resource quotas by namespace
+resource_quotas:
+  default:
+    requests.cpu: "2"
+    requests.memory: "4Gi"
+    limits.cpu: "4"
+    limits.memory: "8Gi"
+  monitoring:
+    requests.cpu: "4"
+    requests.memory: "8Gi"
+    limits.cpu: "8"
+    limits.memory: "16Gi"
+  longhorn-system:
+    requests.cpu: "2"
+    requests.memory: "4Gi"
+    limits.cpu: "4"
+    limits.memory: "8Gi"
+
+# Helm configuration
+helm_version: "3.13.3"
+helm_install_dir: "/usr/local/bin"
+
+# Kubectl configuration
+kubectl_config_dir: "/etc/rancher/k3s"
+kubectl_config_file: "k3s.yaml"
+
+# System requirements validation
+system_requirements:
+  min_memory_gb: 2
+  min_cpu_cores: 2
+  min_disk_gb: 20
+  required_ports:
+    - 6443   # K3s API server
+    - 10250  # Kubelet
+    - 8472   # Flannel VXLAN
+    - 51820  # Flannel Wireguard (if enabled)
+    - 51821  # Flannel Wireguard (if enabled)
+
+# Firewall configuration
+firewall_rules:
+  masters:
+    - port: 6443
+      source: "{{ k3s_cluster_cidr }}"
+      comment: "K3s API server"
+    - port: 2379
+      source: "masters"
+      comment: "etcd client"
+    - port: 2380
+      source: "masters"
+      comment: "etcd peer"
+  all:
+    - port: 10250
+      source: "{{ k3s_cluster_cidr }}"
+      comment: "Kubelet"
+    - port: 8472
+      source: "{{ k3s_cluster_cidr }}"
+      comment: "Flannel VXLAN"

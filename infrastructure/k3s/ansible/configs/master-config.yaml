@@ -1,0 +1,50 @@
+# K3s Master Configuration
+# This template configures K3s server nodes for HA cluster
+
+# Cluster configuration
+cluster-init: {{ 'true' if ansible_hostname == groups['masters'][0] else 'false' }}
+token: "{{ k3s_token }}"
+{% if ansible_hostname != groups['masters'][0] and groups['masters'] | length > 1 %}
+server: https://{{ groups['masters'][0] }}:6443
+{% endif %}
+
+# Network configuration
+cluster-cidr: "{{ k3s_cluster_cidr | default('10.42.0.0/16') }}"
+service-cidr: "{{ k3s_service_cidr | default('10.43.0.0/16') }}"
+cluster-dns: "{{ k3s_cluster_dns | default('10.43.0.10') }}"
+
+# Disable default components (we'll use external ones for HA)
+disable:
+  - traefik
+  - servicelb
+  - local-storage
+
+# Enable required features
+write-kubeconfig-mode: "0644"
+kube-apiserver-arg:
+  - "default-not-ready-toleration-seconds=30"
+  - "default-unreachable-toleration-seconds=30"
+
+# Etcd configuration for HA
+etcd-expose-metrics: true
+etcd-s3-backup: {{ k3s_etcd_backup_enabled | default('false') }}
+{% if k3s_etcd_backup_enabled | default(false) %}
+etcd-s3-endpoint: "{{ k3s_etcd_s3_endpoint }}"
+etcd-s3-access-key: "{{ k3s_etcd_s3_access_key }}"
+etcd-s3-secret-key: "{{ k3s_etcd_s3_secret_key }}"
+etcd-s3-bucket: "{{ k3s_etcd_s3_bucket }}"
+etcd-s3-region: "{{ k3s_etcd_s3_region | default('us-east-1') }}"
+{% endif %}
+
+# Node labels
+node-label:
+  - "node-role.kubernetes.io/master=true"
+  - "node-type=master"
+
+# Taints for master nodes
+node-taint:
+  - "node-role.kubernetes.io/master=true:NoSchedule"
+
+# Logging
+log: /var/log/k3s.log
+alsologtostderr: true

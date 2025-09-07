@@ -1,0 +1,53 @@
+---
+# Fix APT repository issues
+- name: Remove problematic Helm APT repository
+  file:
+    path: "/etc/apt/sources.list.d/{{ item }}"
+    state: absent
+  loop:
+    - helm-stable-debian.list
+    - helm.list
+  become: yes
+  ignore_errors: yes
+
+- name: Remove Helm APT signing key
+  apt_key:
+    keyring: /usr/share/keyrings/helm.gpg
+    state: absent
+  become: yes
+  ignore_errors: yes
+
+- name: Remove Helm GPG keyring file
+  file:
+    path: /usr/share/keyrings/helm.gpg
+    state: absent
+  become: yes
+  ignore_errors: yes
+
+- name: Wait for unattended-upgr to finish
+  shell: |
+    while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+      echo "Waiting for other software managers to finish..."
+      sleep 5
+    done
+  changed_when: false
+
+- name: Update APT cache after removing problematic repos
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+  become: yes
+  retries: 3
+  delay: 10
+
+- name: Install Python packages
+  apt:
+    name:
+      - python3-pip
+      - python3-dev
+      - python3-kubernetes
+    state: present
+    update_cache: yes
+  become: yes
+  retries: 3
+  delay: 10

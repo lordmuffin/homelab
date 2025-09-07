@@ -1,6 +1,47 @@
-module "rackspace-spot" {
-  source      = "./modules/rackspace-spot"
-  rackspace_spot_token = var.api_key
+# module "rackspace-spot" {
+#   source      = "./modules/rackspace-spot"
+#   cloudspace_name = "healingorganics"
+#   rackspace_spot_token = var.api_key
+# }
+
+# Kairos Kubernetes cluster on Proxmox
+# Uncomment and configure the module below to deploy Kairos clusters
+module "kairos_cluster" {
+  source = "./modules/proxmox-kairos"
+  
+  # Only create if required variables are provided
+  count = var.proxmox_api_url != null && var.environment != null ? 1 : 0
+
+  # Proxmox configuration (provide at runtime)
+  proxmox_api_url      = var.proxmox_api_url
+  proxmox_user         = var.proxmox_user
+  proxmox_password     = var.proxmox_password
+  proxmox_node         = var.proxmox_node
+  proxmox_tls_insecure = var.proxmox_tls_insecure
+
+  # Cluster configuration
+  environment  = var.environment
+  cluster_name = var.cluster_name
+
+  # SSH configuration
+  ssh_public_keys      = var.ssh_public_keys
+  ssh_private_key_file = var.ssh_private_key_file
+
+  # Network configuration
+  network_config = var.network_config
+
+  # Control plane and worker configuration
+  control_plane = var.control_plane_config
+  worker_nodes  = var.worker_nodes_config
+
+  # Kairos configuration
+  kairos_config = var.kairos_config
+  
+  # ISO configuration
+  kairos_iso_name = var.kairos_iso_name
+
+  # Tags
+  tags = var.cluster_tags
 }
 
 # module "unifi" {

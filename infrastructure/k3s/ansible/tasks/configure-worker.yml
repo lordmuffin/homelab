@@ -1,0 +1,94 @@
+# Configure K3s worker nodes
+---
+- name: Set worker node hostname
+  hostname:
+    name: "{{ ansible_hostname }}"
+
+- name: Add worker node to /etc/hosts
+  lineinfile:
+    path: /etc/hosts
+    line: "{{ ansible_host | default(ansible_default_ipv4.address) }} {{ ansible_hostname }}"
+    state: present
+
+- name: Add master nodes to /etc/hosts
+  lineinfile:
+    path: /etc/hosts
+    line: "{{ hostvars[item]['ansible_host'] }} {{ item }}"
+    state: present
+  loop: "{{ groups['masters'] }}"
+
+- name: Create containerd configuration for workers
+  copy:
+    dest: /etc/rancher/k3s/containerd.config.toml
+    content: |
+      version = 2
+      
+      [plugins."io.containerd.grpc.v1.cri"]
+        enable_selinux = false
+        sandbox_image = "rancher/mirrored-pause:3.6"
+      
+      [plugins."io.containerd.grpc.v1.cri".containerd]
+        snapshotter = "overlayfs"
+        disable_snapshot_annotations = true
+      
+      [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+        runtime_type = "io.containerd.runc.v2"
+      
+      [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
+        SystemdCgroup = true
+        
+      [plugins."io.containerd.grpc.v1.cri".registry]
+        [plugins."io.containerd.grpc.v1.cri".registry.mirrors]
+          [plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
+            endpoint = ["https://registry-1.docker.io"]
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Configure firewall for worker nodes
+  ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+    comment: "K3s worker {{ item }}"
+  loop:
+    - "22"     # SSH - CRITICAL: Must be first to prevent lockout
+    - "10250"  # kubelet
+    - "30000"  # NodePort range start
+    - "32767"  # NodePort range end
+  when: ansible_os_family == "Debian"
+
+- name: Allow Flannel VXLAN traffic
+  ufw:
+    rule: allow
+    port: "8472"
+    proto: udp
+    comment: "Flannel VXLAN"
+  when: ansible_os_family == "Debian"
+
+- name: Enable and start ufw
+  ufw:
+    state: enabled
+  when: ansible_os_family == "Debian"
+
+- name: Create longhorn storage directory
+  file:
+    path: /var/lib/longhorn
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Label node for storage class
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Node
+      metadata:
+        name: "{{ ansible_hostname }}"
+        labels:
+          storage.class: "{{ storage_class | default('longhorn-ssd-standard') }}"
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+  delegate_to: "{{ groups['masters'][0] }}"
+  run_once: true

@@ -1,0 +1,32 @@
+---
+# Main K3s Site Deployment Playbook
+# This is the main entry point that includes all necessary configuration
+
+- import_playbook: playbooks/configure-k3s-fixed.yml
+
+# Additional handlers that may be needed globally
+- name: Global handlers
+  hosts: all
+  become: yes
+  handlers:
+    - name: reboot system
+      reboot:
+        reboot_timeout: 600
+        connect_timeout: 20
+        pre_reboot_delay: 0
+        post_reboot_delay: 30
+        test_command: whoami
+
+    - name: restart k3s
+      systemd:
+        name: k3s
+        state: restarted
+        daemon_reload: yes
+      when: "'masters' in group_names"
+
+    - name: restart k3s-agent
+      systemd:
+        name: k3s-agent
+        state: restarted
+        daemon_reload: yes
+      when: "'workers' in group_names or 'gpu_workers' in group_names"

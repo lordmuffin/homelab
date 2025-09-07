@@ -5,7 +5,7 @@ output "cloudspace_name" {
 }
 
 output "cloudspace_id" {
-  description = "ID of the created cloudspace"
+  description = "ID of the created cloudspace (using deprecated id attribute)"
   value       = resource.spot_cloudspace.main.id
 }
 

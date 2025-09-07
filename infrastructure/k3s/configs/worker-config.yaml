@@ -1,0 +1,164 @@
+# K3s Worker Node Configuration
+# Optimized for workload execution
+
+# Server connection
+server: "https://{{ groups['masters'][0] }}:6443"
+
+# Node configuration
+node-name: "{{ ansible_hostname }}"
+node-label:
+{% for label in k3s_node_labels.workers %}
+  - "{{ label }}"
+{% endfor %}
+{% if 'gpu_workers' in group_names %}
+{% for label in k3s_node_labels.gpu_workers %}
+  - "{{ label }}"
+{% endfor %}
+{% endif %}
+{% if storage_class is defined %}
+  - "storage.class={{ storage_class }}"
+{% endif %}
+{% if node_labels is defined %}
+{% for label in node_labels %}
+  - "{{ label }}"
+{% endfor %}
+{% endif %}
+
+# Node taints for GPU workers
+{% if 'gpu_workers' in group_names %}
+node-taint:
+{% for taint in k3s_node_taints.gpu_workers %}
+  - "{{ taint }}"
+{% endfor %}
+{% endif %}
+
+# Kubelet configuration
+kubelet-arg:
+{% for arg in k3s_kubelet_args %}
+  - "{{ arg }}"
+{% endfor %}
+{% if 'gpu_workers' in group_names %}
+  - "--feature-gates=DevicePlugins=true"
+  - "--container-runtime=containerd"
+  - "--container-runtime-endpoint=unix:///run/containerd/containerd.sock"
+{% endif %}
+
+# Proxy configuration
+kube-proxy-arg:
+{% for arg in k3s_kube_proxy_args %}
+  - "{{ arg }}"
+{% endfor %}
+
+# Container runtime configuration
+container-runtime-endpoint: unix:///run/containerd/containerd.sock
+containerd-config-path: "/etc/rancher/k3s/containerd.config.toml"
+
+# Data directory
+data-dir: "/var/lib/rancher/k3s"
+
+# Disable components (agents don't need these)
+disable-cloud-controller: true
+
+# Snapshotter configuration
+snapshotter: overlayfs
+
+# Additional configuration for workers
+protect-kernel-defaults: false  # Allow kubelet to modify kernel settings
+rootless: false
+selinux: false
+
+# Resource reservations
+system-reserved:
+  - "cpu=200m"
+  - "memory=512Mi"
+  - "ephemeral-storage=1Gi"
+
+kube-reserved:
+  - "cpu=200m"
+  - "memory=512Mi"
+  - "ephemeral-storage=1Gi"
+
+# Eviction thresholds
+eviction-hard:
+  - "memory.available<100Mi"
+  - "nodefs.available<10%"
+  - "nodefs.inodesFree<5%"
+  - "imagefs.available<15%"
+
+eviction-soft:
+  - "memory.available<300Mi"
+  - "nodefs.available<15%"
+  - "imagefs.available<20%"
+
+eviction-soft-grace-period:
+  - "memory.available=2m"
+  - "nodefs.available=2m"
+  - "imagefs.available=2m"
+
+# Image garbage collection
+image-gc-high-threshold: 85
+image-gc-low-threshold: 80
+
+# Additional kubelet settings for performance
+max-pods: 250
+pods-per-core: 0
+registry-burst: 10
+registry-qps: 5
+
+# Logging configuration
+v: 2  # Log level
+log-file: "/var/log/k3s-agent.log"
+alsologtostderr: false
+
+# Additional labels based on node characteristics
+{% if ansible_processor_vcpus is defined and ansible_processor_vcpus >= 16 %}
+node-label:
+  - "node.kubernetes.io/instance-size=large"
+{% elif ansible_processor_vcpus is defined and ansible_processor_vcpus >= 8 %}
+node-label:
+  - "node.kubernetes.io/instance-size=medium"
+{% else %}
+node-label:
+  - "node.kubernetes.io/instance-size=small"
+{% endif %}
+
+{% if ansible_memtotal_mb is defined and ansible_memtotal_mb >= 32768 %}
+node-label:
+  - "node.kubernetes.io/memory-size=large"
+{% elif ansible_memtotal_mb is defined and ansible_memtotal_mb >= 16384 %}
+node-label:
+  - "node.kubernetes.io/memory-size=medium"
+{% else %}
+node-label:
+  - "node.kubernetes.io/memory-size=small"
+{% endif %}
+
+# GPU-specific configuration
+{% if 'gpu_workers' in group_names %}
+# GPU runtime configuration will be handled by containerd config
+runtime-class: "nvidia"
+
+# Additional GPU labels
+node-label:
+  - "hardware.nvidia.com/gpu=true"
+  - "gpu.nvidia.com/driver-version={{ ansible_local.nvidia.driver_version | default('unknown') }}"
+  - "accelerator={{ gpu_type | default('nvidia') }}"
+{% endif %}
+
+# Storage class labeling based on detected storage
+{% if ansible_mounts is defined %}
+{% for mount in ansible_mounts %}
+{% if mount.mount == "/" %}
+{% if "nvme" in mount.device %}
+node-label:
+  - "storage.type=nvme"
+{% elif "ssd" in mount.device or "SSD" in mount.fstype %}
+node-label:
+  - "storage.type=ssd"
+{% else %}
+node-label:
+  - "storage.type=hdd"
+{% endif %}
+{% endif %}
+{% endfor %}
+{% endif %}

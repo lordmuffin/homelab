@@ -36,7 +36,7 @@ variable "ha_control_plane" {
 variable "preemption_webhook" {
   description = "Webhook URL for preemption notifications"
   type        = string
-  default     = ""
+  default     = "https://example.com/webhook"
 }
 
 variable "wait_until_ready" {

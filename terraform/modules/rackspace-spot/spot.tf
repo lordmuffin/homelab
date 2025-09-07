@@ -8,14 +8,7 @@ resource "spot_cloudspace" "main" {
   kubernetes_version = var.kubernetes_version
   cni                = var.cni
 
-  # Add common labels
-  dynamic "labels" {
-    for_each = var.common_labels
-    content {
-      key   = labels.key
-      value = labels.value
-    }
-  }
+  # Labels are not supported in this resource
 }
 
 # Create worker node pools based on configuration
@@ -26,9 +19,7 @@ resource "spot_spotnodepool" "worker_pools" {
   server_class    = each.value.server_class
   bid_price       = each.value.bid_price
 
-  # Use desired_nodes if specified, otherwise use min_nodes
-  desired_server_count = each.value.desired_nodes != null ? each.value.desired_nodes : each.value.min_nodes
-
+  # Use autoscaling configuration
   autoscaling = {
     min_nodes = each.value.min_nodes
     max_nodes = each.value.max_nodes
@@ -43,24 +34,13 @@ resource "spot_spotnodepool" "worker_pools" {
     }
   )
 
-  # Add taints if specified
-  dynamic "taints" {
-    for_each = each.value.taints != null ? each.value.taints : []
-    content {
-      key    = taints.value.key
-      value  = taints.value.value
-      effect = taints.value.effect
-    }
-  }
+  # Taints are not supported in this resource version
 }
 
-data "spot_kubeconfig" "cloud-homelab" {
-  cloudspace_name = resource.spot_cloudspace.cloud-homelab.name
+data "spot_kubeconfig" "main" {
+  cloudspace_name = resource.spot_cloudspace.main.cloudspace_name
 }
 
-output "kubeconfig" {
-  value = data.spot_kubeconfig.cloud-homelab.raw
-}
 
 ## FUTURE BELOW ##
 

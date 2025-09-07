@@ -1,0 +1,349 @@
+---
+# Main K3s HA Cluster Configuration Playbook - UPDATED WITH FIXES
+# Integrates with existing homelab infrastructure and monitoring
+
+- name: Configure K3s HA Cluster
+  hosts: k3s_cluster
+  become: yes
+  gather_facts: yes
+  serial: 3  # Process nodes in batches to avoid overwhelming
+  
+  pre_tasks:
+    - name: Wait for connection
+      wait_for_connection:
+        delay: 10
+        timeout: 300
+    
+    - name: Gather facts
+      setup:
+    
+    # FIX 1: Clean up problematic APT repositories
+    - name: Remove problematic Helm APT repository
+      file:
+        path: "/etc/apt/sources.list.d/{{ item }}"
+        state: absent
+      loop:
+        - helm-stable-debian.list
+        - helm.list
+      become: yes
+      ignore_errors: yes
+
+    - name: Remove Helm GPG keyring file
+      file:
+        path: /usr/share/keyrings/helm.gpg
+        state: absent
+      become: yes
+      ignore_errors: yes
+
+    # FIX 2: Handle dpkg locks
+    - name: Wait for unattended-upgr to finish
+      shell: |
+        while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+          echo "Waiting for other software managers to finish..."
+          sleep 5
+        done
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Update APT cache after removing problematic repos
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+      become: yes
+      retries: 3
+      delay: 10
+    
+    # FIX 3: Install required Python packages with proper versions
+    - name: Install pip3 and Python development tools
+      apt:
+        name:
+          - python3-pip
+          - python3-dev
+          - python3-setuptools
+          - python3-kubernetes
+        state: present
+        update_cache: yes
+      become: yes
+      when: ansible_os_family == "Debian"
+      retries: 3
+      delay: 10
+    
+    - name: Install Python packages for Kubernetes management
+      pip:
+        name:
+          - kubernetes>=24.2.0
+          - PyYAML>=3.11
+          - jsonpatch
+        state: present
+        executable: pip3
+      become: yes
+    
+    - name: Install Kubernetes Ansible collection
+      ansible.builtin.command:
+        cmd: ansible-galaxy collection install kubernetes.core
+      delegate_to: localhost
+      run_once: true
+      become: no
+      ignore_errors: yes  # Collection may already be installed
+    
+    - name: Check if K3s service is already installed
+      stat:
+        path: /etc/systemd/system/k3s.service
+      register: k3s_master_service
+      when: "'masters' in group_names"
+    
+    - name: Check if K3s agent service is already installed
+      stat:
+        path: /etc/systemd/system/k3s-agent.service
+      register: k3s_agent_service
+      when: "'workers' in group_names or 'gpu_workers' in group_names"
+
+  tasks:
+    # INSTALL K3S WITH PROPER TOKEN HANDLING
+    - name: Install K3s on primary master
+      shell: |
+        curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="{{ k3s_version }}" sh -s - server \
+          --cluster-init \
+          --token "{{ k3s_token }}" \
+          --cluster-cidr "{{ cluster_cidr }}" \
+          --service-cidr "{{ service_cidr }}" \
+          --cluster-dns "{{ cluster_dns }}" \
+          --disable traefik \
+          --disable servicelb \
+          --disable local-storage \
+          --write-kubeconfig-mode 0644 \
+          --node-taint node-role.kubernetes.io/master=true:NoSchedule
+      args:
+        creates: /etc/systemd/system/k3s.service
+      when: 
+        - "'masters' in group_names"
+        - "is_primary | default(false)"
+
+    - name: Wait for primary master to be ready
+      wait_for:
+        port: 6443
+        host: "{{ ansible_host }}"
+        delay: 15
+        timeout: 300
+      when: 
+        - "'masters' in group_names"
+        - "is_primary | default(false)"
+
+    - name: Wait for primary master token file to be created
+      wait_for:
+        path: /var/lib/rancher/k3s/server/node-token
+        timeout: 120
+      delegate_to: k3s-master-01
+      run_once: true
+
+    - name: Get the full node token from primary master
+      shell: cat /var/lib/rancher/k3s/server/node-token
+      delegate_to: k3s-master-01
+      register: full_node_token
+      run_once: true
+
+    - name: Install K3s on additional masters
+      shell: |
+        curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="{{ k3s_version }}" sh -s - server \
+          --server "https://{{ hostvars['k3s-master-01']['ansible_host'] }}:6443" \
+          --token "{{ full_node_token.stdout }}" \
+          --cluster-cidr "{{ cluster_cidr }}" \
+          --service-cidr "{{ service_cidr }}" \
+          --cluster-dns "{{ cluster_dns }}" \
+          --disable traefik \
+          --disable servicelb \
+          --disable local-storage \
+          --write-kubeconfig-mode 0644 \
+          --node-taint node-role.kubernetes.io/master=true:NoSchedule
+      args:
+        creates: /etc/systemd/system/k3s.service
+      when: 
+        - "'masters' in group_names"
+        - "not (is_primary | default(false))"
+
+    - name: Install K3s on worker nodes
+      shell: |
+        curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="{{ k3s_version }}" sh -s - agent \
+          --server "https://{{ hostvars['k3s-master-01']['ansible_host'] }}:6443" \
+          --token "{{ full_node_token.stdout }}" \
+          --node-label "node-type=worker"
+      args:
+        creates: /etc/systemd/system/k3s-agent.service
+      when: "'workers' in group_names"
+
+    - name: Install K3s on GPU worker nodes
+      shell: |
+        curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="{{ k3s_version }}" sh -s - agent \
+          --server "https://{{ hostvars['k3s-master-01']['ansible_host'] }}:6443" \
+          --token "{{ full_node_token.stdout }}" \
+          --node-label "node-type=gpu-worker" \
+          --node-label "gpu=nvidia" \
+          --node-label "workload=ai"
+      args:
+        creates: /etc/systemd/system/k3s-agent.service
+      when: "'gpu_workers' in group_names"
+
+    - name: Enable and start K3s service (masters)
+      systemd:
+        name: k3s
+        state: started
+        enabled: yes
+        daemon_reload: yes
+      when: "'masters' in group_names"
+
+    - name: Enable and start K3s agent service (workers)
+      systemd:
+        name: k3s-agent
+        state: started
+        enabled: yes
+        daemon_reload: yes
+      when: "'workers' in group_names or 'gpu_workers' in group_names"
+
+    # CONFIGURATION TASKS WITH FIXES
+    - name: Configure K3s master nodes
+      include_tasks: ../tasks/configure-master.yml
+      when: "'masters' in group_names"
+
+    - name: Configure K3s worker nodes
+      include_tasks: ../tasks/configure-worker.yml
+      when: "'workers' in group_names"
+
+    - name: Configure GPU worker nodes
+      include_tasks: ../tasks/configure-gpu-worker.yml
+      when: "'gpu_workers' in group_names"
+
+    # KUBECONFIG MANAGEMENT
+    - name: Create local kubeconfig directory
+      file:
+        path: "{{ lookup('env', 'HOME') }}/.kube"
+        state: directory
+        mode: '0755'
+      delegate_to: localhost
+      run_once: true
+      become: no
+
+    - name: Fetch kubeconfig from primary master
+      fetch:
+        src: /etc/rancher/k3s/k3s.yaml
+        dest: "{{ lookup('env', 'HOME') }}/.kube/k3s-cluster-config"
+        flat: yes
+      when: 
+        - "'masters' in group_names"
+        - "is_primary | default(false)"
+
+    - name: Update kubeconfig server address for external access
+      replace:
+        path: "{{ lookup('env', 'HOME') }}/.kube/k3s-cluster-config"
+        regexp: 'server: https://127\.0\.0\.1:6443'
+        replace: 'server: https://{{ hostvars["k3s-master-01"]["ansible_host"] }}:6443'
+      delegate_to: localhost
+      run_once: true
+      become: no
+
+    - name: Set kubeconfig permissions
+      file:
+        path: "{{ lookup('env', 'HOME') }}/.kube/k3s-cluster-config"
+        mode: '0600'
+      delegate_to: localhost
+      run_once: true
+      become: no
+
+    # OPTIONAL: Install kubectl access and other services
+    - name: Set up kubectl access
+      include_tasks: ../tasks/kubectl-access.yml
+      ignore_errors: yes  # May fail if tasks don't exist
+
+    - name: Configure cluster networking
+      include_tasks: ../tasks/configure-networking.yml
+      when: "'masters' in group_names and ansible_hostname == groups['masters'][0]"
+      ignore_errors: yes  # May fail if tasks don't exist
+
+  post_tasks:
+    - name: Wait for cluster to be ready
+      pause:
+        seconds: 30
+      when: "'masters' in group_names and ansible_hostname == groups['masters'][0]"
+
+    - name: Verify cluster status
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Node
+        kubeconfig: /etc/rancher/k3s/k3s.yaml
+      register: cluster_nodes
+      when: "'masters' in group_names and ansible_hostname == groups['masters'][0]"
+      ignore_errors: yes
+
+    - name: Display cluster status
+      debug:
+        msg: |
+          🎉 K3s Cluster Status:
+          - Total nodes: {{ cluster_nodes.resources | length if cluster_nodes.resources is defined else 'Unknown' }}
+          - Ready nodes: {{ cluster_nodes.resources | selectattr('status.conditions', 'defined') | selectattr('status.conditions', 'selectattr', 'type', 'equalto', 'Ready') | selectattr('status.conditions', 'selectattr', 'status', 'equalto', 'True') | list | length if cluster_nodes.resources is defined else 'Unknown' }}
+          
+          📋 Next Steps:
+          1. Export kubeconfig: export KUBECONFIG=$HOME/.kube/k3s-cluster-config
+          2. Test connectivity: kubectl get nodes
+          3. View cluster info: kubectl cluster-info
+          
+          🔧 Cluster Configuration:
+          - API Server: https://{{ hostvars['k3s-master-01']['ansible_host'] }}:6443
+          - Kubeconfig saved to: $HOME/.kube/k3s-cluster-config
+      when: cluster_nodes is defined
+      run_once: true
+
+    - name: Create kubectl alias command
+      copy:
+        content: |
+          #!/bin/bash
+          # K3s Cluster Access Script
+          export KUBECONFIG=$HOME/.kube/k3s-cluster-config
+          kubectl "$@"
+        dest: "{{ lookup('env', 'HOME') }}/k3s-kubectl"
+        mode: '0755'
+      delegate_to: localhost
+      run_once: true
+      become: no
+
+    - name: Display connection instructions
+      debug:
+        msg: |
+          
+          🚀 K3s Cluster Ready!
+          
+          To connect to your cluster:
+          
+          Method 1 - Export kubeconfig:
+            export KUBECONFIG=$HOME/.kube/k3s-cluster-config
+            kubectl get nodes
+          
+          Method 2 - Use the helper script:
+            $HOME/k3s-kubectl get nodes
+          
+          Method 3 - Specify kubeconfig per command:
+            kubectl --kubeconfig=$HOME/.kube/k3s-cluster-config get nodes
+            
+          🌐 API Server: https://{{ hostvars['k3s-master-01']['ansible_host'] }}:6443
+      run_once: true
+
+  handlers:
+    - name: restart k3s
+      systemd:
+        name: k3s
+        state: restarted
+        daemon_reload: yes
+      when: "'masters' in group_names"
+
+    - name: restart k3s-agent
+      systemd:
+        name: k3s-agent
+        state: restarted
+        daemon_reload: yes
+      when: "'workers' in group_names or 'gpu_workers' in group_names"
+
+    - name: reboot system
+      reboot:
+        reboot_timeout: 600
+        connect_timeout: 20
+        pre_reboot_delay: 0
+        post_reboot_delay: 30
+        test_command: whoami

@@ -1,0 +1,123 @@
+# K3s Master Node Configuration
+# High Availability configuration with embedded etcd
+
+# Cluster configuration
+cluster-init: {{ 'true' if ansible_hostname == groups['masters'][0] else 'false' }}
+server: {{ 'https://' + groups['masters'][0] + ':6443' if ansible_hostname != groups['masters'][0] else '' }}
+
+# Network configuration
+cluster-cidr: "{{ k3s_cluster_cidr }}"
+service-cidr: "{{ k3s_service_cidr }}"
+cluster-dns: "{{ k3s_cluster_dns }}"
+
+# High Availability with embedded etcd
+datastore-endpoint: ""  # Use embedded etcd
+etcd-expose-metrics: true
+etcd-snapshot-schedule-cron: "0 */12 * * *"
+etcd-snapshot-retention: 5
+etcd-snapshot-dir: "/var/lib/rancher/k3s/server/db/snapshots"
+
+# Disable built-in components (we'll install our own)
+disable:
+  - traefik      # Using external Traefik
+  - servicelb    # Using MetalLB
+  - local-storage # Using Longhorn
+
+# Node configuration
+node-name: "{{ ansible_hostname }}"
+node-label:
+{% for label in k3s_node_labels.masters %}
+  - "{{ label }}"
+{% endfor %}
+
+node-taint:
+{% for taint in k3s_node_taints.masters %}
+  - "{{ taint }}"
+{% endfor %}
+
+# API Server configuration
+kube-apiserver-arg:
+{% for arg in k3s_kube_apiserver_args %}
+  - "{{ arg }}"
+{% endfor %}
+
+# Controller Manager configuration
+kube-controller-manager-arg:
+{% for arg in k3s_kube_controller_manager_args %}
+  - "{{ arg }}"
+{% endfor %}
+
+# Scheduler configuration
+kube-scheduler-arg:
+{% for arg in k3s_kube_scheduler_args %}
+  - "{{ arg }}"
+{% endfor %}
+
+# Kubelet configuration
+kubelet-arg:
+{% for arg in k3s_kubelet_args %}
+  - "{{ arg }}"
+{% endfor %}
+
+# Proxy configuration
+kube-proxy-arg:
+{% for arg in k3s_kube_proxy_args %}
+  - "{{ arg }}"
+{% endfor %}
+
+# TLS configuration
+tls-san:
+  - "{{ ansible_default_ipv4.address }}"
+  - "{{ ansible_hostname }}"
+  - "{{ ansible_fqdn }}"
+{% for host in groups['masters'] %}
+  - "{{ hostvars[host]['ansible_default_ipv4']['address'] }}"
+  - "{{ host }}"
+{% endfor %}
+{% if metallb_config.address_pools[0].addresses[0] is defined %}
+  - "{{ metallb_config.address_pools[0].addresses[0].split('-')[0] }}"
+{% endif %}
+
+# Secrets encryption at rest
+secrets-encryption: true
+
+# Audit logging
+audit-log-path: "/var/log/k3s-audit.log"
+audit-log-maxage: 30
+audit-log-maxbackup: 3
+audit-log-maxsize: 100
+audit-policy-file: "/etc/rancher/k3s/audit-policy.yaml"
+
+# Container runtime configuration
+container-runtime-endpoint: unix:///run/containerd/containerd.sock
+containerd-config-path: "/etc/rancher/k3s/containerd.config.toml"
+
+# Flannel configuration
+flannel-backend: "vxlan"
+flannel-ipv6-masq: false
+flannel-external-ip: false
+
+# Disable components we don't need
+disable-cloud-controller: true
+disable-network-policy: false  # We want network policies
+
+# Metrics configuration
+enable-pprof: false
+metrics-server-args:
+  - "--kubelet-insecure-tls"
+  - "--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname"
+
+# Additional configuration
+write-kubeconfig-mode: "0644"
+data-dir: "/var/lib/rancher/k3s"
+
+# Embedded registry mirror (optional)
+# registry-config-path: "/etc/rancher/k3s/registries.yaml"
+
+# Additional mount points for container runtime
+# kubelet-arg:
+#   - "--root-dir=/var/lib/kubelet"
+#   - "--volume-plugin-dir=/var/lib/kubelet/volumeplugins"
+
+# Resource reservations for system
+system-default-registry: "docker.io"

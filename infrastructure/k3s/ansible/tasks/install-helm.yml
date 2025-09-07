@@ -1,0 +1,87 @@
+# Install Helm package manager
+---
+- name: Check if Helm is already installed
+  stat:
+    path: "{{ helm_install_dir }}/helm"
+  register: helm_binary
+
+- name: Download and install Helm
+  block:
+    - name: Create temporary directory for Helm installation
+      tempfile:
+        state: directory
+        suffix: helm
+      register: helm_temp_dir
+
+    - name: Download Helm
+      get_url:
+        url: "https://get.helm.sh/helm-v{{ helm_version }}-linux-amd64.tar.gz"
+        dest: "{{ helm_temp_dir.path }}/helm.tar.gz"
+        timeout: 300
+
+    - name: Extract Helm
+      unarchive:
+        src: "{{ helm_temp_dir.path }}/helm.tar.gz"
+        dest: "{{ helm_temp_dir.path }}"
+        remote_src: yes
+
+    - name: Install Helm binary
+      copy:
+        src: "{{ helm_temp_dir.path }}/linux-amd64/helm"
+        dest: "{{ helm_install_dir }}/helm"
+        owner: root
+        group: root
+        mode: '0755'
+        remote_src: yes
+
+    - name: Clean up temporary directory
+      file:
+        path: "{{ helm_temp_dir.path }}"
+        state: absent
+  when: not helm_binary.stat.exists
+
+- name: Add Helm bash completion
+  shell: helm completion bash > /etc/bash_completion.d/helm
+  args:
+    creates: /etc/bash_completion.d/helm
+
+- name: Add common Helm repositories
+  kubernetes.core.helm_repository:
+    name: "{{ item.name }}"
+    repo_url: "{{ item.url }}"
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+  loop:
+    - name: bitnami
+      url: https://charts.bitnami.com/bitnami
+    - name: prometheus-community
+      url: https://prometheus-community.github.io/helm-charts
+    - name: grafana
+      url: https://grafana.github.io/helm-charts
+    - name: jetstack
+      url: https://charts.jetstack.io
+    - name: metallb
+      url: https://metallb.github.io/metallb
+    - name: longhorn
+      url: https://charts.longhorn.io
+    - name: traefik
+      url: https://helm.traefik.io/traefik
+    - name: argo
+      url: https://argoproj.github.io/argo-helm
+  when: "'masters' in group_names and ansible_hostname == groups['masters'][0]"
+
+- name: Update Helm repositories
+  kubernetes.core.helm:
+    name: dummy
+    state: absent
+    update_repo_cache: yes
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+  when: "'masters' in group_names and ansible_hostname == groups['masters'][0]"
+
+- name: Verify Helm installation
+  command: helm version --client
+  register: helm_version_output
+  changed_when: false
+
+- name: Display Helm version
+  debug:
+    msg: "Helm installed successfully: {{ helm_version_output.stdout }}"

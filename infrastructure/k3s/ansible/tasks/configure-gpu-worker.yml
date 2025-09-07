@@ -1,0 +1,208 @@
+# Configure K3s GPU worker nodes
+---
+- name: Install NVIDIA driver prerequisites
+  apt:
+    name:
+      - linux-headers-{{ ansible_kernel }}
+      - dkms
+      - build-essential
+    state: present
+    update_cache: yes
+  when: ansible_os_family == "Debian"
+
+- name: Add NVIDIA package repository key
+  apt_key:
+    url: https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/3bf863cc.pub
+    state: present
+  when: ansible_os_family == "Debian"
+
+- name: Add NVIDIA package repository
+  apt_repository:
+    repo: "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/ /"
+    state: present
+    filename: nvidia-cuda
+  when: ansible_os_family == "Debian"
+
+- name: Install NVIDIA driver
+  apt:
+    name:
+      - nvidia-driver-535
+      - nvidia-utils-535
+    state: present
+    update_cache: yes
+  when: ansible_os_family == "Debian"
+  register: nvidia_driver_installed
+
+- name: Reboot after NVIDIA driver installation
+  reboot:
+    reboot_timeout: 600
+    connect_timeout: 20
+    pre_reboot_delay: 0
+    post_reboot_delay: 30
+    test_command: whoami
+  when: nvidia_driver_installed is changed
+
+- name: Install NVIDIA container toolkit
+  block:
+    - name: Add NVIDIA container toolkit repository key
+      apt_key:
+        url: https://nvidia.github.io/libnvidia-container/gpgkey
+        state: present
+
+    - name: Add NVIDIA container toolkit repository
+      apt_repository:
+        repo: "deb https://nvidia.github.io/libnvidia-container/stable/deb/$(ARCH) /"
+        state: present
+        filename: nvidia-container-toolkit
+
+    - name: Install NVIDIA container toolkit
+      apt:
+        name:
+          - nvidia-container-toolkit
+          - nvidia-container-runtime
+        state: present
+        update_cache: yes
+  when: ansible_os_family == "Debian"
+
+- name: Configure containerd for GPU support
+  copy:
+    dest: /etc/rancher/k3s/containerd.config.toml
+    content: |
+      version = 2
+      
+      [plugins."io.containerd.grpc.v1.cri"]
+        enable_selinux = false
+        sandbox_image = "rancher/mirrored-pause:3.6"
+      
+      [plugins."io.containerd.grpc.v1.cri".containerd]
+        snapshotter = "overlayfs"
+        disable_snapshot_annotations = true
+        default_runtime_name = "nvidia"
+      
+      [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+        runtime_type = "io.containerd.runc.v2"
+      
+      [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
+        SystemdCgroup = true
+
+      [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia]
+        runtime_type = "io.containerd.runc.v2"
+        
+      [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia.options]
+        BinaryName = "/usr/bin/nvidia-container-runtime"
+        SystemdCgroup = true
+        
+      [plugins."io.containerd.grpc.v1.cri".registry]
+        [plugins."io.containerd.grpc.v1.cri".registry.mirrors]
+          [plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
+            endpoint = ["https://registry-1.docker.io"]
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart k3s-agent
+
+- name: Create GPU device plugin manifest directory
+  file:
+    path: /var/lib/rancher/k3s/server/manifests
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  delegate_to: "{{ groups['masters'][0] }}"
+  run_once: true
+
+- name: Deploy NVIDIA device plugin
+  copy:
+    dest: /var/lib/rancher/k3s/server/manifests/nvidia-device-plugin.yaml
+    content: |
+      apiVersion: apps/v1
+      kind: DaemonSet
+      metadata:
+        name: nvidia-device-plugin-daemonset
+        namespace: kube-system
+      spec:
+        selector:
+          matchLabels:
+            name: nvidia-device-plugin-ds
+        updateStrategy:
+          type: RollingUpdate
+        template:
+          metadata:
+            labels:
+              name: nvidia-device-plugin-ds
+          spec:
+            tolerations:
+            - key: nvidia.com/gpu
+              operator: Exists
+              effect: NoSchedule
+            nodeSelector:
+              nvidia.com/gpu: "true"
+            containers:
+            - image: nvcr.io/nvidia/k8s-device-plugin:v0.14.1
+              name: nvidia-device-plugin-ctr
+              env:
+                - name: FAIL_ON_INIT_ERROR
+                  value: "false"
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+              volumeMounts:
+                - name: device-plugin
+                  mountPath: /var/lib/kubelet/device-plugins
+            volumes:
+              - name: device-plugin
+                hostPath:
+                  path: /var/lib/kubelet/device-plugins
+            priorityClassName: system-node-critical
+    owner: root
+    group: root
+    mode: '0644'
+  delegate_to: "{{ groups['masters'][0] }}"
+  run_once: true
+
+- name: Create GPU runtime class
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: node.k8s.io/v1
+      kind: RuntimeClass
+      metadata:
+        name: nvidia
+      handler: nvidia
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+  delegate_to: "{{ groups['masters'][0] }}"
+  run_once: true
+
+- name: Verify GPU detection
+  shell: nvidia-smi
+  register: nvidia_smi_output
+  failed_when: false
+  changed_when: false
+
+- name: Display GPU detection results
+  debug:
+    msg: |
+      GPU Detection Results:
+      {% if nvidia_smi_output.rc == 0 %}
+      ✅ NVIDIA driver loaded successfully
+      {{ nvidia_smi_output.stdout }}
+      {% else %}
+      ⚠️  NVIDIA driver not yet loaded (exit code: {{ nvidia_smi_output.rc }})
+      This is normal if the system needs a reboot to load the driver.
+      Error: {{ nvidia_smi_output.stdout }}
+      {% endif %}
+
+- name: Warn if GPU not detected
+  debug:
+    msg: |
+      ⚠️  WARNING: GPU not detected. This may be due to:
+      1. Driver not loaded yet (reboot may be needed)
+      2. No GPU hardware present
+      3. Driver installation issues
+      
+      To troubleshoot after deployment:
+      - Run 'nvidia-smi' on the GPU nodes
+      - Check 'sudo dmesg | grep nvidia' for driver messages
+      - Verify GPU hardware with 'lspci | grep -i nvidia'
+  when: nvidia_smi_output.rc != 0

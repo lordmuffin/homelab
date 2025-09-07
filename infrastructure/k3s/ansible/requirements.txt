@@ -1,0 +1,14 @@
+# Python requirements for K3s Ansible playbooks
+# Install with: pip3 install -r requirements.txt
+
+# Kubernetes management
+kubernetes>=24.2.0
+PyYAML>=3.11
+jsonpatch
+
+# Ansible requirements
+ansible>=6.0.0
+
+# Additional useful libraries
+requests>=2.25.0
+urllib3>=1.26.0

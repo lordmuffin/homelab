@@ -1,0 +1,45 @@
+# Production Environment Configuration
+# Copy this file to terraform.tfvars and customize the values
+
+# Multi-Node Proxmox Configuration
+proxmox_nodes_config = {
+  pve2 = {
+    api_url      = "https://192.168.1.14:8006/api2/json"
+    ip_address   = "192.168.1.14"
+    token_id     = "terraform@pve!terraform"
+    token_secret = "your-pve2-token-secret-here"
+  }
+  pve-nas-01 = {
+    api_url      = "https://192.168.1.15:8006/api2/json"
+    ip_address   = "192.168.1.15"
+    token_id     = "terraform@pve!terraform"
+    token_secret = "your-nas-token-secret-here"
+  }
+}
+
+# Cluster Configuration
+cluster_name      = "k3s-prod"
+vm_template_name  = "ubuntu-k3s-homelab-template"  # Fallback template name
+
+# Template VM ID Configuration (RECOMMENDED - faster and more reliable)
+# Use the template IDs from your Packer builds:
+vm_template_ids = {
+  pve2       = 9000  # Template built for pve2 node
+  pve-nas-01 = 9001  # Template built for pve-nas-01 node
+}
+
+k3s_token = "my-super-secure-k3s-production-token"
+
+# Per-node VM configuration (handled by module defaults)
+workers_per_node = 2
+gpu_workers_per_node = 1
+
+# Network Configuration
+network_bridge  = "vmbr0"
+network_gateway = "192.168.1.1"
+
+# SSH Configuration - Add your public keys for access
+ssh_public_keys = [
+  "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC... your-key-here"
+  # Add more keys as needed
+]

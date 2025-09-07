@@ -1,0 +1,37 @@
+# K3s Worker Configuration
+# This template configures K3s agent nodes
+
+# Cluster connection
+server: https://{{ groups['masters'][0] }}:6443
+token: "{{ k3s_token }}"
+
+# Node configuration
+node-label:
+  - "node-role.kubernetes.io/worker=true"
+{% if 'gpu_workers' in group_names %}
+  - "node-type=gpu-worker"
+  - "accelerator=nvidia-gpu"
+{% else %}
+  - "node-type=worker"
+{% endif %}
+
+# Kubelet configuration
+kubelet-arg:
+  - "max-pods={{ k3s_max_pods_per_node | default('110') }}"
+  - "cluster-dns={{ k3s_cluster_dns | default('10.43.0.10') }}"
+  - "cluster-domain={{ k3s_cluster_domain | default('cluster.local') }}"
+{% if 'gpu_workers' in group_names %}
+  - "feature-gates=DevicePlugins=true"
+{% endif %}
+
+{% if 'gpu_workers' in group_names %}
+# GPU-specific configuration for agent nodes
+# Note: GPU device plugin will be deployed as a DaemonSet
+
+# Container runtime for GPU support
+container-runtime-endpoint: unix:///var/run/containerd/containerd.sock
+{% endif %}
+
+# Logging
+log: /var/log/k3s-agent.log
+alsologtostderr: true

@@ -1,0 +1,2 @@
+instance-id: ubuntu-k3s-template
+local-hostname: ubuntu-k3s-template

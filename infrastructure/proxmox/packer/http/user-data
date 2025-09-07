@@ -1,0 +1,32 @@
+#cloud-config
+autoinstall:
+  version: 1
+  locale: en_US
+  keyboard:
+    layout: us
+  ssh:
+    install-server: true
+    allow-pw: true
+    authorized-keys: []
+  packages:
+    - openssh-server
+    - curl
+    - wget
+    - git
+    - vim
+    - htop
+    - qemu-guest-agent
+  storage:
+    layout:
+      name: direct
+  identity:
+    hostname: ubuntu-k3s-template
+    username: ubuntu
+    password: '$6$S10JpOUYfL.rn/Cw$VrnhvmAQeMXeXQHVbEa/ZcXY/SgCjXb1ghKQxPqo0q28.yXz3TL12JnRzqm4K4MCA4fuwYDI2dSsWyF719YwI/'
+  user-data:
+    disable_root: false
+  late-commands:
+    - echo 'ubuntu ALL=(ALL) NOPASSWD:ALL' > /target/etc/sudoers.d/ubuntu
+    - curtin in-target --target=/target -- chmod 440 /etc/sudoers.d/ubuntu
+    - curtin in-target --target=/target -- apt-get update
+    - curtin in-target --target=/target -- systemctl enable qemu-guest-agent

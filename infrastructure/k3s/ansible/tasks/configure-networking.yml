@@ -1,0 +1,170 @@
+# Configure cluster networking
+---
+- name: Wait for cluster to be ready
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Node
+    wait: true
+    wait_condition:
+      type: Ready
+      status: "True"
+    wait_timeout: 300
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+
+- name: Create networking namespace
+  kubernetes.core.k8s:
+    name: networking
+    api_version: v1
+    kind: Namespace
+    state: present
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+
+- name: Install MetalLB namespace
+  kubernetes.core.k8s:
+    name: metallb-system
+    api_version: v1
+    kind: Namespace
+    state: present
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+
+- name: Install MetalLB using Helm
+  kubernetes.core.helm:
+    name: metallb
+    chart_ref: metallb/metallb
+    release_namespace: metallb-system
+    create_namespace: true
+    wait: true
+    wait_timeout: 300
+    values:
+      controller:
+        enabled: true
+      speaker:
+        enabled: true
+        tolerateMaster: false
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+
+- name: Wait for MetalLB controller to be ready
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    name: metallb-controller
+    namespace: metallb-system
+    wait: true
+    wait_condition:
+      type: Available
+      status: "True"
+    wait_timeout: 300
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+
+- name: Configure MetalLB address pool
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: metallb.io/v1beta1
+      kind: IPAddressPool
+      metadata:
+        name: homelab-pool
+        namespace: metallb-system
+      spec:
+        addresses:
+        - "{{ metallb_config.address_pools[0].addresses[0] }}"
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+
+- name: Configure MetalLB L2 advertisement
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: metallb.io/v1beta1
+      kind: L2Advertisement
+      metadata:
+        name: homelab-l2-advertisement
+        namespace: metallb-system
+      spec:
+        ipAddressPools:
+        - homelab-pool
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+
+- name: Create network policies namespace
+  kubernetes.core.k8s:
+    name: network-policies
+    api_version: v1
+    kind: Namespace
+    state: present
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+  when: network_policies_enabled | default(true)
+
+- name: Apply default network policies
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ item }}"
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+  loop:
+    - apiVersion: networking.k8s.io/v1
+      kind: NetworkPolicy
+      metadata:
+        name: deny-all-ingress
+        namespace: default
+      spec:
+        podSelector: {}
+        policyTypes:
+        - Ingress
+    - apiVersion: networking.k8s.io/v1
+      kind: NetworkPolicy
+      metadata:
+        name: allow-dns
+        namespace: default
+      spec:
+        podSelector: {}
+        policyTypes:
+        - Egress
+        egress:
+        - to: []
+          ports:
+          - protocol: UDP
+            port: 53
+          - protocol: TCP
+            port: 53
+  when: 
+    - network_policies_enabled | default(true)
+    - default_deny_ingress | default(false)
+
+- name: Test MetalLB functionality
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: metallb-test
+        namespace: default
+        annotations:
+          metallb.universe.tf/loadBalancerIPs: "{{ metallb_config.address_pools[0].addresses[0].split('-')[0] }}"
+      spec:
+        type: LoadBalancer
+        ports:
+        - port: 80
+          targetPort: 8080
+        selector:
+          app: metallb-test
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+
+- name: Wait for MetalLB test service to get external IP
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Service
+    name: metallb-test
+    namespace: default
+    wait: true
+    wait_condition:
+      type: LoadBalancer
+    wait_timeout: 120
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+
+- name: Cleanup MetalLB test service
+  kubernetes.core.k8s:
+    state: absent
+    api_version: v1
+    kind: Service
+    name: metallb-test
+    namespace: default
+    kubeconfig: /etc/rancher/k3s/k3s.yaml

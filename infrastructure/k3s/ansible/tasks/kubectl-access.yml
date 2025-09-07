@@ -1,0 +1,79 @@
+# Configure kubectl access for K3s cluster
+---
+- name: Create kubectl config directory for root
+  file:
+    path: /root/.kube
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Copy K3s kubeconfig for root access
+  copy:
+    src: /etc/rancher/k3s/k3s.yaml
+    dest: /root/.kube/config
+    owner: root
+    group: root
+    mode: '0600'
+    remote_src: yes
+  when: "'masters' in group_names"
+
+- name: Update kubeconfig server address for external access
+  replace:
+    path: /root/.kube/config
+    regexp: 'https://127.0.0.1:6443'
+    replace: "https://{{ ansible_default_ipv4.address }}:6443"
+  when: "'masters' in group_names"
+
+- name: Create kubectl config for regular users
+  block:
+    - name: Create user kube directory
+      file:
+        path: "/home/{{ ansible_user }}/.kube"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+
+    - name: Copy kubeconfig for regular user
+      copy:
+        src: /etc/rancher/k3s/k3s.yaml
+        dest: "/home/{{ ansible_user }}/.kube/config"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0600'
+        remote_src: yes
+
+    - name: Update kubeconfig server address for user
+      replace:
+        path: "/home/{{ ansible_user }}/.kube/config"
+        regexp: 'https://127.0.0.1:6443'
+        replace: "https://{{ ansible_default_ipv4.address }}:6443"
+  when: "'masters' in group_names"
+
+- name: Install kubectl bash completion
+  shell: kubectl completion bash > /etc/bash_completion.d/kubectl
+  args:
+    creates: /etc/bash_completion.d/kubectl
+  when: "'masters' in group_names"
+
+- name: Add kubectl alias to bashrc
+  lineinfile:
+    path: "/home/{{ ansible_user }}/.bashrc"
+    line: "alias k='kubectl'"
+    create: yes
+  when: "'masters' in group_names"
+
+- name: Test kubectl access
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Node
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+  register: kubectl_test
+  failed_when: kubectl_test.failed
+  when: "'masters' in group_names"
+
+- name: Display kubectl test results
+  debug:
+    msg: "kubectl access verified - {{ kubectl_test.resources | length }} nodes found"
+  when: "'masters' in group_names and kubectl_test.resources is defined"

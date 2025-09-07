@@ -1,4 +1,0 @@
--rw-r--r--    1 root     root       13.1M Jun 13 21:54 /data/user-files/group-c0cff1c3-9a30-4354-a3e4-cdd938b2563a.sqlite
--rw-r--r--    1 root     root        2.6M Jun 17 16:20 /data/user-files/file-36aea600-3dbf-44bf-986e-7f139bc64fd9.blob
--rw-r--r--    1 root     root         647 Jun  9 09:51 /data/.migrate
--rw-r--r--    1 root     root       60.0K Jun 17 16:20 /data/server-files/account.sqlite

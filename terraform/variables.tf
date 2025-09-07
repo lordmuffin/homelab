@@ -4,6 +4,162 @@ variable "api_key" {
   sensitive   = true
 }
 
+# Proxmox Configuration Variables
+variable "proxmox_api_url" {
+  description = "Proxmox API URL"
+  type        = string
+  default     = null
+}
+
+variable "proxmox_user" {
+  description = "Proxmox username for API access"
+  type        = string
+  default     = "root@pam"
+}
+
+variable "proxmox_password" {
+  description = "Proxmox password for API access"
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "PM_API_TOKEN_ID" {
+  description = "Proxmox API Token ID"
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "PM_API_TOKEN_SECRET" {
+  description = "Proxmox API Token Secret"
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "proxmox_node" {
+  description = "Primary Proxmox node name"
+  type        = string
+  default     = null
+}
+
+variable "proxmox_tls_insecure" {
+  description = "Skip TLS verification for Proxmox API"
+  type        = bool
+  default     = false
+}
+
+# Cluster Configuration
+variable "environment" {
+  description = "Environment name (prod, staging, dev, non-prod)"
+  type        = string
+  default     = null
+}
+
+variable "cluster_name" {
+  description = "Name of the Kubernetes cluster"
+  type        = string
+  default     = null
+}
+
+# SSH Configuration
+variable "ssh_public_keys" {
+  description = "List of SSH public keys for VM access"
+  type        = list(string)
+  default     = []
+}
+
+variable "ssh_private_key_file" {
+  description = "Path to SSH private key file for provisioning"
+  type        = string
+  default     = null
+}
+
+# Network Configuration
+variable "network_config" {
+  description = "Network configuration for VMs"
+  type = object({
+    bridge         = string
+    vlan_id        = optional(number)
+    model          = string
+    firewall       = bool
+    rate_limit     = optional(number)
+    dhcp           = bool
+    ip_range_start = optional(string)
+    ip_range_end   = optional(string)
+    gateway        = optional(string)
+    dns_servers    = list(string)
+    domain         = string
+  })
+  default = null
+}
+
+# Control Plane Configuration
+variable "control_plane_config" {
+  description = "Control plane node configuration"
+  type = object({
+    count       = number
+    vm_id_start = number
+    cpu_cores   = number
+    cpu_sockets = number
+    memory_mb   = number
+    disk_size   = string
+    storage     = string
+  })
+  default = null
+}
+
+# Worker Node Configuration
+variable "worker_nodes_config" {
+  description = "Worker node configuration"
+  type = object({
+    count       = number
+    vm_id_start = number
+    cpu_cores   = number
+    cpu_sockets = number
+    memory_mb   = number
+    disk_size   = string
+    storage     = string
+  })
+  default = null
+}
+
+# Kairos Configuration
+variable "kairos_config" {
+  description = "Kairos-specific configuration"
+  type = object({
+    bundles          = list(string)
+    k3s_version      = string
+    k3s_extra_args   = list(string)
+    p2p_enable       = bool
+    auto_install     = bool
+    reboot_strategy  = string
+    upgrade_strategy = string
+  })
+  default = null
+}
+
+# Tags
+variable "cluster_tags" {
+  description = "Tags to apply to cluster resources"
+  type        = list(string)
+  default     = []
+}
+
+# Kairos ISO Configuration
+variable "kairos_iso_name" {
+  description = "Name of the Kairos ISO file in Proxmox storage"
+  type        = string
+  default     = "kairos-ubuntu-22.04-standard-amd64-generic-v1.1.0-k3sv1.33.3_k3s1.iso"
+}
+
+variable "kairos_iso_storage" {
+  description = "Proxmox storage location for ISO files"
+  type        = string
+  default     = "local"
+}
+
 # Proxmox K3s Variables
 variable "proxmox_providers" {
   description = "List of Proxmox provider configurations"
@@ -84,12 +240,7 @@ variable "proxmox_vms" {
   default = []
 }
 
-variable "proxmox_password" {
-  description = "Proxmox VE password for authentication"
-  type        = string
-  sensitive   = true
-  default     = ""
-}
+# Removed duplicate - already defined above
 
 variable "ssh_private_key" {
   description = "SSH private key for VM provisioning"
@@ -134,6 +285,8 @@ variable "vm_password" {
   sensitive   = true
   default     = "ubuntu"
 }
+
+# Removed duplicate - already defined above
 
 # variable "unifi_site_name" {
 #   type        = string

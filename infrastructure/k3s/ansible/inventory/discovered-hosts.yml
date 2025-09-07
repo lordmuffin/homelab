@@ -1,0 +1,214 @@
+# Discovered K3s Cluster Inventory
+# Generated from Terraform state with actual VM information
+# Complete deployment: 3 masters, 6 workers, 3 gpu workers across pve2, pve-nas-01, pve4
+
+all:
+  children:
+    k3s_cluster:
+      children:
+        masters:
+          hosts:
+            k3s-master-01:
+              # VM: k3s-masters-pve2-1 (VM ID: 300)
+              ansible_host: "192.168.11.248"
+              ansible_user: ubuntu
+              ansible_ssh_private_key_file: ~/.ssh/id_rsa
+              node_role: master
+              vm_name: "k3s-masters-pve2-1"
+              vm_id: 300
+              proxmox_node: "pve2"
+              is_primary: true
+              node_taint: "CriticalAddonsOnly=true:NoExecute"
+              etcd_member: true
+              
+            k3s-master-02:
+              # VM: k3s-masters-pve-nas-01-1 (VM ID: 400)
+              ansible_host: "192.168.11.195"
+              ansible_user: ubuntu
+              ansible_ssh_private_key_file: ~/.ssh/id_rsa
+              node_role: master
+              vm_name: "k3s-masters-pve-nas-01-1"
+              vm_id: 400
+              proxmox_node: "pve-nas-01"
+              is_primary: false
+              node_taint: "CriticalAddonsOnly=true:NoExecute"
+              etcd_member: true
+
+            k3s-master-03:
+              # VM: k3s-masters-pve4-1 (VM ID: 500)
+              ansible_host: "192.168.11.77"
+              ansible_user: ubuntu
+              ansible_ssh_private_key_file: ~/.ssh/id_rsa
+              node_role: master
+              vm_name: "k3s-masters-pve4-1"
+              vm_id: 500
+              proxmox_node: "pve4"
+              is_primary: false
+              node_taint: "CriticalAddonsOnly=true:NoExecute"
+              etcd_member: true
+          vars:
+            k3s_role: master
+            
+        workers:
+          hosts:
+            k3s-worker-01:
+              # VM: k3s-workers-pve2-1 (VM ID: 400)
+              ansible_host: "192.168.11.51"
+              ansible_user: ubuntu
+              ansible_ssh_private_key_file: ~/.ssh/id_rsa
+              node_role: worker
+              vm_name: "k3s-workers-pve2-1"
+              vm_id: 400
+              proxmox_node: "pve2"
+              storage_class: "longhorn-ssd-standard"
+              
+            k3s-worker-02:
+              # VM: k3s-workers-pve2-2 (VM ID: 401)
+              ansible_host: "192.168.11.25"
+              ansible_user: ubuntu
+              ansible_ssh_private_key_file: ~/.ssh/id_rsa
+              node_role: worker
+              vm_name: "k3s-workers-pve2-2"
+              vm_id: 401
+              proxmox_node: "pve2"
+              storage_class: "longhorn-ssd-standard"
+              
+            k3s-worker-03:
+              # VM: k3s-workers-pve-nas-01-1 (VM ID: 500)
+              ansible_host: "192.168.11.145"
+              ansible_user: ubuntu
+              ansible_ssh_private_key_file: ~/.ssh/id_rsa
+              node_role: worker
+              vm_name: "k3s-workers-pve-nas-01-1"
+              vm_id: 500
+              proxmox_node: "pve-nas-01"
+              storage_class: "longhorn-nvme-critical"
+              
+            k3s-worker-04:
+              # VM: k3s-workers-pve-nas-01-2 (VM ID: 501)
+              ansible_host: "192.168.11.24"
+              ansible_user: ubuntu
+              ansible_ssh_private_key_file: ~/.ssh/id_rsa
+              node_role: worker
+              vm_name: "k3s-workers-pve-nas-01-2"
+              vm_id: 501
+              proxmox_node: "pve-nas-01"
+              storage_class: "longhorn-bulk"
+
+            k3s-worker-05:
+              # VM: k3s-workers-pve4-1 (VM ID: 600)
+              ansible_host: "192.168.11.23"
+              ansible_user: ubuntu
+              ansible_ssh_private_key_file: ~/.ssh/id_rsa
+              node_role: worker
+              vm_name: "k3s-workers-pve4-1"
+              vm_id: 600
+              proxmox_node: "pve4"
+              storage_class: "longhorn-ssd-standard"
+
+            k3s-worker-06:
+              # VM: k3s-workers-pve4-2 (VM ID: 601)
+              ansible_host: "192.168.11.19"
+              ansible_user: ubuntu
+              ansible_ssh_private_key_file: ~/.ssh/id_rsa
+              node_role: worker
+              vm_name: "k3s-workers-pve4-2"
+              vm_id: 601
+              proxmox_node: "pve4"
+              storage_class: "longhorn-ssd-standard"
+          vars:
+            k3s_role: worker
+            
+        gpu_workers:
+          hosts:
+            k3s-gpu-01:
+              # VM: k3s-gpu-workers-pve2-1 (VM ID: 500)
+              ansible_host: "192.168.11.198"
+              ansible_user: ubuntu
+              ansible_ssh_private_key_file: ~/.ssh/id_rsa
+              node_role: gpu-worker
+              vm_name: "k3s-gpu-workers-pve2-1"
+              vm_id: 500
+              proxmox_node: "pve2"
+              gpu_type: "nvidia"
+              storage_class: "longhorn-nvme-critical"
+              node_labels:
+                - "nvidia.com/gpu=true"
+                - "workload.type=ai"
+                
+            k3s-gpu-02:
+              # VM: k3s-gpu-workers-pve-nas-01-1 (VM ID: 600)
+              ansible_host: "192.168.11.254"
+              ansible_user: ubuntu
+              ansible_ssh_private_key_file: ~/.ssh/id_rsa
+              node_role: gpu-worker
+              vm_name: "k3s-gpu-workers-pve-nas-01-1"
+              vm_id: 600
+              proxmox_node: "pve-nas-01"
+              gpu_type: "nvidia"
+              storage_class: "longhorn-nvme-critical"
+              node_labels:
+                - "nvidia.com/gpu=true"
+                - "workload.type=ai"
+
+            k3s-gpu-03:
+              # VM: k3s-gpu-workers-pve4-1 (VM ID: 700)
+              ansible_host: "192.168.11.17"
+              ansible_user: ubuntu
+              ansible_ssh_private_key_file: ~/.ssh/id_rsa
+              node_role: gpu-worker
+              vm_name: "k3s-gpu-workers-pve4-1"
+              vm_id: 700
+              proxmox_node: "pve4"
+              gpu_type: "nvidia"
+              storage_class: "longhorn-nvme-critical"
+              node_labels:
+                - "nvidia.com/gpu=true"
+                - "workload.type=ai"
+          vars:
+            k3s_role: gpu-worker
+
+  vars:
+    # Global cluster configuration
+    cluster_name: "k3s-prod-production"
+    k3s_version: "v1.28.5+k3s1"
+    k3s_download_url: "https://github.com/k3s-io/k3s/releases/download/{{ k3s_version }}/k3s"
+    k3s_token: "aMn525rq7MsERHLTKPU3X3YVL1Dtq73E"
+    
+    # Network configuration
+    cluster_cidr: "10.42.0.0/16"
+    service_cidr: "10.43.0.0/16"
+    cluster_dns: "10.43.0.10"
+    
+    # Load balancer configuration
+    metallb_ip_range: "192.168.11.100-192.168.11.200"
+    
+    # Storage configuration
+    longhorn_enabled: true
+    longhorn_namespace: "longhorn-system"
+    
+    # Monitoring configuration
+    prometheus_enabled: true
+    grafana_enabled: true
+    monitoring_namespace: "monitoring"
+    
+    # SSH configuration
+    ssh_user: "ubuntu"
+    ssh_private_key: "~/.ssh/homelab"
+    
+    # High Availability configuration
+    ha_enabled: true
+    embedded_etcd: true
+    datastore_endpoint: ""  # Use embedded etcd for HA
+    
+    # Security configuration
+    disable_components:
+      - traefik  # We'll use our own Traefik setup
+      - servicelb  # We'll use MetalLB
+    
+    # Node configuration
+    kubelet_args:
+      - "--max-pods=250"
+      - "--node-status-update-frequency=5s"
+      - "--image-gc-high-threshold=85"
+      - "--image-gc-low-threshold=80"

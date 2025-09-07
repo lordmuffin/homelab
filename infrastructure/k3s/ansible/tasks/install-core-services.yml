@@ -1,0 +1,198 @@
+# Install core cluster services
+---
+- name: Create system namespaces
+  kubernetes.core.k8s:
+    name: "{{ item }}"
+    api_version: v1
+    kind: Namespace
+    state: present
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+  loop:
+    - longhorn-system
+    - monitoring
+    - argocd
+    - cert-manager
+
+- name: Install cert-manager CRDs
+  kubernetes.core.k8s:
+    state: present
+    src: https://github.com/jetstack/cert-manager/releases/download/v1.13.2/cert-manager.crds.yaml
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+
+- name: Install cert-manager
+  kubernetes.core.helm:
+    name: cert-manager
+    chart_ref: jetstack/cert-manager
+    release_namespace: cert-manager
+    create_namespace: true
+    wait: true
+    wait_timeout: 300
+    values:
+      installCRDs: false
+      global:
+        leaderElection:
+          namespace: cert-manager
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+
+- name: Install Longhorn storage
+  kubernetes.core.helm:
+    name: longhorn
+    chart_ref: longhorn/longhorn
+    release_namespace: longhorn-system
+    create_namespace: true
+    wait: true
+    wait_timeout: 600
+    values:
+      persistence:
+        defaultClass: true
+        defaultFsType: ext4
+        defaultClassReplicaCount: 2
+      csi:
+        kubeletRootDir: /var/lib/kubelet
+      defaultSettings:
+        backupTarget: "s3://{{ backup_config.s3_bucket }}@{{ backup_config.s3_endpoint }}/"
+        backupTargetCredentialSecret: longhorn-backup-secret
+        createDefaultDiskLabeledNodes: true
+        defaultDataPath: /var/lib/longhorn/
+        replicaSoftAntiAffinity: true
+        storageOverProvisioningPercentage: 150
+        storageMinimalAvailablePercentage: 15
+        upgradeChecker: false
+      longhornManager:
+        tolerations:
+        - key: "node-role.kubernetes.io/control-plane"
+          operator: "Exists"
+          effect: "NoSchedule"
+      longhornDriver:
+        tolerations:
+        - key: "node-role.kubernetes.io/control-plane"
+          operator: "Exists"
+          effect: "NoSchedule"
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+
+- name: Create Longhorn backup secret
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: longhorn-backup-secret
+        namespace: longhorn-system
+      type: Opaque
+      data:
+        AWS_ACCESS_KEY_ID: "{{ backblaze_access_key_id | b64encode }}"
+        AWS_SECRET_ACCESS_KEY: "{{ backblaze_secret_access_key | b64encode }}"
+        AWS_ENDPOINTS: "{{ backup_config.s3_endpoint | b64encode }}"
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+  when: 
+    - backblaze_access_key_id is defined
+    - backblaze_secret_access_key is defined
+
+- name: Create Longhorn storage classes
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: storage.k8s.io/v1
+      kind: StorageClass
+      metadata:
+        name: "{{ item.name }}"
+      provisioner: driver.longhorn.io
+      allowVolumeExpansion: true
+      reclaimPolicy: "{{ item.reclaim_policy }}"
+      volumeBindingMode: "{{ item.volume_binding_mode }}"
+      parameters:
+        numberOfReplicas: "{{ item.replicas | string }}"
+        staleReplicaTimeout: "2880"
+        fromBackup: ""
+        fsType: "ext4"
+        dataLocality: "disabled"
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+  loop: "{{ longhorn_storage_classes }}"
+
+- name: Wait for Longhorn to be ready
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: DaemonSet
+    name: longhorn-manager
+    namespace: longhorn-system
+    wait: true
+    wait_condition:
+      type: Ready
+    wait_timeout: 300
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+
+- name: Install metrics-server (if not present)
+  kubernetes.core.k8s:
+    state: present
+    src: https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+
+- name: Patch metrics-server for insecure TLS
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: metrics-server
+        namespace: kube-system
+      spec:
+        template:
+          spec:
+            containers:
+            - name: metrics-server
+              args:
+              - --cert-dir=/tmp
+              - --secure-port=4443
+              - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+              - --kubelet-use-node-status-port
+              - --metric-resolution=15s
+              - --kubelet-insecure-tls
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+
+- name: Create monitoring namespace
+  kubernetes.core.k8s:
+    name: monitoring
+    api_version: v1
+    kind: Namespace
+    state: present
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+
+- name: Create resource quotas for namespaces
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ResourceQuota
+      metadata:
+        name: compute-resources
+        namespace: "{{ item.key }}"
+      spec:
+        hard:
+          requests.cpu: "{{ item.value['requests.cpu'] }}"
+          requests.memory: "{{ item.value['requests.memory'] }}"
+          limits.cpu: "{{ item.value['limits.cpu'] }}"
+          limits.memory: "{{ item.value['limits.memory'] }}"
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+  loop: "{{ resource_quotas | dict2items }}"
+  when: resource_quotas is defined
+
+- name: Verify core services
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: "{{ item }}"
+    label_selectors:
+      - "app.kubernetes.io/name"
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+  loop:
+    - longhorn-system
+    - cert-manager
+    - metallb-system
+  register: core_services_status
+
+- name: Display core services status
+  debug:
+    msg: "{{ item.item }} namespace has {{ item.resources | length }} pods running"
+  loop: "{{ core_services_status.results }}"

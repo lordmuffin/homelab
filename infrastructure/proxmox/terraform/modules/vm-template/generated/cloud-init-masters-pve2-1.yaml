@@ -1,0 +1,170 @@
+#cloud-config
+# K3s HA Cluster Cloud-Init Configuration
+# Hostname: k3s-masters-pve2-1
+# VM Type: masters
+# Environment: prod
+
+hostname: k3s-masters-pve2-1
+manage_etc_hosts: true
+
+# User configuration
+users:
+  - name: ubuntu
+    groups: [adm, cdrom, dip, plugdev, lxd, sudo]
+    lock_passwd: false
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDA8goFZngSeRbtWzKIdDNd+vJdjABjsRwSDrRdSg9jCHl2alXMHQTDf9O9u+adKZRsaXB4y28O5wdsCvyv23s6h3d5lIi85Xz8qeV0A/qJwrvvqzV+Bh0WK4aktaMxY1SbREKjsiuRBqRGGsuKv26rC0oa4XMdugmDmzSfiTs4iV61j/Y9HpyPVuvOeO+JC0sFXpcrrXqPQz9FyOqqtrFURai65ftCYYKjMci8zJ9MHBxAjKDQbmklTUqF4l+d1t4yTZNcy067JjfpU3SFJoOHblu24417FZNnUUhLS/V3hHxE5RZePVZM8vpVUGMHalQsI7dcxz/Tq0qIL6OCc9Z/v/pTg62Ha5Y4TXpi65hpwqOL5UBSXqOSMuGwhuKlsMwCwRQ8NSnr+175Irp0KNH8SPGtyiZ15SxBOifdIqy3qAZH/qFvlvda0a4lsVtZXjzrl7TREX6/2mwS1X///0C7vj3CnUcQ+R2mE8Fe4JkWepN1eDREXYZ3vENe/AzoBVMV3sbRi66dTD7E3vsijCflfBtj5hp977WMMWHbcXiGIF0gqRac1Dr6p7wUAZwLu1tXeGZFHQQOUwDmYllg7O9aA7lyPZ6r9CpLUFnV3a8Pfhj3wAxW5tV8dMcMystWLKo23lRyQsYwEym7TE/an4nNwe4RHBOxdihPfZawONn74w==
+    sudo: ALL=(ALL) NOPASSWD:ALL
+
+# System packages
+packages:
+  - curl
+  - wget
+  - git
+  - htop
+  - iotop
+  - iftop
+  - ncdu
+  - net-tools
+  - unzip
+  - jq
+  - nfs-common
+  - open-iscsi
+  - util-linux
+  - cryptsetup
+  - lvm2
+
+
+# System configuration
+write_files:
+  # K3s configuration
+  - path: /etc/k3s-config.yaml
+    content: |
+      cluster-init: false
+      server: 
+      token: MD7VSWru58GKUOPPdhP0JUeMNsYQnMfQ
+      disable:
+        - servicelb  # Use MetalLB instead
+        - traefik    # Use existing Traefik
+      tls-san:
+        - k3s-vip.cluster.local
+        - 10.10.100.50
+
+      node-taint:
+        - "node-role.kubernetes.io/master=true:NoSchedule"
+
+
+
+    permissions: '0644'
+
+  # K3s installation script
+  - path: /usr/local/bin/install-k3s.sh
+    content: |
+      #!/bin/bash
+      set -euo pipefail
+      
+      echo "Installing K3s on k3s-masters-pve2-1..."
+      
+      # Wait for system to be ready
+      sleep 30
+      
+      # Install K3s
+      curl -sfL https://get.k3s.io | sh -s - \
+        --config /etc/k3s-config.yaml \
+
+        --server https://k3s-masters-1:6443 \
+
+
+        --write-kubeconfig-mode 644
+      
+      # Enable and start K3s
+      systemctl enable k3s
+      systemctl start k3s
+      
+      # Wait for K3s to be ready
+      until kubectl get nodes; do
+        echo "Waiting for K3s to be ready..."
+        sleep 10
+      done
+      
+      echo "K3s installation completed on k3s-masters-pve2-1"
+    permissions: '0755'
+
+  # System optimization for K3s
+  - path: /etc/sysctl.d/99-k3s.conf
+    content: |
+      # K3s system optimizations
+      net.bridge.bridge-nf-call-iptables = 1
+      net.bridge.bridge-nf-call-ip6tables = 1
+      net.ipv4.ip_forward = 1
+      vm.swappiness = 1
+      vm.overcommit_memory = 1
+      kernel.panic = 10
+      kernel.panic_on_oops = 1
+    permissions: '0644'
+
+  # Logrotate configuration for K3s
+  - path: /etc/logrotate.d/k3s
+    content: |
+      /var/log/k3s.log {
+        daily
+        missingok
+        rotate 7
+        compress
+        notifempty
+        create 644 root root
+        postrotate
+          systemctl reload k3s || true
+        endscript
+      }
+    permissions: '0644'
+
+
+
+# Boot commands
+bootcmd:
+  - echo 'APT::Periodic::Update-Package-Lists "1";' > /etc/apt/apt.conf.d/20auto-upgrades
+  - echo 'APT::Periodic::Unattended-Upgrade "1";' >> /etc/apt/apt.conf.d/20auto-upgrades
+
+# Run commands
+runcmd:
+  # Update system
+  - apt-get update
+  - apt-get upgrade -y
+  
+  # Apply sysctl settings
+  - sysctl --system
+  
+  # Enable and configure services
+  - systemctl enable iscsid
+  - systemctl start iscsid
+  
+
+  
+  # Install K3s (delayed to ensure system is ready)
+  - sleep 60
+  - /usr/local/bin/install-k3s.sh
+  
+  # Log completion
+  - echo "Cloud-init completed for k3s-masters-pve2-1 at $(date)" >> /var/log/cloud-init-custom.log
+
+# Final message
+final_message: |
+  K3s node k3s-masters-pve2-1 (masters) is ready!
+  Environment: prod
+  VM Type: masters
+  Primary: false
+  
+  System information:
+  - OS: Ubuntu 22.04 LTS
+  - K3s: Latest stable
+  - Hostname: k3s-masters-pve2-1
+  
+  The system is ready for K3s cluster operations.
+
+# Reboot after cloud-init completion
+power_state:
+  mode: reboot
+  delay: now
+  condition: true
