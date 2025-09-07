@@ -1,0 +1,291 @@
+---
+# K3s Testing Framework - Comprehensive Testing Profile  
+# ======================================================
+# Complete testing configuration for thorough validation
+
+profile_name: "comprehensive" 
+profile_version: "1.0"
+description: "Comprehensive testing profile for complete K3s deployment validation"
+
+# Extended from default configuration
+extends: "default"
+
+# Test Execution Configuration - Comprehensive Coverage
+execution:
+  max_parallel_tests: 1  # Sequential for thorough testing
+  default_iterations: 10  # Many iterations for statistical confidence
+  timeout_multiplier: 2.0  # Extended timeouts for thorough testing
+  test_focus: ["storage", "network"]
+  test_mode: "full"  # Complete deployment testing
+
+# Comprehensive Storage Testing
+storage_tests:
+  enabled: true
+  timeout_seconds: 900  # Extended timeout for comprehensive tests
+  
+  scenarios:
+    - name: "basic_pvc"
+      description: "Basic PVC creation and binding test"
+      storage_class: "default"
+      size: "1Gi"
+      access_mode: "ReadWriteOnce"
+      
+    - name: "rwo_pvc"
+      description: "ReadWriteOnce PVC test"
+      storage_class: "default"
+      size: "2Gi"
+      access_mode: "ReadWriteOnce"
+      
+    - name: "performance_test"
+      description: "Comprehensive storage I/O performance validation"
+      storage_class: "default"
+      size: "10Gi"
+      test_duration: "180s"  # Extended test duration
+      io_patterns: ["sequential", "random"]
+      block_sizes: ["4k", "64k", "1M"]
+      
+    - name: "persistence_test"
+      description: "Data persistence across multiple pod restarts"
+      storage_class: "default"
+      size: "5Gi"
+      test_file_size_mb: 500
+      restart_iterations: 5
+      
+    - name: "stress_test"
+      description: "Storage stress testing with high load"
+      storage_class: "default"
+      size: "15Gi"
+      concurrent_jobs: 5
+      test_duration: "300s"
+      
+    - name: "backup_restore_test"
+      description: "Backup and restore functionality test"
+      storage_class: "default"
+      size: "3Gi"
+      backup_size_mb: 200
+      
+    - name: "resize_test"
+      description: "PVC resize functionality test"
+      storage_class: "default"
+      initial_size: "1Gi"
+      target_size: "3Gi"
+      
+    - name: "snapshot_test"
+      description: "Volume snapshot functionality test"
+      storage_class: "default"
+      size: "2Gi"
+      snapshot_count: 3
+
+  # Comprehensive storage class testing
+  storage_classes:
+    - name: "local-path"
+      size: "5Gi"
+      test_all_scenarios: true
+    - name: "longhorn" 
+      size: "5Gi"
+      enabled: false
+      test_all_scenarios: true
+    - name: "nfs"
+      size: "3Gi"
+      enabled: false
+      test_all_scenarios: false
+
+# Comprehensive Network Testing
+network_tests:
+  enabled: true
+  timeout_seconds: 900
+  
+  # Extensive DNS testing
+  dns:
+    external_servers:
+      - "8.8.8.8"          # Google Primary
+      - "8.8.4.4"          # Google Secondary
+      - "1.1.1.1"          # Cloudflare Primary
+      - "1.0.0.1"          # Cloudflare Secondary
+      - "208.67.222.222"   # OpenDNS Primary
+      - "208.67.220.220"   # OpenDNS Secondary
+      - "9.9.9.9"          # Quad9 Primary
+      - "149.112.112.112"  # Quad9 Secondary
+    internal_services:
+      - "kubernetes.default.svc.cluster.local"
+      - "kube-dns.kube-system.svc.cluster.local"
+      - "metrics-server.kube-system.svc.cluster.local"
+    resolution_tests: 20  # Multiple resolution tests per server
+    
+  # Comprehensive connectivity testing
+  connectivity:
+    pod_to_pod: true
+    service_discovery: true
+    external_connectivity: true
+    external_hosts:
+      - "google.com"
+      - "github.com"
+      - "docker.io"
+      - "registry.k8s.io"
+      - "quay.io"
+      - "gcr.io"
+      - "amazonaws.com"
+      - "microsoft.com"
+    cross_namespace_tests: true
+    network_policy_tests: true
+    
+  # Ingress testing across multiple configurations
+  ingress:
+    enabled: true
+    test_hosts:
+      - "network-test.local"
+      - "storage-test.local" 
+      - "api-test.local"
+    ssl_tests: true
+    load_balancing_tests: true
+    
+  # Comprehensive performance testing
+  performance:
+    enabled: true
+    bandwidth_test: "1G"
+    duration: "180s"  # Extended performance testing
+    latency_threshold_ms: 30
+    jitter_tests: true
+    packet_loss_tests: true
+    concurrent_connection_tests: true
+    throughput_matrix:
+      - protocol: "tcp"
+        ports: [80, 443, 8080, 8443]
+        duration: "60s"
+      - protocol: "udp"
+        ports: [53, 123, 8081]
+        duration: "30s"
+
+# Strict validation thresholds for comprehensive testing
+validation:
+  success_rate:
+    minimum: 95.0    # High minimum for comprehensive testing
+    target: 98.0     # High target
+    excellent: 99.5  # Very strict excellence threshold
+    
+  performance:
+    storage:
+      min_read_iops: 200
+      min_write_iops: 150
+      max_pvc_creation_time: 30
+      min_read_bandwidth_mbps: 20
+      min_write_bandwidth_mbps: 15
+      max_latency_ms: 10
+    network:
+      max_dns_resolution_time: 1.5
+      max_pod_to_pod_latency: 3.0
+      max_ingress_response_time: 150
+      min_throughput_mbps: 50
+      max_packet_loss_percent: 0.1
+
+# Advanced monitoring for comprehensive testing
+monitoring:
+  enabled: true
+  metrics_collection_interval: 10
+  detailed_resource_tracking: true
+  system_metrics:
+    - cpu_usage
+    - memory_usage  
+    - disk_io
+    - network_io
+    - pod_resource_usage
+    - node_resource_usage
+    - cluster_resource_usage
+  
+  alerts:
+    enabled: true
+    high_latency_threshold: 50
+    low_throughput_threshold: 25
+    resource_usage_threshold: 70
+    error_rate_threshold: 1.0
+
+# Comprehensive resource management
+resource_management:
+  auto_cleanup_success: false  # Keep resources for analysis
+  ask_cleanup_failed: true
+  max_resource_age_hours: 72   # Keep resources longer for analysis
+  cleanup_batch_size: 3
+  detailed_cleanup_logging: true
+  
+  # Comprehensive priority system
+  priorities:
+    critical: ["vm", "k3s_cluster", "persistent_volumes"]
+    high: ["helm_release", "namespace", "ingress"]
+    normal: ["configmap", "secret", "service"]
+    low: ["test_data", "temp_files", "logs"]
+
+# Comprehensive reporting
+reporting:
+  enabled: true
+  formats: ["json", "html", "csv", "xml"]  # All formats
+  output_directory: "./comprehensive-reports"
+  include_detailed_logs: true
+  include_performance_charts: true
+  include_trend_analysis: true
+  include_regression_analysis: true
+  
+  # Comprehensive report components
+  report_components:
+    executive_summary: true
+    detailed_metrics: true
+    performance_analysis: true
+    failure_analysis: true
+    recommendation_engine: true
+    comparison_reports: true
+    historical_trends: true
+    
+  # Extended retention for comprehensive analysis
+  retention_days: 90
+  max_reports: 500
+
+# Detailed logging for comprehensive testing
+logging:
+  level: "DEBUG"  # Maximum verbosity
+  format: "detailed"
+  file_logging: true
+  console_logging: true
+  structured_logging: true
+  
+  # Comprehensive log retention
+  max_log_files: 50
+  max_log_size_mb: 100
+  log_rotation: true
+  log_compression: true
+
+# All features enabled for comprehensive testing
+features:
+  parallel_validation: false  # Sequential for thorough testing
+  resource_monitoring: true
+  performance_trending: true
+  automated_retry: true
+  smart_cleanup: true
+  advanced_analytics: true
+  regression_detection: true
+  trend_analysis: true
+  failure_pattern_analysis: true
+  recommendation_engine: true
+
+# Extended test scenarios
+extended_scenarios:
+  disaster_recovery:
+    enabled: true
+    node_failure_simulation: true
+    network_partition_simulation: true
+    storage_failure_simulation: true
+    
+  security_testing:
+    enabled: true
+    network_policy_validation: true
+    rbac_testing: true
+    secret_encryption_testing: true
+    
+  scalability_testing:
+    enabled: true
+    pod_scaling_tests: true
+    node_scaling_tests: true
+    resource_limit_tests: true
+    
+  upgrade_testing:
+    enabled: false  # Requires special configuration
+    rolling_upgrade_simulation: false
+    rollback_testing: false

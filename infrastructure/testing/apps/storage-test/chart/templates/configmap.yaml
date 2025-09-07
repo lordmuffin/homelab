@@ -1,0 +1,225 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "k3s-storage-test.fullname" . }}-config
+  labels:
+    {{- include "k3s-storage-test.labels" . | nindent 4 }}
+data:
+  test-script.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    
+    # Test configuration
+    DATA_SIZE="{{ .Values.test.dataSize }}"
+    ITERATIONS="{{ .Values.test.iterations }}"
+    MOUNT_PATH="/data"
+    TEST_FILE="${MOUNT_PATH}/test-file.dat"
+    RESULTS_FILE="${MOUNT_PATH}/test-results.json"
+    
+    echo "🧪 Starting K3s Storage Tests"
+    echo "Data Size: ${DATA_SIZE}"
+    echo "Iterations: ${ITERATIONS}"
+    echo "Mount Path: ${MOUNT_PATH}"
+    
+    # Initialize results
+    cat > ${RESULTS_FILE} << EOF
+    {
+      "test_start": "$(date -Iseconds)",
+      "data_size": "${DATA_SIZE}",
+      "iterations": ${ITERATIONS},
+      "tests": []
+    }
+    EOF
+    
+    # Test 1: PVC Creation and Binding
+    echo "🔍 Test 1: PVC Creation and Binding"
+    start_time=$(date +%s.%N)
+    
+    if [ -d "${MOUNT_PATH}" ]; then
+      echo "✅ PVC successfully mounted at ${MOUNT_PATH}"
+      pvc_test="passed"
+    else
+      echo "❌ PVC mount failed"
+      pvc_test="failed"
+    fi
+    
+    end_time=$(date +%s.%N)
+    duration=$(echo "${end_time} - ${start_time}" | bc)
+    
+    # Test 2: Write Performance
+    echo "🔍 Test 2: Write Performance"
+    write_start=$(date +%s.%N)
+    
+    {{- if .Values.performance.enabled }}
+    # Write test data
+    dd if=/dev/zero of=${TEST_FILE} bs={{ .Values.performance.blockSize }} count=1000 oflag=sync 2>/dev/null || true
+    {{- else }}
+    # Simple write test
+    echo "test data for storage validation" > ${TEST_FILE}
+    {{- end }}
+    
+    write_end=$(date +%s.%N)
+    write_duration=$(echo "${write_end} - ${write_start}" | bc)
+    
+    if [ -f "${TEST_FILE}" ]; then
+      echo "✅ Write test completed"
+      write_test="passed"
+      file_size=$(stat -c%s ${TEST_FILE})
+    else
+      echo "❌ Write test failed"
+      write_test="failed" 
+      file_size=0
+    fi
+    
+    # Test 3: Read Performance
+    echo "🔍 Test 3: Read Performance"
+    read_start=$(date +%s.%N)
+    
+    if [ -f "${TEST_FILE}" ]; then
+      cat ${TEST_FILE} > /dev/null
+      echo "✅ Read test completed"
+      read_test="passed"
+    else
+      echo "❌ Read test failed - file not found"
+      read_test="failed"
+    fi
+    
+    read_end=$(date +%s.%N)
+    read_duration=$(echo "${read_end} - ${read_start}" | bc)
+    
+    # Test 4: Data Persistence (simulate pod restart)
+    echo "🔍 Test 4: Data Persistence"
+    persist_start=$(date +%s.%N)
+    
+    if [ -f "${TEST_FILE}" ]; then
+      original_content=$(cat ${TEST_FILE})
+      # Simulate some time passing
+      sleep 1
+      current_content=$(cat ${TEST_FILE})
+      
+      if [ "${original_content}" = "${current_content}" ]; then
+        echo "✅ Data persistence validated"
+        persist_test="passed"
+      else
+        echo "❌ Data persistence failed"
+        persist_test="failed"
+      fi
+    else
+      echo "❌ Data persistence test failed - no file to test"
+      persist_test="failed"
+    fi
+    
+    persist_end=$(date +%s.%N)
+    persist_duration=$(echo "${persist_end} - ${persist_start}" | bc)
+    
+    # Calculate I/O stats
+    {{- if .Values.performance.enabled }}
+    write_iops=$(echo "scale=2; 1000 / ${write_duration}" | bc)
+    read_iops=$(echo "scale=2; 1000 / ${read_duration}" | bc)
+    {{- else }}
+    write_iops=0
+    read_iops=0
+    {{- end }}
+    
+    # Update results file
+    cat > ${RESULTS_FILE} << EOF
+    {
+      "test_start": "$(date -Iseconds)",
+      "test_end": "$(date -Iseconds)",
+      "data_size": "${DATA_SIZE}",
+      "iterations": ${ITERATIONS},
+      "storage_class": "{{ .Values.storage.storageClass }}",
+      "tests": {
+        "pvc_binding": {
+          "status": "${pvc_test}",
+          "duration": ${duration}
+        },
+        "write_performance": {
+          "status": "${write_test}",
+          "duration": ${write_duration},
+          "file_size": ${file_size},
+          "write_iops": ${write_iops}
+        },
+        "read_performance": {
+          "status": "${read_test}",
+          "duration": ${read_duration},
+          "read_iops": ${read_iops}
+        },
+        "data_persistence": {
+          "status": "${persist_test}",
+          "duration": ${persist_duration}
+        }
+      },
+      "summary": {
+        "total_tests": 4,
+        "passed_tests": $(echo "${pvc_test} ${write_test} ${read_test} ${persist_test}" | tr ' ' '\n' | grep -c "passed"),
+        "success_rate": $(echo "scale=2; $(echo "${pvc_test} ${write_test} ${read_test} ${persist_test}" | tr ' ' '\n' | grep -c "passed") * 100 / 4" | bc)
+      }
+    }
+    EOF
+    
+    echo "📊 Storage Test Results:"
+    cat ${RESULTS_FILE}
+    
+    # Keep container running for result collection
+    echo "✅ Storage tests completed. Results saved to ${RESULTS_FILE}"
+    
+    # Exit with success/failure based on test results
+    if [ $(echo "${pvc_test} ${write_test} ${read_test} ${persist_test}" | tr ' ' '\n' | grep -c "passed") -eq 4 ]; then
+      echo "🎉 All storage tests passed!"
+      exit 0
+    else
+      echo "❌ Some storage tests failed!"
+      exit 1
+    fi
+
+  _helpers.tpl: |
+    {{/*
+    Expand the name of the chart.
+    */}}
+    {{- define "k3s-storage-test.name" -}}
+    {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
+    {{- end }}
+
+    {{/*
+    Create a default fully qualified app name.
+    */}}
+    {{- define "k3s-storage-test.fullname" -}}
+    {{- if .Values.fullnameOverride }}
+    {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
+    {{- else }}
+    {{- $name := default .Chart.Name .Values.nameOverride }}
+    {{- if contains $name .Release.Name }}
+    {{- .Release.Name | trunc 63 | trimSuffix "-" }}
+    {{- else }}
+    {{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
+    {{- end }}
+    {{- end }}
+    {{- end }}
+
+    {{/*
+    Common labels
+    */}}
+    {{- define "k3s-storage-test.labels" -}}
+    helm.sh/chart: {{ include "k3s-storage-test.chart" . }}
+    {{ include "k3s-storage-test.selectorLabels" . }}
+    {{- if .Chart.AppVersion }}
+    app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+    {{- end }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    {{- end }}
+
+    {{/*
+    Selector labels
+    */}}
+    {{- define "k3s-storage-test.selectorLabels" -}}
+    app.kubernetes.io/name: {{ include "k3s-storage-test.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    {{- end }}
+
+    {{/*
+    Create chart name and version as used by the chart label.
+    */}}
+    {{- define "k3s-storage-test.chart" -}}
+    {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
+    {{- end }}

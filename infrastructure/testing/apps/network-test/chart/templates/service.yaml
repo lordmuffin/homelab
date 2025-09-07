@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "k3s-network-test.fullname" . }}
+  labels:
+    {{- include "k3s-network-test.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.network.service.type }}
+  ports:
+    - port: {{ .Values.network.service.port }}
+      targetPort: {{ .Values.network.service.targetPort }}
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "k3s-network-test.selectorLabels" . | nindent 4 }}
+
+---
+{{- if .Values.server.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "k3s-network-test.fullname" . }}-server
+  labels:
+    {{- include "k3s-network-test.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+spec:
+  type: {{ .Values.server.service.type }}
+  ports:
+    - port: {{ .Values.server.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "k3s-network-test.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+{{- end }}

@@ -1,0 +1,88 @@
+{{- if .Values.server.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "k3s-network-test.fullname" . }}-server-config
+  labels:
+    {{- include "k3s-network-test.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+data:
+  nginx.conf: |
+    server {
+        listen 80;
+        server_name localhost;
+        
+        location / {
+            root /usr/share/nginx/html;
+            index index.html;
+            
+            # Add headers for testing
+            add_header X-Pod-Name $hostname;
+            add_header X-Test-Server "network-test-server";
+            add_header Access-Control-Allow-Origin "*";
+        }
+        
+        location /health {
+            access_log off;
+            return 200 "healthy\n";
+            add_header Content-Type text/plain;
+        }
+        
+        location /api/test {
+            add_header Content-Type application/json;
+            return 200 '{"status":"ok","server":"{{ include "k3s-network-test.fullname" . }}-server","timestamp":"$time_iso8601","pod":"$hostname"}';
+        }
+    }
+  
+  index.html: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>K3s Network Test Server</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 40px; }
+            .header { background: #4CAF50; color: white; padding: 20px; border-radius: 5px; }
+            .info { background: #f0f0f0; padding: 15px; margin: 20px 0; border-radius: 5px; }
+            .status { color: #4CAF50; font-weight: bold; }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h1>K3s Network Test Server</h1>
+            <p class="status">✅ Server is running successfully</p>
+        </div>
+        
+        <div class="info">
+            <h2>Server Information</h2>
+            <ul>
+                <li><strong>Service:</strong> {{ include "k3s-network-test.fullname" . }}-server</li>
+                <li><strong>Chart Version:</strong> {{ .Chart.Version }}</li>
+                <li><strong>App Version:</strong> {{ .Chart.AppVersion }}</li>
+                <li><strong>Namespace:</strong> {{ .Release.Namespace }}</li>
+                <li><strong>Release:</strong> {{ .Release.Name }}</li>
+            </ul>
+        </div>
+        
+        <div class="info">
+            <h2>Available Endpoints</h2>
+            <ul>
+                <li><strong>GET /</strong> - This page</li>
+                <li><strong>GET /health</strong> - Health check endpoint</li>
+                <li><strong>GET /api/test</strong> - JSON test endpoint</li>
+            </ul>
+        </div>
+        
+        <div class="info">
+            <h2>Network Testing</h2>
+            <p>This server can be used to test:</p>
+            <ul>
+                <li>Pod-to-Pod communication</li>
+                <li>Service discovery</li>
+                <li>Load balancing</li>
+                <li>HTTP connectivity</li>
+                <li>DNS resolution</li>
+            </ul>
+        </div>
+    </body>
+    </html>
+{{- end }}

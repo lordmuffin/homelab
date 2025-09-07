@@ -1,0 +1,192 @@
+---
+# K3s Testing Framework - Performance Testing Profile
+# ===================================================
+# Optimized configuration for performance testing and benchmarking
+
+profile_name: "performance"
+profile_version: "1.0"
+description: "Performance-focused testing profile for benchmarking K3s deployments"
+
+# Extended from default configuration
+extends: "default"
+
+# Test Execution Configuration - Performance Optimized
+execution:
+  max_parallel_tests: 4  # Increased parallelism for performance testing
+  default_iterations: 5  # More iterations for statistical significance
+  timeout_multiplier: 1.5  # Longer timeouts for performance tests
+  test_focus: ["storage", "network"]
+  test_mode: "full"
+
+# Enhanced Storage Performance Testing
+storage_tests:
+  enabled: true
+  timeout_seconds: 600  # Extended timeout for performance tests
+  
+  scenarios:
+    - name: "high_performance_pvc"
+      description: "High-performance storage validation with large volumes"
+      storage_class: "default"
+      size: "10Gi"
+      access_mode: "ReadWriteOnce"
+      
+    - name: "intensive_performance_test"
+      description: "Intensive I/O performance benchmarking"
+      storage_class: "default"
+      size: "20Gi"
+      test_duration: "120s"  # Extended test duration
+      io_depth: 32
+      block_size: "4k"
+      
+    - name: "concurrent_access_test"
+      description: "Multiple pod concurrent storage access"
+      storage_class: "default"
+      size: "5Gi"
+      concurrent_pods: 3
+      test_duration: "60s"
+      
+    - name: "large_file_persistence"
+      description: "Large file persistence and integrity test"
+      storage_class: "default"
+      size: "15Gi"
+      test_file_size_mb: 1024  # 1GB test file
+      checksum_validation: true
+
+  # Performance-focused storage classes
+  storage_classes:
+    - name: "local-path"
+      size: "10Gi"
+      performance_test: true
+    - name: "longhorn"
+      size: "10Gi"
+      enabled: false
+      performance_test: true
+
+# Enhanced Network Performance Testing
+network_tests:
+  enabled: true
+  timeout_seconds: 600
+  
+  # Extended DNS testing
+  dns:
+    external_servers:
+      - "8.8.8.8"
+      - "1.1.1.1" 
+      - "208.67.222.222"
+      - "9.9.9.9"  # Quad9
+    internal_services:
+      - "kubernetes.default.svc.cluster.local"
+      - "kube-dns.kube-system.svc.cluster.local"
+    resolution_tests: 50  # Number of resolution tests per server
+    
+  # Enhanced connectivity testing
+  connectivity:
+    pod_to_pod: true
+    service_discovery: true
+    external_connectivity: true
+    external_hosts:
+      - "google.com"
+      - "github.com"
+      - "docker.io"
+      - "registry.k8s.io"
+    connection_pool_size: 10
+    concurrent_connections: 5
+    
+  # Performance benchmarking
+  performance:
+    enabled: true
+    bandwidth_test: "1G"  # Higher bandwidth test
+    duration: "120s"  # Extended duration
+    latency_threshold_ms: 25  # Stricter latency requirement
+    throughput_tests:
+      - protocol: "tcp"
+        port: 8080
+        duration: "60s"
+      - protocol: "udp" 
+        port: 8081
+        duration: "30s"
+
+# Stricter validation thresholds for performance
+validation:
+  success_rate:
+    minimum: 90.0    # Higher minimum for performance profile
+    target: 98.0     # Higher target
+    excellent: 99.5  # Stricter excellence threshold
+    
+  performance:
+    storage:
+      min_read_iops: 500   # Higher performance requirements
+      min_write_iops: 400
+      max_pvc_creation_time: 15  # Faster creation required
+      min_read_bandwidth_mbps: 50
+      min_write_bandwidth_mbps: 30
+    network:
+      max_dns_resolution_time: 1.0  # Stricter DNS timing
+      max_pod_to_pod_latency: 2.0   # Lower latency requirement
+      max_ingress_response_time: 100  # Faster response required
+      min_throughput_mbps: 100
+
+# Performance monitoring configuration
+monitoring:
+  enabled: true
+  metrics_collection_interval: 5  # seconds
+  system_metrics:
+    - cpu_usage
+    - memory_usage
+    - disk_io
+    - network_io
+    - pod_resource_usage
+  
+  alerts:
+    high_latency_threshold: 100  # milliseconds
+    low_throughput_threshold: 50  # Mbps
+    resource_usage_threshold: 80  # percent
+
+# Benchmarking configuration
+benchmarking:
+  enabled: true
+  baseline_comparison: true
+  historical_trends: true
+  
+  # Benchmark suites
+  suites:
+    - name: "storage_benchmark"
+      tests: ["sequential_read", "sequential_write", "random_read", "random_write"]
+      block_sizes: ["4k", "64k", "1M"]
+      
+    - name: "network_benchmark" 
+      tests: ["bandwidth", "latency", "packet_loss", "connection_rate"]
+      packet_sizes: [64, 1024, 8192]
+
+# Extended resource management for performance testing
+resource_management:
+  auto_cleanup_success: false  # Keep successful runs for analysis
+  ask_cleanup_failed: true
+  max_resource_age_hours: 48  # Keep resources longer for analysis
+  cleanup_batch_size: 3  # Smaller batches to avoid resource conflicts
+
+# Enhanced reporting for performance analysis
+reporting:
+  enabled: true
+  formats: ["json", "html", "csv"]  # Include CSV for data analysis
+  output_directory: "./performance-reports"
+  include_detailed_logs: true
+  include_performance_charts: true
+  include_benchmarks: true
+  
+  # Performance-specific reports
+  performance_reports:
+    trend_analysis: true
+    regression_detection: true
+    percentile_analysis: [50, 90, 95, 99]
+    comparison_reports: true
+
+# Feature flags for performance testing
+features:
+  parallel_validation: true
+  resource_monitoring: true
+  performance_trending: true
+  automated_retry: true
+  smart_cleanup: true
+  benchmark_mode: true
+  advanced_metrics: true

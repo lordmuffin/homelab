@@ -1,0 +1,17 @@
+apiVersion: v2
+name: k3s-storage-test
+description: K3s Storage Validation Test Application
+version: 1.0.0
+appVersion: "1.0.0"
+type: application
+
+maintainers:
+  - name: K3s Deploy Team
+    email: admin@homelab.local
+
+keywords:
+  - storage
+  - testing
+  - validation
+  - k3s
+  - persistence

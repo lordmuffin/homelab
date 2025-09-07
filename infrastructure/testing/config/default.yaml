@@ -1,0 +1,165 @@
+---
+# K3s Testing Framework - Default Configuration Profile
+# ====================================================
+# This is the base configuration for the K3s testing framework v1.1.0
+
+profile_name: "default"
+profile_version: "1.0"
+description: "Default testing configuration for general K3s deployment validation"
+
+# Test Execution Configuration
+execution:
+  max_parallel_tests: 2
+  default_iterations: 3
+  timeout_multiplier: 1.0
+  test_focus: ["storage", "network"]
+  test_mode: "full"  # Options: "full", "k3s_only", "apps_only"
+
+# Storage Testing Configuration
+storage_tests:
+  enabled: true
+  timeout_seconds: 300
+  
+  # Test scenarios
+  scenarios:
+    - name: "basic_pvc"
+      description: "Basic PVC creation and binding test"
+      storage_class: "default"
+      size: "1Gi"
+      access_mode: "ReadWriteOnce"
+      
+    - name: "performance_test"
+      description: "Storage I/O performance validation"
+      storage_class: "default" 
+      size: "5Gi"
+      test_duration: "30s"
+      
+    - name: "persistence_test"
+      description: "Data persistence across pod restarts"
+      storage_class: "default"
+      size: "2Gi"
+      test_file_size_mb: 100
+
+  # Additional storage classes to test
+  storage_classes:
+    - name: "local-path"
+      size: "1Gi"
+    - name: "longhorn"
+      size: "2Gi"
+      enabled: false  # Only if Longhorn is deployed
+
+# Network Testing Configuration
+network_tests:
+  enabled: true
+  timeout_seconds: 300
+  
+  # DNS Configuration
+  dns:
+    external_servers:
+      - "8.8.8.8"
+      - "1.1.1.1"
+      - "208.67.222.222"  # OpenDNS
+    internal_services:
+      - "kubernetes.default.svc.cluster.local"
+      - "kube-dns.kube-system.svc.cluster.local"
+  
+  # Connectivity Tests
+  connectivity:
+    pod_to_pod: true
+    service_discovery: true
+    external_connectivity: true
+    external_hosts:
+      - "google.com"
+      - "github.com"
+      - "docker.io"
+    
+  # Ingress Testing
+  ingress:
+    enabled: true
+    test_hosts:
+      - "network-test.local"
+      - "storage-test.local"
+  
+  # Performance Testing
+  performance:
+    enabled: true
+    bandwidth_test: "100M"
+    duration: "30s"
+    latency_threshold_ms: 50
+
+# Resource Management Configuration
+resource_management:
+  auto_cleanup_success: true
+  ask_cleanup_failed: true
+  max_resource_age_hours: 24
+  cleanup_batch_size: 5
+  
+  # Priority levels for resource cleanup
+  priorities:
+    critical: ["vm", "k3s_cluster"]
+    high: ["helm_release", "namespace"]
+    normal: ["configmap", "secret"]
+    low: ["test_data"]
+
+# Reporting Configuration
+reporting:
+  enabled: true
+  formats: ["json", "html"]
+  output_directory: "./test-reports"
+  include_detailed_logs: false
+  include_performance_charts: true
+  
+  # Report retention
+  retention_days: 30
+  max_reports: 100
+
+# Validation Thresholds
+validation:
+  # Overall success rate thresholds
+  success_rate:
+    minimum: 80.0    # Minimum acceptable success rate
+    target: 95.0     # Target success rate
+    excellent: 99.0  # Excellent success rate
+  
+  # Performance thresholds
+  performance:
+    storage:
+      min_read_iops: 100
+      min_write_iops: 80
+      max_pvc_creation_time: 30  # seconds
+    network:
+      max_dns_resolution_time: 2.0  # seconds
+      max_pod_to_pod_latency: 5.0   # seconds
+      max_ingress_response_time: 200  # milliseconds
+
+# Infrastructure Configuration
+infrastructure:
+  # Terraform configuration
+  terraform:
+    timeout_multiplier: 1.0
+    max_retries: 3
+    
+  # Ansible configuration
+  ansible:
+    timeout_multiplier: 1.0
+    max_retries: 3
+    inventory_discovery_timeout: 300
+
+# Logging Configuration
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: "detailed"  # simple, detailed, json
+  file_logging: true
+  console_logging: true
+  
+  # Log retention
+  max_log_files: 10
+  max_log_size_mb: 50
+
+# Feature Flags
+features:
+  parallel_validation: true
+  resource_monitoring: true
+  performance_trending: true
+  automated_retry: true
+  smart_cleanup: true

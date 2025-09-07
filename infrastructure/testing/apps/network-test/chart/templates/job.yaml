@@ -1,0 +1,99 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "k3s-network-test.fullname" . }}-test
+  labels:
+    {{- include "k3s-network-test.labels" . | nindent 4 }}
+spec:
+  template:
+    metadata:
+      labels:
+        {{- include "k3s-network-test.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- if .Values.serviceAccount.create }}
+      serviceAccountName: {{ include "k3s-network-test.serviceAccountName" . }}
+      {{- end }}
+      restartPolicy: Never
+      containers:
+      - name: network-test-job
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command:
+          - /bin/sh
+          - -c
+          - |
+            echo "Starting network test job at $(date)"
+            echo "Running comprehensive network tests..."
+            
+            # Run the main test script
+            /scripts/test-script.sh
+            
+            # Additional job-specific tests
+            echo
+            echo "=== Job-Specific Network Tests ==="
+            
+            # Test for multiple iterations if specified
+            ITERATIONS={{ .Values.test.iterations | default 1 }}
+            echo "Running $ITERATIONS test iterations..."
+            
+            for i in $(seq 1 $ITERATIONS); do
+              echo
+              echo "--- Iteration $i/$ITERATIONS ---"
+              
+              # Quick connectivity tests
+              echo "Testing external connectivity..."
+              ping -c 2 8.8.8.8 && echo "✅ External ping successful" || echo "❌ External ping failed"
+              
+              # DNS resolution test
+              echo "Testing DNS resolution..."
+              nslookup kubernetes.default.svc.cluster.local && echo "✅ Internal DNS successful" || echo "❌ Internal DNS failed"
+              
+              # Service endpoint test
+              echo "Testing service endpoints..."
+              wget -q --timeout=5 -O- http://{{ include "k3s-network-test.fullname" . }}:{{ .Values.network.service.port }}/ && echo "✅ Service endpoint accessible" || echo "❌ Service endpoint failed"
+              
+              # Wait between iterations
+              if [ $i -lt $ITERATIONS ]; then
+                sleep 5
+              fi
+            done
+            
+            echo
+            echo "Network test job completed at $(date)"
+        volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+        env:
+        - name: TEST_ITERATIONS
+          value: "{{ .Values.test.iterations }}"
+        - name: TEST_TIMEOUT
+          value: "{{ .Values.test.timeout }}"
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+      volumes:
+      - name: scripts
+        configMap:
+          name: {{ include "k3s-network-test.fullname" . }}-config
+          defaultMode: 0755
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  backoffLimit: {{ .Values.test.iterations | default 3 }}
+  activeDeadlineSeconds: {{ .Values.test.timeout | default 300 }}

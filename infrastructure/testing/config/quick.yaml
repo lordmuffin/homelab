@@ -1,0 +1,120 @@
+---
+# K3s Testing Framework - Quick Testing Profile
+# ==============================================
+# Fast configuration for rapid validation and development
+
+profile_name: "quick"
+profile_version: "1.0"
+description: "Quick testing profile for fast validation during development"
+
+# Extended from default configuration
+extends: "default"
+
+# Test Execution Configuration - Speed Optimized
+execution:
+  max_parallel_tests: 3  # Moderate parallelism for speed
+  default_iterations: 2  # Fewer iterations for speed
+  timeout_multiplier: 0.7  # Shorter timeouts
+  test_focus: ["storage", "network"]
+  test_mode: "apps_only"  # Skip infrastructure deployment
+
+# Lightweight Storage Testing
+storage_tests:
+  enabled: true
+  timeout_seconds: 180  # Shorter timeout
+  
+  scenarios:
+    - name: "quick_pvc"
+      description: "Quick PVC creation and binding test"
+      storage_class: "default"
+      size: "500Mi"  # Smaller size for speed
+      access_mode: "ReadWriteOnce"
+      
+    - name: "basic_performance"
+      description: "Basic storage performance check"
+      storage_class: "default"
+      size: "1Gi"
+      test_duration: "10s"  # Short test duration
+
+  # Only test default storage class for speed
+  storage_classes:
+    - name: "local-path"
+      size: "500Mi"
+
+# Streamlined Network Testing
+network_tests:
+  enabled: true
+  timeout_seconds: 180
+  
+  # Minimal DNS testing
+  dns:
+    external_servers:
+      - "8.8.8.8"  # Only test Google DNS
+    internal_services:
+      - "kubernetes.default.svc.cluster.local"
+    
+  # Basic connectivity tests
+  connectivity:
+    pod_to_pod: true
+    service_discovery: true
+    external_connectivity: true
+    external_hosts:
+      - "google.com"  # Single host test
+    
+  # Quick performance check
+  performance:
+    enabled: true
+    bandwidth_test: "10M"  # Lower bandwidth test
+    duration: "10s"  # Short duration
+    latency_threshold_ms: 100  # Relaxed threshold
+
+# Relaxed validation thresholds for speed
+validation:
+  success_rate:
+    minimum: 70.0    # Lower minimum for quick tests
+    target: 85.0     # Reasonable target
+    excellent: 95.0  # Standard excellence
+    
+  performance:
+    storage:
+      min_read_iops: 50    # Lower requirements for speed
+      min_write_iops: 30
+      max_pvc_creation_time: 60  # Relaxed timing
+    network:
+      max_dns_resolution_time: 5.0  # Relaxed DNS timing
+      max_pod_to_pod_latency: 10.0  # Relaxed latency
+      max_ingress_response_time: 500  # Relaxed response time
+
+# Fast resource cleanup
+resource_management:
+  auto_cleanup_success: true
+  ask_cleanup_failed: false  # Auto-cleanup failed resources too
+  max_resource_age_hours: 2  # Quick cleanup
+  cleanup_batch_size: 10  # Larger batches for speed
+
+# Minimal reporting for speed
+reporting:
+  enabled: true
+  formats: ["json"]  # Only JSON for speed
+  output_directory: "./quick-reports"
+  include_detailed_logs: false  # Skip detailed logs
+  include_performance_charts: false  # Skip charts for speed
+  
+  # Quick report retention
+  retention_days: 7
+  max_reports: 20
+
+# Optimized logging for speed
+logging:
+  level: "WARNING"  # Reduce log verbosity
+  format: "simple"
+  file_logging: false  # Skip file logging for speed
+  console_logging: true
+
+# Speed-optimized feature flags
+features:
+  parallel_validation: true
+  resource_monitoring: false  # Skip monitoring for speed
+  performance_trending: false  # Skip trending for speed
+  automated_retry: false  # Skip retries for speed
+  smart_cleanup: true

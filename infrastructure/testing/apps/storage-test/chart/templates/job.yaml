@@ -1,0 +1,132 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "k3s-storage-test.fullname" . }}-test
+  labels:
+    {{- include "k3s-storage-test.labels" . | nindent 4 }}
+spec:
+  template:
+    metadata:
+      labels:
+        {{- include "k3s-storage-test.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- if .Values.serviceAccount.create }}
+      serviceAccountName: {{ include "k3s-storage-test.fullname" . }}
+      {{- end }}
+      restartPolicy: Never
+      containers:
+      - name: storage-test
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command:
+          - /bin/sh
+          - -c
+          - |
+            # Install bc for calculations
+            apk add --no-cache bc > /dev/null 2>&1 || echo "bc not available, using basic math"
+            
+            # Run the test script
+            chmod +x /scripts/test-script.sh
+            /scripts/test-script.sh
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: scripts
+          mountPath: /scripts
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+        env:
+        - name: TEST_START_TIME
+          value: "{{ now | date "2006-01-02T15:04:05Z07:00" }}"
+        - name: STORAGE_CLASS
+          value: "{{ .Values.storage.storageClass }}"
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: {{ include "k3s-storage-test.fullname" . }}-data
+      - name: scripts
+        configMap:
+          name: {{ include "k3s-storage-test.fullname" . }}-config
+          defaultMode: 0755
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+---
+# Additional storage class tests
+{{- range .Values.storage.classes }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "k3s-storage-test.fullname" $ }}-{{ .name }}-test
+  labels:
+    {{- include "k3s-storage-test.labels" $ | nindent 4 }}
+    storage-class: {{ .name }}
+spec:
+  template:
+    metadata:
+      labels:
+        {{- include "k3s-storage-test.selectorLabels" $ | nindent 8 }}
+        storage-class: {{ .name }}
+    spec:
+      {{- if $.Values.serviceAccount.create }}
+      serviceAccountName: {{ include "k3s-storage-test.fullname" $ }}
+      {{- end }}
+      restartPolicy: Never
+      containers:
+      - name: storage-test-{{ .name }}
+        image: "{{ $.Values.image.repository }}:{{ $.Values.image.tag }}"
+        imagePullPolicy: {{ $.Values.image.pullPolicy }}
+        command:
+          - /bin/sh
+          - -c
+          - |
+            # Install bc for calculations
+            apk add --no-cache bc > /dev/null 2>&1 || echo "bc not available, using basic math"
+            
+            # Run the test script
+            chmod +x /scripts/test-script.sh
+            /scripts/test-script.sh
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: scripts
+          mountPath: /scripts
+        resources:
+          {{- toYaml $.Values.resources | nindent 10 }}
+        env:
+        - name: TEST_START_TIME
+          value: "{{ now | date "2006-01-02T15:04:05Z07:00" }}"
+        - name: STORAGE_CLASS
+          value: "{{ .name }}"
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: {{ include "k3s-storage-test.fullname" $ }}-{{ .name }}
+      - name: scripts
+        configMap:
+          name: {{ include "k3s-storage-test.fullname" $ }}-config
+          defaultMode: 0755
+      {{- with $.Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $.Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $.Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+{{- end }}

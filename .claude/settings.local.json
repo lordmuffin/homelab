@@ -76,7 +76,8 @@
       "Bash(KUBECONFIG=~/.kube/k3s-cluster-config kubectl get nodes -o wide)",
       "Bash(python:*)",
       "Bash(/home/lordmuffin/k3s-kubectl get nodes)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(./fix-k3s-metrics.sh:*)"
     ],
     "deny": [],
     "additionalDirectories": [

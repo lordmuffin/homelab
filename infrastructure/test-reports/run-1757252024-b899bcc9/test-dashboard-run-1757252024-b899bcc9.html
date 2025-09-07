@@ -1,0 +1,251 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>K3s Test Dashboard - run-1757252024-b899bcc9</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .container { max-width: 1400px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        .header { text-align: center; margin-bottom: 40px; color: #2c3e50; }
+        .header h1 { margin: 0; font-size: 2.5em; font-weight: 300; }
+        .header h2 { color: #7f8c8d; font-weight: normal; }
+        .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 25px; margin-bottom: 40px; }
+        .metric-card { background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); padding: 25px; border-radius: 12px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.1); transition: transform 0.2s; }
+        .metric-card:hover { transform: translateY(-5px); }
+        .metric-value { font-size: 2.5em; font-weight: bold; margin-bottom: 5px; }
+        .metric-label { font-size: 0.9em; color: #6c757d; font-weight: 500; }
+        .success .metric-value { color: #28a745; }
+        .warning .metric-value { color: #ffc107; }
+        .info .metric-value { color: #17a2b8; }
+        .primary .metric-value { color: #007bff; }
+        
+        .performance-section { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin: 40px 0; }
+        .performance-card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .performance-card h3 { margin-top: 0; color: #2c3e50; font-weight: 500; }
+        .metric-row { display: flex; justify-content: space-between; margin: 15px 0; padding: 10px; background: #f8f9fa; border-radius: 8px; }
+        .metric-name { font-weight: 500; color: #495057; }
+        .metric-val { font-weight: bold; color: #007bff; }
+        
+        .chart-section { margin: 40px 0; }
+        .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+        .chart-card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .chart-container { position: relative; height: 300px; }
+        
+        .iterations { margin-top: 40px; }
+        .iterations h3 { color: #2c3e50; font-weight: 500; margin-bottom: 25px; }
+        .iteration { margin: 15px 0; padding: 20px; border-left: 5px solid #007bff; background: linear-gradient(90deg, #f8f9fa 0%, white 100%); border-radius: 0 8px 8px 0; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .success { border-color: #28a745; background: linear-gradient(90deg, #d4edda 0%, white 100%); }
+        .failed { border-color: #dc3545; background: linear-gradient(90deg, #f8d7da 0%, white 100%); }
+        .iteration-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .iteration-title { font-weight: bold; font-size: 1.1em; }
+        .iteration-status { padding: 5px 15px; border-radius: 20px; font-size: 0.8em; font-weight: bold; text-transform: uppercase; }
+        .status-passed { background: #28a745; color: white; }
+        .status-failed { background: #dc3545; color: white; }
+        .iteration-details { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
+        .detail-item { text-align: center; }
+        .detail-value { font-size: 1.2em; font-weight: bold; color: #007bff; }
+        .detail-label { font-size: 0.8em; color: #6c757d; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 K3s Deployment Test Dashboard</h1>
+            <h2>Run ID: run-1757252024-b899bcc9</h2>
+            <p>Generated: 2025-09-07 08:34:13 | Duration: 29.7s</p>
+        </div>
+        
+        <div class="metrics">
+            <div class="metric-card success">
+                <div class="metric-value">0.0%</div>
+                <div class="metric-label">Overall Success Rate</div>
+            </div>
+            <div class="metric-card info">
+                <div class="metric-value">3</div>
+                <div class="metric-label">Completed Iterations</div>
+            </div>
+            <div class="metric-card primary">
+                <div class="metric-value">9.9s</div>
+                <div class="metric-label">Avg Iteration Time</div>
+            </div>
+            <div class="metric-card warning">
+                <div class="metric-value">3</div>
+                <div class="metric-label">Failed Iterations</div>
+            </div>
+        </div>
+        
+        <div class="performance-section">
+            <div class="performance-card">
+                <h3>📊 Storage Performance Metrics</h3>
+                <p>No storage metrics available</p>
+            </div>
+            <div class="performance-card">
+                <h3>🌐 Network Performance Metrics</h3>
+                <p>No network metrics available</p>
+            </div>
+        </div>
+        
+        <div class="chart-section">
+            <div class="charts">
+                <div class="chart-card">
+                    <h3>📈 Success Rate Trend</h3>
+                    <div class="chart-container">
+                        <canvas id="successChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h3>⏱️ Duration Trend</h3>
+                    <div class="chart-container">
+                        <canvas id="durationChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="iterations">
+            <h3>🔍 Detailed Iteration Results</h3>
+            
+            <div class="iteration failed">
+                <div class="iteration-header">
+                    <div class="iteration-title">Iteration 1</div>
+                    <div class="iteration-status status-failed">
+                        FAILED
+                    </div>
+                </div>
+                <div class="iteration-details">
+                    <div class="detail-item">
+                        <div class="detail-value">8.7s</div>
+                        <div class="detail-label">Total Duration</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-value">0.0%</div>
+                        <div class="detail-label">Success Rate</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-value">2.7s</div>
+                        <div class="detail-label">Validation Time</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-value">2</div>
+                        <div class="detail-label">Tests Run</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="iteration failed">
+                <div class="iteration-header">
+                    <div class="iteration-title">Iteration 2</div>
+                    <div class="iteration-status status-failed">
+                        FAILED
+                    </div>
+                </div>
+                <div class="iteration-details">
+                    <div class="detail-item">
+                        <div class="detail-value">7.8s</div>
+                        <div class="detail-label">Total Duration</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-value">0.0%</div>
+                        <div class="detail-label">Success Rate</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-value">1.8s</div>
+                        <div class="detail-label">Validation Time</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-value">2</div>
+                        <div class="detail-label">Tests Run</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="iteration failed">
+                <div class="iteration-header">
+                    <div class="iteration-title">Iteration 3</div>
+                    <div class="iteration-status status-failed">
+                        FAILED
+                    </div>
+                </div>
+                <div class="iteration-details">
+                    <div class="detail-item">
+                        <div class="detail-value">8.1s</div>
+                        <div class="detail-label">Total Duration</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-value">0.0%</div>
+                        <div class="detail-label">Success Rate</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-value">2.1s</div>
+                        <div class="detail-label">Validation Time</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-value">2</div>
+                        <div class="detail-label">Tests Run</div>
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+        
+        <script>
+            // Success Rate Chart
+            const successCtx = document.getElementById('successChart').getContext('2d');
+            new Chart(successCtx, {
+                type: 'line',
+                data: {
+                    labels: ['Iter 1', 'Iter 2', 'Iter 3'],
+                    datasets: [{
+                        label: 'Success Rate %',
+                        data: [0.0, 0.0, 0.0],
+                        borderColor: '#28a745',
+                        backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100
+                        }
+                    }
+                }
+            });
+            
+            // Duration Chart
+            const durationCtx = document.getElementById('durationChart').getContext('2d');
+            new Chart(durationCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Iter 1', 'Iter 2', 'Iter 3'],
+                    datasets: [{
+                        label: 'Duration (seconds)',
+                        data: [8.654311, 7.799231, 8.077479],
+                        backgroundColor: 'rgba(0, 123, 255, 0.6)',
+                        borderColor: '#007bff',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        </script>
+    </div>
+</body>
+</html>
+        

@@ -1,0 +1,99 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "k3s-network-test.fullname" . }}
+  labels:
+    {{- include "k3s-network-test.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "k3s-network-test.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "k3s-network-test.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- if .Values.serviceAccount.create }}
+      serviceAccountName: {{ include "k3s-network-test.serviceAccountName" . }}
+      {{- end }}
+      containers:
+      - name: network-test
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.network.service.targetPort }}
+          protocol: TCP
+        command:
+          - /bin/sh
+          - -c
+          - |
+            # Keep container running and provide simple HTTP endpoint for testing
+            echo "Starting network test container..."
+            echo "Network Test Pod - $(hostname)" > /tmp/index.html
+            echo "Pod IP: $(hostname -i)" >> /tmp/index.html
+            echo "Start Time: $(date)" >> /tmp/index.html
+            
+            # Start simple HTTP server for pod-to-pod testing
+            (cd /tmp && python3 -m http.server {{ .Values.network.service.targetPort }}) &
+            
+            # Run initial network tests
+            /scripts/test-script.sh || true
+            
+            # Keep container alive
+            while true; do
+              echo "Network test pod $(hostname) is running at $(date)"
+              sleep 300
+            done
+        volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        livenessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 60
+        readinessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 10
+      volumes:
+      - name: scripts
+        configMap:
+          name: {{ include "k3s-network-test.fullname" . }}-config
+          defaultMode: 0755
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

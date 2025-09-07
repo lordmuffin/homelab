@@ -161,11 +161,18 @@
         - "'masters' in group_names"
         - "not (is_primary | default(false))"
 
+    - name: Get the node token for worker nodes
+      shell: cat /var/lib/rancher/k3s/server/node-token
+      delegate_to: k3s-master-01
+      register: worker_node_token
+      when: "'workers' in group_names or 'gpu_workers' in group_names"
+      run_once: true
+
     - name: Install K3s on worker nodes
       shell: |
         curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="{{ k3s_version }}" sh -s - agent \
           --server "https://{{ hostvars['k3s-master-01']['ansible_host'] }}:6443" \
-          --token "{{ full_node_token.stdout }}" \
+          --token "{{ hostvars['k3s-master-01']['worker_node_token']['stdout'] | default(worker_node_token.stdout) }}" \
           --node-label "node-type=worker"
       args:
         creates: /etc/systemd/system/k3s-agent.service
@@ -175,7 +182,7 @@
       shell: |
         curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="{{ k3s_version }}" sh -s - agent \
           --server "https://{{ hostvars['k3s-master-01']['ansible_host'] }}:6443" \
-          --token "{{ full_node_token.stdout }}" \
+          --token "{{ hostvars['k3s-master-01']['worker_node_token']['stdout'] | default(worker_node_token.stdout) }}" \
           --node-label "node-type=gpu-worker" \
           --node-label "gpu=nvidia" \
           --node-label "workload=ai"

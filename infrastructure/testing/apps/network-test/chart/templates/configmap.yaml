@@ -1,0 +1,154 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "k3s-network-test.fullname" . }}-config
+  labels:
+    {{- include "k3s-network-test.labels" . | nindent 4 }}
+data:
+  test-script.sh: |
+    #!/bin/sh
+    set -e
+    
+    # Colors for output
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[1;33m'
+    BLUE='\033[0;34m'
+    NC='\033[0m' # No Color
+    
+    echo -e "${BLUE}=== K3s Network Test Application ===${NC}"
+    echo "Test started at: $(date)"
+    echo "Hostname: $(hostname)"
+    echo "Pod IP: $(hostname -i)"
+    echo
+    
+    # Test results tracking
+    TOTAL_TESTS=0
+    PASSED_TESTS=0
+    FAILED_TESTS=0
+    
+    # Function to run test and track results
+    run_test() {
+        local test_name="$1"
+        local test_command="$2"
+        TOTAL_TESTS=$((TOTAL_TESTS + 1))
+        
+        echo -e "${YELLOW}[TEST $TOTAL_TESTS] $test_name${NC}"
+        
+        if eval "$test_command"; then
+            echo -e "${GREEN}✅ PASSED: $test_name${NC}"
+            PASSED_TESTS=$((PASSED_TESTS + 1))
+        else
+            echo -e "${RED}❌ FAILED: $test_name${NC}"
+            FAILED_TESTS=$((FAILED_TESTS + 1))
+        fi
+        echo
+    }
+    
+    # Install required tools
+    echo -e "${BLUE}Installing network tools...${NC}"
+    apk add --no-cache curl dig nmap-ncat netcat-openbsd iperf3 wget traceroute > /dev/null 2>&1 || echo "Some tools not available"
+    echo
+    
+    # Test 1: DNS Resolution Tests
+    echo -e "${BLUE}=== DNS Resolution Tests ===${NC}"
+    
+    {{- range .Values.network.dns.external }}
+    run_test "DNS Resolution - External Server {{ . }}" "nslookup google.com {{ . }}"
+    {{- end }}
+    
+    {{- range .Values.network.dns.internal }}
+    run_test "DNS Resolution - Internal Service {{ . }}" "nslookup {{ . }}"
+    {{- end }}
+    
+    # Test 2: Connectivity Tests
+    echo -e "${BLUE}=== Connectivity Tests ===${NC}"
+    
+    {{- if .Values.network.connectivity.external }}
+    {{- range .Values.network.connectivity.externalHosts }}
+    run_test "External Connectivity - {{ . }}" "ping -c 3 {{ . }}"
+    run_test "External HTTP - {{ . }}" "wget --timeout=10 --tries=3 -qO- https://{{ . }} > /dev/null"
+    {{- end }}
+    {{- end }}
+    
+    {{- if .Values.network.connectivity.serviceDiscovery }}
+    # Test Kubernetes service discovery
+    run_test "Kubernetes API Server Connectivity" "nc -zv kubernetes.default.svc.cluster.local 443 2>&1"
+    run_test "DNS Service Discovery" "nc -zv kube-dns.kube-system.svc.cluster.local 53 2>&1"
+    {{- end }}
+    
+    # Test 3: Pod-to-Pod Communication
+    {{- if .Values.network.connectivity.podToPod }}
+    echo -e "${BLUE}=== Pod-to-Pod Communication Tests ===${NC}"
+    
+    # Get other pod IPs in the same namespace
+    NAMESPACE=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
+    
+    # Simple HTTP server for testing
+    echo "Starting simple HTTP server on port 8080..."
+    echo "Network test server responding" > /tmp/response.html
+    (cd /tmp && python3 -m http.server 8080 > /dev/null 2>&1) &
+    HTTP_SERVER_PID=$!
+    
+    sleep 2
+    
+    # Test local connectivity
+    run_test "Local HTTP Server Test" "curl -s http://localhost:8080/response.html | grep 'Network test server'"
+    
+    # Cleanup HTTP server
+    kill $HTTP_SERVER_PID 2>/dev/null || true
+    {{- end }}
+    
+    # Test 4: Network Performance Tests
+    {{- if .Values.performance.enabled }}
+    echo -e "${BLUE}=== Network Performance Tests ===${NC}"
+    
+    # Simple bandwidth test using wget
+    run_test "Download Speed Test" "timeout 30 wget --progress=bar:force -O /dev/null http://speedtest.tele2.net/1MB.zip 2>&1 | grep -o '[0-9.]* [KM]B/s'"
+    
+    # Port connectivity tests
+    run_test "DNS Port 53 Test" "nc -zv 8.8.8.8 53 2>&1"
+    run_test "HTTP Port 80 Test" "nc -zv google.com 80 2>&1"
+    run_test "HTTPS Port 443 Test" "nc -zv google.com 443 2>&1"
+    {{- end }}
+    
+    # Test 5: Service Discovery Tests
+    echo -e "${BLUE}=== Service Discovery Tests ===${NC}"
+    
+    # Test service discovery through environment variables
+    run_test "Kubernetes Service Environment Variables" "env | grep -i kubernetes"
+    
+    # Test service account
+    run_test "Service Account Token Exists" "test -f /var/run/secrets/kubernetes.io/serviceaccount/token"
+    run_test "Service Account Namespace" "test -f /var/run/secrets/kubernetes.io/serviceaccount/namespace"
+    
+    # Test 6: Network Policy Tests (if applicable)
+    echo -e "${BLUE}=== Network Policy Tests ===${NC}"
+    
+    # Test basic network connectivity from pod
+    run_test "Pod Network Interface" "ip addr show eth0"
+    run_test "Pod Routing Table" "ip route show"
+    run_test "Pod Network Namespace" "ls -la /proc/self/ns/net"
+    
+    # Test 7: Ingress Tests (if enabled)
+    {{- if .Values.network.ingress.enabled }}
+    echo -e "${BLUE}=== Ingress Tests ===${NC}"
+    
+    {{- range .Values.network.ingress.hosts }}
+    run_test "Ingress Host Resolution - {{ .host }}" "nslookup {{ .host }}"
+    {{- end }}
+    {{- end }}
+    
+    # Generate final report
+    echo -e "${BLUE}=== Test Summary ===${NC}"
+    echo "Total tests run: $TOTAL_TESTS"
+    echo -e "Passed: ${GREEN}$PASSED_TESTS${NC}"
+    echo -e "Failed: ${RED}$FAILED_TESTS${NC}"
+    
+    if [ $FAILED_TESTS -eq 0 ]; then
+        echo -e "${GREEN}🎉 All network tests PASSED!${NC}"
+        exit 0
+    else
+        echo -e "${RED}💥 Some network tests FAILED!${NC}"
+        exit 1
+    fi

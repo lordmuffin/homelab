@@ -1,0 +1,89 @@
+{{- if .Values.network.ingress.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "k3s-network-test.fullname" . }}
+  labels:
+    {{- include "k3s-network-test.labels" . | nindent 4 }}
+  {{- with .Values.network.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.network.ingress.className }}
+  ingressClassName: {{ .Values.network.ingress.className }}
+  {{- end }}
+  {{- if .Values.network.ingress.tls }}
+  tls:
+    {{- range .Values.network.ingress.tls }}
+    - hosts:
+        {{- range .hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ .secretName }}
+    {{- end }}
+  {{- end }}
+  rules:
+    {{- range .Values.network.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            {{- if .pathType }}
+            pathType: {{ .pathType }}
+            {{- end }}
+            backend:
+              service:
+                name: {{ include "k3s-network-test.fullname" $ }}
+                port:
+                  number: {{ $.Values.network.service.port }}
+          {{- end }}
+    {{- end }}
+
+{{- if .Values.server.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "k3s-network-test.fullname" . }}-server
+  labels:
+    {{- include "k3s-network-test.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+  {{- with .Values.network.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.network.ingress.className }}
+  ingressClassName: {{ .Values.network.ingress.className }}
+  {{- end }}
+  {{- if .Values.network.ingress.tls }}
+  tls:
+    {{- range .Values.network.ingress.tls }}
+    - hosts:
+        {{- range .hosts }}
+        - server-{{ . | quote }}
+        {{- end }}
+      secretName: {{ .secretName }}-server
+    {{- end }}
+  {{- end }}
+  rules:
+    {{- range .Values.network.ingress.hosts }}
+    - host: server-{{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            {{- if .pathType }}
+            pathType: {{ .pathType }}
+            {{- end }}
+            backend:
+              service:
+                name: {{ include "k3s-network-test.fullname" $ }}-server
+                port:
+                  number: {{ $.Values.server.service.port }}
+          {{- end }}
+    {{- end }}
+{{- end }}
+{{- end }}

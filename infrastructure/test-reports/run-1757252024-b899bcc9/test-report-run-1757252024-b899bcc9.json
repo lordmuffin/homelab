@@ -1,0 +1,192 @@
+{
+  "metadata": {
+    "report_version": "1.1.0",
+    "generated_at": "2025-09-07T08:34:13.812687",
+    "generator": "K3s Testing Framework v1.1.0",
+    "run_id": "run-1757252024-b899bcc9",
+    "total_duration": 29.669421,
+    "start_time": "2025-09-07T08:33:44.133856",
+    "end_time": "2025-09-07T08:34:13.803277"
+  },
+  "summary": {
+    "overall_success_rate": 0.0,
+    "completed_iterations": 3,
+    "planned_iterations": 3,
+    "average_iteration_time": 9.889807,
+    "test_configuration": {
+      "mode": "full",
+      "test_focus": [
+        "storage",
+        "network"
+      ],
+      "parallel_tests": 1
+    },
+    "environment": "production"
+  },
+  "performance_metrics": {
+    "storage": {
+      "averages": {},
+      "description": "Average storage performance metrics across all successful iterations"
+    },
+    "network": {
+      "averages": {},
+      "description": "Average network performance metrics across all successful iterations"
+    },
+    "trends": {
+      "iteration_duration": [
+        8.654311,
+        7.799231,
+        8.077479
+      ],
+      "success_rate": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "validation_time": [
+        2.6528353691101074,
+        1.798279047012329,
+        2.0762217044830322
+      ],
+      "description": "Performance trends across all iterations"
+    }
+  },
+  "iteration_analysis": {
+    "iterations": [
+      {
+        "iteration_number": 1,
+        "status": "failed",
+        "duration": 8.654311,
+        "success_rate": 0.0,
+        "mode": "full",
+        "phases": {
+          "infrastructure_time": 2.0003159046173096,
+          "k3s_deployment_time": 3.0004239082336426,
+          "app_deployment_time": 1.0005347728729248,
+          "validation_time": 2.6528353691101074
+        },
+        "tests": [
+          {
+            "test_name": "storage_validation",
+            "status": "failed",
+            "duration": 1.351751,
+            "error_message": "Command '['kubectl', 'apply', '-f', '-', '--validate=false']' returned non-zero exit status 1.",
+            "metrics": {},
+            "logs_count": 0
+          },
+          {
+            "test_name": "network_validation",
+            "status": "failed",
+            "duration": 1.300577,
+            "error_message": "Command '['kubectl', 'apply', '-f', '-', '--validate=false']' returned non-zero exit status 1.",
+            "metrics": {},
+            "logs_count": 0
+          }
+        ]
+      },
+      {
+        "iteration_number": 2,
+        "status": "failed",
+        "duration": 7.799231,
+        "success_rate": 0.0,
+        "mode": "full",
+        "phases": {
+          "infrastructure_time": 2.000180721282959,
+          "k3s_deployment_time": 3.0003254413604736,
+          "app_deployment_time": 1.0003249645233154,
+          "validation_time": 1.798279047012329
+        },
+        "tests": [
+          {
+            "test_name": "storage_validation",
+            "status": "failed",
+            "duration": 0.83341,
+            "error_message": "Command '['kubectl', 'apply', '-f', '-', '--validate=false']' returned non-zero exit status 1.",
+            "metrics": {},
+            "logs_count": 0
+          },
+          {
+            "test_name": "network_validation",
+            "status": "failed",
+            "duration": 0.964554,
+            "error_message": "Command '['kubectl', 'apply', '-f', '-', '--validate=false']' returned non-zero exit status 1.",
+            "metrics": {},
+            "logs_count": 0
+          }
+        ]
+      },
+      {
+        "iteration_number": 3,
+        "status": "failed",
+        "duration": 8.077479,
+        "success_rate": 0.0,
+        "mode": "full",
+        "phases": {
+          "infrastructure_time": 2.0001373291015625,
+          "k3s_deployment_time": 3.000337600708008,
+          "app_deployment_time": 1.0007219314575195,
+          "validation_time": 2.0762217044830322
+        },
+        "tests": [
+          {
+            "test_name": "storage_validation",
+            "status": "failed",
+            "duration": 0.987,
+            "error_message": "Command '['kubectl', 'apply', '-f', '-', '--validate=false']' returned non-zero exit status 1.",
+            "metrics": {},
+            "logs_count": 0
+          },
+          {
+            "test_name": "network_validation",
+            "status": "failed",
+            "duration": 1.088938,
+            "error_message": "Command '['kubectl', 'apply', '-f', '-', '--validate=false']' returned non-zero exit status 1.",
+            "metrics": {},
+            "logs_count": 0
+          }
+        ]
+      }
+    ],
+    "statistics": {
+      "fastest_iteration": 2,
+      "slowest_iteration": 1,
+      "most_stable_iteration": null,
+      "failure_patterns": []
+    }
+  },
+  "test_results": {
+    "by_type": {
+      "storage_validation": {
+        "total_runs": 3,
+        "successes": 0,
+        "failures": 3,
+        "average_duration": 0,
+        "error_patterns": [
+          "Command '['kubectl', 'apply', '-f', '-', '--validate=false']' returned non-zero exit status 1.",
+          "Command '['kubectl', 'apply', '-f', '-', '--validate=false']' returned non-zero exit status 1.",
+          "Command '['kubectl', 'apply', '-f', '-', '--validate=false']' returned non-zero exit status 1."
+        ],
+        "success_rate": 0.0
+      },
+      "network_validation": {
+        "total_runs": 3,
+        "successes": 0,
+        "failures": 3,
+        "average_duration": 0,
+        "error_patterns": [
+          "Command '['kubectl', 'apply', '-f', '-', '--validate=false']' returned non-zero exit status 1.",
+          "Command '['kubectl', 'apply', '-f', '-', '--validate=false']' returned non-zero exit status 1.",
+          "Command '['kubectl', 'apply', '-f', '-', '--validate=false']' returned non-zero exit status 1."
+        ],
+        "success_rate": 0.0
+      }
+    },
+    "failure_analysis": {},
+    "success_patterns": {}
+  },
+  "resource_utilization": {
+    "average": {},
+    "peak": {},
+    "trends": []
+  }
+}
