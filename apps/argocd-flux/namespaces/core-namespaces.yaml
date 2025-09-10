@@ -1,0 +1,57 @@
+# Core system namespaces (converted from ArgoCD destinations)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kube-system
+  labels:
+    managed-by: flux
+    category: core
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: argocd
+  labels:
+    managed-by: flux
+    category: core
+    prometheus: enabled
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: koordinator-system
+  labels:
+    managed-by: flux
+    category: core
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cert-manager
+  labels:
+    managed-by: flux
+    category: core
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: democratic-csi
+  labels:
+    managed-by: flux
+    category: core
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nvidia-gpu-operator
+  labels:
+    managed-by: flux
+    category: core
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: 1password
+  labels:
+    managed-by: flux
+    category: core

@@ -1,0 +1,116 @@
+# Traefik Application converted from ArgoCD to FluxCD HelmRelease
+# Original: base/networking/traefik.yaml
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: traefik
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  chart:
+    spec:
+      chart: traefik
+      version: '26.0.0'  # From original targetRevision: v26.0.0
+      sourceRef:
+        kind: HelmRepository
+        name: traefik
+        namespace: flux-system
+      interval: 5m0s
+  
+  # Target namespace (equivalent to ArgoCD destination)
+  targetNamespace: traefik
+  createNamespace: true
+  
+  # Helm values from original ArgoCD Application
+  values:
+    globalArguments:
+      - "--global.sendanonymoususage=false"
+      - "--global.checknewversion=false"
+    
+    additionalArguments:
+      - "--serversTransport.insecureSkipVerify=true"
+      - "--log.level=INFO"
+    
+    tolerations:
+      - key: dedicated
+        operator: Equal
+        value: control
+        effect: NoSchedule
+    
+    deployment:
+      enabled: true
+      replicas: 5
+      annotations: {}
+      podAnnotations: {}
+      additionalContainers: []
+      initContainers: []
+    
+    ports:
+      web:
+        redirectTo:
+          port: websecure
+          priority: 10
+      websecure:
+        tls:
+          enabled: true
+        forwardedHeaders:
+          insecure: false
+      web-int:
+        port: 8080
+        redirectTo:
+          port: web-int-tls
+      web-int-tls:
+        port: 8043
+        tls:
+          enabled: true
+    
+    ingressRoute:
+      dashboard:
+        enabled: false
+    
+    providers:
+      kubernetesCRD:
+        enabled: true
+        ingressClass: traefik-external
+        allowExternalNameServices: true
+        allowCrossNamespace: true
+      kubernetesIngress:
+        enabled: true
+        allowExternalNameServices: true
+        publishedService:
+          enabled: false
+    
+    rbac:
+      enabled: true
+    
+    service:
+      enabled: true
+      type: LoadBalancer
+      single: true
+      annotations: {}
+      labels: {}
+      spec: {}
+  
+  # Health checks converted from ArgoCD
+  postRenderers:
+    - kustomize:
+        patches:
+          - target:
+              kind: Namespace
+              name: traefik
+            patch: |
+              - op: add
+                path: /metadata/labels/prometheus
+                value: enabled
+  
+  # Retry and timeout settings converted from ArgoCD sync policy
+  timeout: 15m0s
+  # Equivalent to ArgoCD retry configuration
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 5
+      remediateLastFailure: true
+  rollback:
+    recreate: true
+    timeout: 15m0s

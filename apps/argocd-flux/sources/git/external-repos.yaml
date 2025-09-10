@@ -1,0 +1,58 @@
+# External Git repositories used by applications
+# These are converted from ArgoCD Applications that reference external git repos
+
+# KASM Helm Repository (git-based)
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: GitRepository
+metadata:
+  name: kasm-helm
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  ref:
+    branch: release/1.17.0  # From kasm.yaml targetRevision
+  url: https://github.com/kasmtech/kasm-helm.git
+  timeout: 60s
+
+# ChromaDB Chart Repository (git-based)
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: GitRepository
+metadata:
+  name: chromadb-chart
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  ref:
+    commit: d5b9b61  # From chroma.yaml targetRevision
+  url: https://github.com/amikos-tech/chromadb-chart.git
+  timeout: 60s
+
+# Democratic CSI Charts
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: GitRepository
+metadata:
+  name: democratic-csi-charts
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  ref:
+    tag: democratic-csi-0.14.6  # From democratic-csi.yaml targetRevision
+  url: https://github.com/democratic-csi/charts.git
+  timeout: 60s
+
+# NVIDIA K8s Device Plugin
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: GitRepository
+metadata:
+  name: nvidia-device-plugin
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  ref:
+    tag: v0.14.1  # From nvidia.yaml targetRevision
+  url: https://github.com/NVIDIA/k8s-device-plugin.git
+  timeout: 60s

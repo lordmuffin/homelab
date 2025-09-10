@@ -1,0 +1,41 @@
+# Networking namespaces (converted from ArgoCD networking project destinations)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: traefik
+  labels:
+    managed-by: flux
+    category: networking
+    prometheus: enabled
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cilium-system
+  labels:
+    managed-by: flux
+    category: networking
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kube-vip
+  labels:
+    managed-by: flux
+    category: networking
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: metallb-system
+  labels:
+    managed-by: flux
+    category: networking
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: headscale
+  labels:
+    managed-by: flux
+    category: networking

@@ -1,0 +1,42 @@
+# FluxCD RBAC for Apps Project (converted from ArgoCD AppProject)
+# Original: base/projects/apps.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: flux-apps-sa
+  namespace: flux-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: flux-apps-role
+  namespace: default
+rules:
+  # Application-specific resources
+  - apiGroups: [""]
+    resources: ["pods", "services", "configmaps", "secrets", "persistentvolumeclaims"]
+    verbs: ["*"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets", "daemonsets"]
+    verbs: ["*"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["*"]
+  # 1Password CRDs
+  - apiGroups: ["onepassword.com"]
+    resources: ["*"]
+    verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: flux-apps-binding
+  namespace: default
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: flux-apps-role
+subjects:
+  - kind: ServiceAccount
+    name: flux-apps-sa
+    namespace: flux-system

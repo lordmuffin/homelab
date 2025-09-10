@@ -1,0 +1,91 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: GitRepository
+metadata:
+  name: homelab-gitops
+  namespace: flux-system
+spec:
+  interval: 5m
+  ref:
+    branch: single-node-cluster
+  url: https://github.com/lordmuffin/homelab
+  secretRef:
+    name: flux-system
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1beta2
+kind: Kustomization
+metadata:
+  name: node1-compute-cluster
+  namespace: flux-system
+spec:
+  interval: 10m
+  path: ./infrastructure/single-node-clusters/clusters/node1-compute
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: homelab-gitops
+  timeout: 5m
+  retryInterval: 2m
+  force: false
+  wait: true
+  validation: client
+  healthChecks:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: traefik
+      namespace: traefik-system
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: democratic-csi-controller
+      namespace: democratic-csi
+  postBuild:
+    substitute:
+      cluster_name: "node1-compute"
+      node_type: "compute"
+      gpu_enabled: "true"
+      workload_class: "ai-ml"
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1beta2
+kind: Kustomization
+metadata:
+  name: node1-compute-infrastructure
+  namespace: flux-system
+spec:
+  interval: 10m
+  path: ./infrastructure/single-node-clusters/clusters/node1-compute/infrastructure
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: homelab-gitops
+  timeout: 10m
+  dependsOn:
+    - name: node1-compute-cluster
+  healthChecks:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: cert-manager
+      namespace: cert-manager
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: nvidia-gpu-operator
+      namespace: gpu-operator
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1beta2
+kind: Kustomization
+metadata:
+  name: node1-compute-apps
+  namespace: flux-system
+spec:
+  interval: 15m
+  path: ./infrastructure/single-node-clusters/clusters/node1-compute/apps
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: homelab-gitops
+  timeout: 15m
+  dependsOn:
+    - name: node1-compute-infrastructure
+  postBuild:
+    substitute:
+      cluster_name: "node1-compute"
+      gpu_resources: "nvidia.com/gpu=1"

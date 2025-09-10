@@ -1,0 +1,44 @@
+# FluxCD Bootstrap Configuration
+# This configures FluxCD to sync the cluster with the Git repository
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: GitRepository
+metadata:
+  name: flux-system
+  namespace: flux-system
+spec:
+  interval: 1m0s
+  ref:
+    branch: main
+  secretRef:
+    name: flux-system
+  url: https://github.com/lordmuffin/homelab.git
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1beta2
+kind: Kustomization
+metadata:
+  name: flux-system
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  path: ./apps/argocd-flux
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  # Health checks for critical FluxCD components
+  healthChecks:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: source-controller
+      namespace: flux-system
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: kustomize-controller
+      namespace: flux-system
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: helm-controller
+      namespace: flux-system
+  # Retry configuration converted from ArgoCD patterns
+  retryInterval: 1m0s
+  timeout: 5m0s

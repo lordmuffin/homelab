@@ -1,0 +1,244 @@
+# K3s Intelligent Installer Configuration Template
+# Copy this file to config.yaml and modify as needed
+
+# K3s Installation Configuration
+k3s:
+  version: "v1.31.1+k3s1"  # Latest stable version
+  install_dir: "/usr/local/bin"
+  data_dir: "/var/lib/rancher/k3s"
+  config_file: "/etc/rancher/k3s/config.yaml"
+  
+  # K3s server configuration
+  server:
+    cluster_init: true
+    disable:
+      - traefik        # We'll use our own ingress controller
+      - servicelb      # We'll use MetalLB
+      - metrics-server # Optional: use kube-prometheus-stack instead
+    write_kubeconfig_mode: "644"
+    node_name: ""      # Auto-detect if empty
+    
+  # Advanced options
+  advanced:
+    snapshotter: "containerd"
+    flannel_backend: "vxlan"
+    cluster_cidr: "10.42.0.0/16"
+    service_cidr: "10.43.0.0/16"
+    cluster_dns: "10.43.0.10"
+
+# GPU Support Configuration
+gpu:
+  enabled: true
+  auto_detect: true
+  
+  # NVIDIA GPU settings
+  nvidia:
+    install_driver: true
+    driver_version: "latest"  # or specific version like "535.54.03"
+    container_runtime: "containerd"
+    device_plugin: true
+    
+  # AMD GPU settings  
+  amd:
+    install_driver: false
+    device_plugin: false
+    
+  # Intel GPU settings
+  intel:
+    device_plugin: true
+
+# Storage Configuration
+storage:
+  provider: "local-path"  # Options: openebs, local-path
+  
+  openebs:
+    version: "v4.1.0"
+    engine: "hostpath"    # Options: hostpath, localpv, mayastor
+    storage_class: "openebs-hostpath"
+
+# Networking Configuration  
+networking:
+  # MetalLB Load Balancer
+  metallb:
+    enabled: true
+    version: "v0.14.8"
+    address_pools:
+      - name: "default"
+        protocol: "layer2"
+        addresses:
+          - "192.168.1.240-192.168.1.250"  # Adjust to your network
+        auto_assign: true
+    
+  # Wireguard VPN for cross-cluster networking
+  wireguard:
+    enabled: false
+    interface: "wg0"
+    listen_port: 51820
+    private_key: ""      # Generate automatically if empty
+    
+    # Peers configuration for multi-cluster setup
+    peers: []
+    #  - public_key: "peer-public-key"
+    #    endpoint: "peer.example.com:51820" 
+    #    allowed_ips: ["10.44.0.0/16"]
+    
+  # CNI Configuration
+  cni:
+    plugin: "flannel"    # K3s default
+    # Additional CNI plugins can be configured here
+
+# TLS Certificate Configuration
+tls:
+  auto_generate: true
+  
+  # cert-manager integration
+  cert_manager:
+    enabled: true
+    version: "v1.15.3"
+    email: "admin@example.com"  # Let's Encrypt email
+    
+    # DNS challenge for wildcard certificates
+    dns_challenge:
+      enabled: false
+      provider: "cloudflare"  # Options: cloudflare, route53, etc
+      credentials_secret: "cloudflare-api-token"
+      
+    # HTTP challenge for basic certificates  
+    http_challenge:
+      enabled: true
+
+# Backup and Restore Configuration
+backup:
+  enabled: true
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  retention: "30d"       # Keep backups for 30 days
+  
+  # Backup destinations
+  destinations:
+    # Local backup
+    local:
+      enabled: true
+      path: "/var/backups/k3s"
+      
+    # S3 backup
+    s3:
+      enabled: false
+      endpoint: "s3.amazonaws.com"
+      bucket: "my-k3s-backups"
+      region: "us-east-1"
+      access_key: ""
+      secret_key: ""
+      
+    # Remote backup via rsync/ssh
+    remote:
+      enabled: false
+      host: "backup.example.com"
+      user: "backup"
+      path: "/backups/k3s"
+      ssh_key: "/root/.ssh/backup_key"
+
+# Monitoring and Observability
+monitoring:
+  enabled: true
+  
+  # Prometheus monitoring stack
+  prometheus:
+    enabled: true
+    version: "kube-prometheus-stack-61.7.2"
+    storage_size: "50Gi"
+    retention: "15d"
+    
+  # Grafana dashboards  
+  grafana:
+    enabled: true
+    admin_password: "admin"  # Change this!
+    
+  # Log aggregation
+  logging:
+    enabled: true
+    provider: "loki"       # Options: loki, elasticsearch
+    retention: "7d"
+
+# Security Configuration
+security:
+  # Pod Security Standards
+  pod_security:
+    enabled: true
+    default_policy: "restricted"
+    
+  # Network Policies
+  network_policies:
+    enabled: true
+    deny_all_default: false
+    
+  # RBAC hardening
+  rbac:
+    strict_mode: true
+    
+  # Runtime security scanning
+  runtime_security:
+    enabled: false
+    provider: "falco"
+
+# System Configuration
+system:
+  # Automatic OS updates
+  auto_updates:
+    enabled: true
+    reboot_required: false
+    
+  # System optimizations
+  optimizations:
+    kernel_modules: true
+    sysctl_tuning: true
+    firewall_config: true
+    
+  # Resource limits
+  resources:
+    max_pods: 110
+    max_open_files: 1000000
+    
+# Installation Hooks
+hooks:
+  # Pre-installation hooks
+  pre_install: []
+  #  - "echo 'Starting K3s installation'"
+  #  - "/path/to/custom-prep-script.sh"
+  
+  # Post-installation hooks  
+  post_install: []
+  #  - "kubectl apply -f /path/to/custom-manifests/"
+  #  - "/path/to/post-install-script.sh"
+  
+  # Pre-uninstall hooks
+  pre_uninstall: []
+  
+  # Post-uninstall hooks
+  post_uninstall: []
+
+# Feature Gates and Experimental Features
+experimental:
+  # Enable experimental features (use with caution)
+  features: []
+  #  - "ServiceInternalTrafficPolicy=true"
+  #  - "MixedProtocolLBService=true"
+  
+# Validation and Health Checks
+validation:
+  enabled: true
+  timeout: 300  # seconds
+  
+  # Health check endpoints
+  health_checks:
+    - name: "k3s-server"
+      endpoint: "https://localhost:6443/livez"
+    - name: "containerd"
+      command: "crictl info"
+    - name: "storage"
+      command: "kubectl get storageclass"
+      
+# Logging Configuration  
+logging:
+  level: "INFO"  # Options: DEBUG, INFO, WARNING, ERROR
+  format: "json"  # Options: json, text
+  file: "/var/log/k3s-installer.log"

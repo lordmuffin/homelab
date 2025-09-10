@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - core-rbac.yaml
+  - secrets-rbac.yaml
+  - cluster-rbac.yaml
+  - monitoring-rbac.yaml
+  - networking-rbac.yaml
+  - apps-rbac.yaml
+  # Commented out initially
+  # - mlops-rbac.yaml
+  # - matrix-rbac.yaml
+
+namespace: flux-system
+
+commonLabels:
+  app.kubernetes.io/component: rbac
+  converted-from: argocd-appproject

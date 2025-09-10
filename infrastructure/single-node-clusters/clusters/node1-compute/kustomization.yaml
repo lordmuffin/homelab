@@ -1,0 +1,82 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Node1 Compute Cluster Configuration
+# High-performance node optimized for AI/ML workloads
+
+metadata:
+  name: node1-compute-cluster
+  namespace: flux-system
+
+# Base infrastructure components
+resources:
+  - ../base/flux-system/
+  - ../base/infrastructure/
+  - flux-system/
+  - infrastructure/
+  - apps/
+
+# Cluster-specific patches
+patchesStrategicMerge:
+  - patches/node-affinity.yaml
+  - patches/resource-limits.yaml
+  - patches/gpu-support.yaml
+
+# Cluster-specific configuration
+configMapGenerator:
+  - name: cluster-config
+    literals:
+      - cluster-name=node1-compute
+      - cluster-role=compute
+      - gpu-enabled=true
+      - cpu-cores=16
+      - memory-gb=64
+      - storage-type=nvme
+      - workload-type=ai-ml
+    options:
+      disableNameSuffixHash: true
+
+# Environment-specific secrets
+secretGenerator:
+  - name: cluster-secrets
+    files:
+      - cluster-ca.crt
+      - cluster.key
+    options:
+      disableNameSuffixHash: true
+
+# Labels applied to all resources in this cluster
+commonLabels:
+  homelab.cluster: node1-compute
+  homelab.node-type: compute
+  homelab.gpu-enabled: "true"
+  homelab.workload-class: ai-ml
+
+# Annotations for resource management
+commonAnnotations:
+  homelab.io/cluster-role: compute
+  homelab.io/gpu-support: nvidia
+  homelab.io/preferred-workloads: localai,qdrant,milvus,turbopilot
+
+# Replacement transformers for cluster-specific values
+replacements:
+  - source:
+      kind: ConfigMap
+      name: cluster-config
+      fieldPath: data.cluster-name
+    targets:
+      - select:
+          kind: GitRepository
+        fieldPaths:
+          - metadata.name
+        options:
+          delimiter: '-'
+
+# Images used in this cluster (for vulnerability scanning)
+images:
+  - name: traefik
+    newTag: v3.0
+  - name: democratic-csi
+    newTag: latest
+  - name: nvidia/gpu-operator
+    newTag: v23.6.0

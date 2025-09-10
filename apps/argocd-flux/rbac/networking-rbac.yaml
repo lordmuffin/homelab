@@ -1,0 +1,48 @@
+# FluxCD RBAC for Networking Project (converted from ArgoCD AppProject)
+# Original: base/projects/networking.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: flux-networking-sa
+  namespace: flux-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: flux-networking-role
+rules:
+  # Core Kubernetes networking resources
+  - apiGroups: [""]
+    resources: ["services", "endpoints", "configmaps", "secrets"]
+    verbs: ["*"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "daemonsets", "replicasets"]
+    verbs: ["*"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies", "ingresses", "ingressclasses"]
+    verbs: ["*"]
+  # Traefik CRDs
+  - apiGroups: ["traefik.containo.us", "traefik.io"]
+    resources: ["*"]
+    verbs: ["*"]
+  # Cert-manager CRDs
+  - apiGroups: ["cert-manager.io"]
+    resources: ["*"]
+    verbs: ["*"]
+  # Cilium CRDs
+  - apiGroups: ["cilium.io"]
+    resources: ["*"]
+    verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: flux-networking-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: flux-networking-role
+subjects:
+  - kind: ServiceAccount
+    name: flux-networking-sa
+    namespace: flux-system

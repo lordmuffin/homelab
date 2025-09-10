@@ -14,6 +14,7 @@ apps/argocd/overlay/*.json
 j*.pem
 .DS_Store
 .history
+node_modules/*
 
 #Python
 venv

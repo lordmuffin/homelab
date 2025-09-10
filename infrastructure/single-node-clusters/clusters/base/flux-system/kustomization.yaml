@@ -1,0 +1,33 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Base FluxCD System Configuration
+# Shared across all single-node clusters
+
+metadata:
+  name: flux-system-base
+  namespace: flux-system
+
+resources:
+  # Core Flux components (will be installed via flux bootstrap)
+  - gotk-components.yaml
+  - gotk-sync.yaml
+
+# Common patches for all clusters
+patchesStrategicMerge:
+  - flux-system-patches.yaml
+
+# Common configuration
+configMapGenerator:
+  - name: flux-system-config
+    literals:
+      - cluster-type=single-node
+      - architecture=homelab
+      - managed-by=flux-cd
+      - backup-enabled=true
+
+# Labels applied to all resources
+commonLabels:
+  homelab.service: gitops
+  homelab.component: flux-system
+  homelab.architecture: single-node

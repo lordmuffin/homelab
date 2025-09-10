@@ -1,0 +1,70 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Node3 General Cluster Configuration
+# General-purpose node for home automation and utility services
+
+metadata:
+  name: node3-general-cluster
+  namespace: flux-system
+
+# Base infrastructure components
+resources:
+  - ../base/flux-system/
+  - ../base/infrastructure/
+  - flux-system/
+  - infrastructure/
+  - apps/
+
+# Cluster-specific patches
+patchesStrategicMerge:
+  - patches/home-automation.yaml
+  - patches/utility-services.yaml
+  - patches/monitoring-primary.yaml
+
+# Cluster-specific configuration
+configMapGenerator:
+  - name: cluster-config
+    literals:
+      - cluster-name=node3-general
+      - cluster-role=general
+      - monitoring-primary=true
+      - home-automation=enabled
+      - cpu-cores=6
+      - memory-gb=16
+      - storage-type=ssd
+      - workload-type=general-utility
+    options:
+      disableNameSuffixHash: true
+
+# General cluster secrets
+secretGenerator:
+  - name: home-automation-secrets
+    literals:
+      - ha-token=changeme
+    options:
+      disableNameSuffixHash: true
+
+# Labels applied to all resources in this cluster
+commonLabels:
+  homelab.cluster: node3-general
+  homelab.node-type: general
+  homelab.monitoring-primary: "true"
+  homelab.workload-class: utility
+
+# Annotations for general services
+commonAnnotations:
+  homelab.io/cluster-role: general
+  homelab.io/home-automation: enabled
+  homelab.io/preferred-workloads: homeassistant,adguard,unifi,monitoring
+
+# General-purpose image versions
+images:
+  - name: homeassistant/home-assistant
+    newTag: latest
+  - name: adguard/adguardhome
+    newTag: latest
+  - name: prometheus/prometheus
+    newTag: v2.45.0
+  - name: grafana/grafana
+    newTag: 10.0.0

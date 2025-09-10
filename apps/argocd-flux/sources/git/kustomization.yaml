@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - homelab-main.yaml
+  - homelab-private.yaml
+  - external-repos.yaml
+
+commonLabels:
+  app.kubernetes.io/component: git-source
+  source-type: git
