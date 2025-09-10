@@ -121,7 +121,6 @@ spec:
       enabled: false
     postgresql:
       enabled: false
-    replicaCount: 1
     resources:
       limits:
         cpu: 750m
