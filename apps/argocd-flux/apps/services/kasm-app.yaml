@@ -18,7 +18,6 @@ spec:
       interval: 5m0s
   
   targetNamespace: kasm
-  createNamespace: true
   
   # Converted Helm values from original ArgoCD Application
   values:

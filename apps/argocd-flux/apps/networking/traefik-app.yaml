@@ -19,7 +19,6 @@ spec:
   
   # Target namespace (equivalent to ArgoCD destination)
   targetNamespace: traefik
-  createNamespace: true
   
   # Helm values from original ArgoCD Application
   values:
