@@ -1,0 +1,28 @@
+# Actual Budget Application converted from ArgoCD to FluxCD  
+# Original: base/services/actual.yaml
+apiVersion: kustomize.toolkit.fluxcd.io/v1beta2
+kind: Kustomization
+metadata:
+  name: actual
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  path: ./apps/services/actual
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: homelab-main
+    namespace: flux-system
+  targetNamespace: services
+  
+  # Health checks
+  healthChecks:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: actual
+      namespace: services
+  
+  # Converted from ArgoCD sync policy
+  retryInterval: 2m0s
+  timeout: 15m0s
+  wait: true

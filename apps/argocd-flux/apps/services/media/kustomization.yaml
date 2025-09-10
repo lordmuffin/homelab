@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - jellyfin-app.yaml
+  - qbittorrent-app.yaml
+  - prowlarr-app.yaml
+  - bazarr-app.yaml
+  - sonarr-app.yaml
+  - ganymede-app.yaml
+  - lidarr-app.yaml
+  - beets-app.yaml
+  - tanoshi-app.yaml
+
+commonLabels:
+  app.kubernetes.io/component: media-applications
+  category: media

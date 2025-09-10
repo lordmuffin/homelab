@@ -1,0 +1,13 @@
+# Forgejo OCI Helm Repository  
+# Converted from: base/services/forgejo.yaml
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: OCIRepository
+metadata:
+  name: forgejo-helm
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  url: oci://code.forgejo.org/forgejo-helm
+  ref:
+    tag: v8.0.0
+  timeout: 60s

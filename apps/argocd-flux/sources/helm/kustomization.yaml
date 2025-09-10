@@ -10,6 +10,7 @@ resources:
   - utilities-helm.yaml
   - networking-helm.yaml
   - gitea-helm.yaml
+  - forgejo-helm.yaml
   - mlops-helm.yaml
 
 commonLabels:

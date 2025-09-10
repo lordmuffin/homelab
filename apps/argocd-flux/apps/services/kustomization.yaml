@@ -4,11 +4,40 @@ kind: Kustomization
 resources:
   - kasm-app.yaml
   - homepage-app.yaml
-  # Missing files - add when ready:
-  # - gitea-app.yaml
-  # - n8n-app.yaml
-  # - media/
-  # - mlops/
+  - gitea-app.yaml
+  - forgejo-app.yaml
+  - n8n-app.yaml
+  - azure-pipelines-app.yaml
+  - actual-app.yaml
+  - gitea-utils-app.yaml
+  - paperless-app.yaml
+  - woodpecker-app.yaml
+  - woodpecker-utils-app.yaml
+  - tandoor-app.yaml
+  - vikunja-app.yaml
+  - litellm-app.yaml
+  - obsidian-app.yaml
+  - grill-stats-app.yaml
+  - grill-stats-dev-app.yaml
+  - mcp-servers-app.yaml
+  - influxdb-app.yaml
+  - blinko-app.yaml
+  - kasm-unified-app.yaml
+  - squid-app.yaml
+  - jupyterlab-app.yaml
+  - wallabag-app.yaml
+  - grocy-app.yaml
+  - onchange-app.yaml
+  - wger-app.yaml
+  - ofx-exporter-app.yaml
+  - librex-app.yaml
+  - archivebox-app.yaml
+  - feedpushr-app.yaml
+  - rss-hub-app.yaml
+  - nitter-app.yaml
+  - mlops-app.yaml
+  - metabase-app.yaml
+  - media/
 
 namespace: flux-system
 
