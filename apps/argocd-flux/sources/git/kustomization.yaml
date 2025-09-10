@@ -3,7 +3,6 @@ kind: Kustomization
 
 resources:
   - homelab-main.yaml
-  - homelab-private.yaml
   - external-repos.yaml
 
 commonLabels:
