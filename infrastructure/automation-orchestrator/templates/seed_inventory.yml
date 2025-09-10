@@ -1,0 +1,185 @@
+# Seed Inventory Template
+# This file defines the starting points for automated infrastructure discovery
+# Edit this file to match your infrastructure and run: orchestrate discover seed_inventory.yml
+
+version: "1.0"
+name: "Homelab Infrastructure"
+description: "Primary homelab infrastructure discovery seed"
+
+# Networks to discover
+# The orchestrator will scan these network ranges for active devices
+networks:
+  - network: "192.168.1.0/24"
+    name: "Main Network"
+    location: "Home Lab"
+    discovery_priority: 1
+    scan_ports: [22, 80, 443, 3389, 5900, 8006]
+    exclude_hosts:
+      - "192.168.1.1"    # Router
+      - "192.168.1.255"  # Broadcast
+  
+  - network: "10.0.0.0/24" 
+    name: "Management Network"
+    location: "Home Lab"
+    vlan_id: 100
+    discovery_priority: 2
+  
+  # Add more networks as needed
+  # - network: "172.16.0.0/24"
+  #   name: "Guest Network"
+  #   location: "Home Lab"
+  #   discovery_priority: 3
+
+# Known hosts with specific information
+# These hosts will be included in discovery and can have predefined metadata
+known_hosts:
+  # Hypervisor/Virtualization Hosts
+  - ip: "192.168.1.10"
+    hostname: "proxmox-host"
+    type: "hypervisor"
+    location: "Home Lab"
+    role: "compute"
+    os: "Proxmox VE"
+    services: ["ssh", "https"]
+    metadata:
+      cluster_member: true
+      gpu_passthrough: true
+      cpu_cores: 16
+      memory_gb: 64
+  
+  # Storage Systems  
+  - ip: "192.168.1.20"
+    hostname: "nas-server"
+    type: "storage"
+    location: "Home Lab" 
+    role: "storage"
+    os: "TrueNAS SCALE"
+    services: ["ssh", "nfs", "smb", "https"]
+    metadata:
+      storage_capacity_tb: 8
+      raid_level: "RAID-Z2"
+  
+  # Kubernetes Cluster
+  - ip: "192.168.1.30"
+    hostname: "k3s-master"
+    type: "server"
+    location: "Home Lab"
+    role: "k8s_master"  
+    os: "Ubuntu 22.04"
+    services: ["ssh", "k3s-api"]
+    metadata:
+      k8s_version: "v1.28.0"
+      cluster_name: "homelab"
+  
+  - ip: "192.168.1.31"
+    hostname: "k3s-worker-1"
+    type: "server"
+    location: "Home Lab"
+    role: "k8s_worker"
+    os: "Ubuntu 22.04" 
+    services: ["ssh"]
+    metadata:
+      k8s_version: "v1.28.0"
+      cluster_name: "homelab"
+      has_gpu: true
+      gpu_type: "nvidia"
+  
+  # Network Infrastructure
+  - ip: "192.168.1.1"
+    hostname: "router"
+    type: "router"
+    location: "Home Lab"
+    role: "gateway"
+    services: ["https", "ssh"]
+    metadata:
+      device_type: "pfSense"
+      wan_interface: "igb0"
+  
+  - ip: "192.168.1.2"
+    hostname: "switch-main"
+    type: "switch"
+    location: "Home Lab"
+    role: "networking"
+    services: ["snmp", "https"]
+    metadata:
+      device_type: "UniFi"
+      port_count: 24
+  
+  # Monitoring and Management
+  - ip: "192.168.1.40"
+    hostname: "monitoring"
+    type: "server"
+    location: "Home Lab"
+    role: "monitoring"
+    os: "Ubuntu 22.04"
+    services: ["ssh", "prometheus", "grafana"]
+    metadata:
+      monitoring_stack: "prometheus"
+      retention_days: 30
+  
+  # Development/Build Systems
+  - ip: "192.168.1.50"
+    hostname: "dev-server"
+    type: "server"
+    location: "Home Lab"
+    role: "development"
+    os: "Ubuntu 22.04"
+    services: ["ssh", "docker", "jenkins"]
+    metadata:
+      purpose: "CI/CD"
+      docker_enabled: true
+
+# Access credentials for authenticated discovery
+credentials:
+  - name: "homelab_ssh"
+    type: "ssh_key"
+    username: "admin"
+    ssh_key_path: "~/.ssh/homelab_rsa"
+    description: "Main SSH key for homelab access"
+  
+  - name: "monitoring_creds"
+    type: "username_password"
+    username: "monitor"
+    description: "Read-only monitoring credentials"
+  
+  # Add more credentials as needed
+  # - name: "windows_admin"
+  #   type: "username_password"  
+  #   username: "Administrator"
+  #   description: "Windows administrator account"
+
+# Discovery preferences and hints
+discovery_hints:
+  # Preferred discovery methods in order
+  preferred_discovery_methods:
+    - "ping"
+    - "port_scan"
+    - "ssh"
+    - "snmp"
+    - "http"
+  
+  # Timeouts and limits
+  network_timeout: 30
+  parallel_scan_limit: 100
+  
+  # Feature toggles
+  enable_os_detection: true
+  enable_service_detection: true
+  enable_hardware_detection: true
+  
+  # Custom nmap arguments for advanced users
+  custom_nmap_args: "-sS -O --version-detection"
+
+# Global tags and metadata
+tags:
+  environment: "homelab"
+  owner: "admin"
+  created_by: "automation_orchestrator"
+  purpose: "infrastructure_management"
+  
+# Comments and documentation
+# - Edit the networks section to match your IP ranges
+# - Add known hosts for critical infrastructure components
+# - Configure credentials for authenticated discovery
+# - Adjust discovery hints based on your network characteristics
+# - Run discovery with: orchestrate discover seed_inventory.yml

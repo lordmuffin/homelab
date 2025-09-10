@@ -1,0 +1,22 @@
+# Main homelab Git repository (most applications source from here)
+# Converted from multiple ArgoCD Applications using: repoURL: 'https://github.com/lordmuffin/homelab.git'
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: GitRepository
+metadata:
+  name: homelab-main
+  namespace: flux-system
+spec:
+  interval: 1m0s
+  ref:
+    branch: main
+  url: https://github.com/lordmuffin/homelab.git
+  # Ignore non-essential paths to reduce sync overhead
+  ignore: |
+    /*
+    !/apps/
+    !/infrastructure/
+    /apps/argocd-cloud/
+    /apps/**/.git
+    /apps/**/node_modules/
+  # Timeout and retry settings converted from ArgoCD patterns
+  timeout: 60s

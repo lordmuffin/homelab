@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: core-namespaces
+
+resources:
+  - traefik-system.yaml
+  - democratic-csi.yaml
+  - cert-manager.yaml
+  - monitoring.yaml
+  - security.yaml
+  - 1password.yaml
+  - external-dns.yaml
+  - backup.yaml

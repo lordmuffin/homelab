@@ -1,0 +1,137 @@
+version: '3.8'
+
+# External Load Balancer for Single-Node Kubernetes Clusters
+# Provides HA proxy with keepalived for VIP management
+
+services:
+  haproxy:
+    image: haproxy:2.8-alpine
+    container_name: homelab-haproxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "6443:6443"
+      - "8404:8404"  # Stats endpoint
+    volumes:
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - ./ssl-certs:/etc/ssl/certs/homelab:ro
+      - ./errors:/etc/haproxy/errors:ro
+      - haproxy_logs:/var/log/haproxy
+    networks:
+      - homelab-external
+    depends_on:
+      - keepalived
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8404/stats"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    labels:
+      - "homelab.service=load-balancer"
+      - "homelab.component=haproxy"
+      - "traefik.enable=false"
+    environment:
+      - HAPROXY_USER=haproxy
+      - HAPROXY_GROUP=haproxy
+
+  keepalived:
+    image: osixia/keepalived:2.0.20
+    container_name: homelab-keepalived  
+    restart: unless-stopped
+    privileged: true
+    network_mode: "host"
+    volumes:
+      - ./keepalived.conf:/usr/local/etc/keepalived/keepalived.conf:ro
+      - ./health-scripts:/usr/local/bin:ro
+      - keepalived_logs:/var/log/keepalived
+    environment:
+      - KEEPALIVED_INTERFACE=eth0
+      - KEEPALIVED_VIRTUAL_IPS=10.0.1.100
+      - KEEPALIVED_UNICAST_PEERS=#PYTHON2BASH:['10.0.1.11']
+      - KEEPALIVED_PASSWORD=homelab_vip_2024
+    cap_add:
+      - NET_ADMIN
+      - NET_BROADCAST
+      - NET_RAW
+    labels:
+      - "homelab.service=load-balancer"
+      - "homelab.component=keepalived"
+
+  # Health monitoring and metrics
+  prometheus-haproxy-exporter:
+    image: prom/haproxy-exporter:latest
+    container_name: homelab-haproxy-exporter
+    restart: unless-stopped
+    ports:
+      - "9101:9101"
+    command:
+      - '--haproxy.scrape-uri=http://haproxy:8404/stats?stats;csv'
+    networks:
+      - homelab-external
+    depends_on:
+      - haproxy
+    labels:
+      - "homelab.service=monitoring"
+      - "homelab.component=haproxy-exporter"
+
+  # Log aggregation
+  fluentd:
+    image: fluent/fluentd:v1.16-1
+    container_name: homelab-log-aggregator
+    restart: unless-stopped
+    ports:
+      - "24224:24224"
+      - "24224:24224/udp"
+    volumes:
+      - ./fluentd.conf:/fluentd/etc/fluent.conf:ro
+      - haproxy_logs:/var/log/haproxy:ro
+      - keepalived_logs:/var/log/keepalived:ro
+      - /var/log:/host/var/log:ro
+    networks:
+      - homelab-external
+    environment:
+      - FLUENTD_CONF=fluent.conf
+    labels:
+      - "homelab.service=logging"
+      - "homelab.component=fluentd"
+
+  # Configuration backup service
+  config-backup:
+    image: alpine:latest
+    container_name: homelab-config-backup
+    restart: "no"
+    volumes:
+      - ./:/source:ro
+      - config_backups:/backups
+    networks:
+      - homelab-external
+    command: >
+      sh -c "
+        apk add --no-cache tar gzip &&
+        mkdir -p /backups &&
+        tar -czf /backups/lb-config-$$(date +%Y%m%d-%H%M%S).tar.gz -C /source . &&
+        find /backups -name 'lb-config-*.tar.gz' -mtime +7 -delete &&
+        echo 'Configuration backup completed'
+      "
+    labels:
+      - "homelab.service=backup"
+      - "homelab.component=config-backup"
+
+networks:
+  homelab-external:
+    driver: bridge
+    enable_ipv6: false
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+          gateway: 172.20.0.1
+
+volumes:
+  haproxy_logs:
+    driver: local
+  keepalived_logs:
+    driver: local  
+  config_backups:
+    driver: local

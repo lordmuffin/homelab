@@ -1,0 +1,49 @@
+# FluxCD RBAC for Core Project (converted from ArgoCD AppProject)
+# Original: base/projects/core.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: flux-core-sa
+  namespace: flux-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: flux-core-role
+rules:
+  # Equivalent to ArgoCD AppProject clusterResourceWhitelist: group: '*', kind: '*'
+  - apiGroups: ["*"]
+    resources: ["*"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: flux-core-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: flux-core-role
+subjects:
+  - kind: ServiceAccount
+    name: flux-core-sa
+    namespace: flux-system
+---
+# NetworkPolicy for core applications (FluxCD security best practice)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: core-apps-netpol
+  namespace: kube-system
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: flux-system
+  egress:
+    - to: []

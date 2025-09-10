@@ -1,0 +1,55 @@
+# ArgoCD Application converted to FluxCD
+# Original: base/core/argocd.yaml
+# This creates ArgoCD using the existing ArgoCD manifests during migration
+apiVersion: kustomize.toolkit.fluxcd.io/v1beta2
+kind: Kustomization
+metadata:
+  name: argocd
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  path: ./apps/argocd-cloud
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: homelab-main
+    namespace: flux-system
+  targetNamespace: argocd
+  
+  # Health checks converted from ArgoCD
+  healthChecks:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: argocd-server
+      namespace: argocd
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: argocd-repo-server
+      namespace: argocd
+    - apiVersion: apps/v1
+      kind: StatefulSet
+      name: argocd-application-controller
+      namespace: argocd
+      
+  # Retry configuration converted from original ArgoCD sync policy
+  retryInterval: 1m0s
+  timeout: 15m0s
+  
+  # Sync options converted from ArgoCD
+  wait: true
+  
+  # Force recreation to handle ArgoCD's complex deployment updates
+  force: false
+  
+  # Equivalent to ArgoCD's managedNamespaceMetadata
+  patches:
+    - patch: |
+        apiVersion: v1
+        kind: Namespace
+        metadata:
+          name: argocd
+          labels:
+            prometheus: enabled
+      target:
+        kind: Namespace
+        name: argocd

@@ -1,0 +1,14 @@
+# ML/AI Ops Helm Repositories
+# Converted from various mlops applications
+
+# Qdrant Vector Database
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: HelmRepository
+metadata:
+  name: qdrant
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  url: https://qdrant.github.io/qdrant-helm
+  timeout: 60s

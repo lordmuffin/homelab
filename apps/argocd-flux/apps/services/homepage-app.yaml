@@ -1,0 +1,41 @@
+# Homepage Application converted from ArgoCD to FluxCD
+# Original: base/services/homepage.yaml
+apiVersion: kustomize.toolkit.fluxcd.io/v1beta2
+kind: Kustomization
+metadata:
+  name: homepage
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  path: ./apps/services/homepage
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: homelab-main
+    namespace: flux-system
+  targetNamespace: homepage
+  
+  # Health checks
+  healthChecks:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: homepage
+      namespace: homepage
+  
+  # Converted from ArgoCD sync policy
+  retryInterval: 2m0s
+  timeout: 15m0s
+  wait: true
+  
+  # Create namespace equivalent to ArgoCD CreateNamespace=true
+  patches:
+    - patch: |
+        apiVersion: v1
+        kind: Namespace
+        metadata:
+          name: homepage
+          labels:
+            managed-by: flux
+      target:
+        kind: Namespace
+        name: homepage

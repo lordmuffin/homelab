@@ -1,0 +1,69 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Node2 Storage Cluster Configuration
+# Storage-optimized node for media services and file management
+
+metadata:
+  name: node2-storage-cluster
+  namespace: flux-system
+
+# Base infrastructure components
+resources:
+  - ../base/flux-system/
+  - ../base/infrastructure/
+  - flux-system/
+  - infrastructure/
+  - apps/
+
+# Cluster-specific patches
+patchesStrategicMerge:
+  - patches/storage-optimization.yaml
+  - patches/media-services.yaml
+  - patches/nfs-priority.yaml
+
+# Cluster-specific configuration
+configMapGenerator:
+  - name: cluster-config
+    literals:
+      - cluster-name=node2-storage
+      - cluster-role=storage
+      - storage-class=fast-ssd
+      - nfs-priority=high
+      - cpu-cores=8
+      - memory-gb=32
+      - storage-capacity=4TB
+      - workload-type=media-storage
+    options:
+      disableNameSuffixHash: true
+
+# Storage-specific secrets
+secretGenerator:
+  - name: storage-credentials
+    literals:
+      - nfs-server=10.0.1.200
+      - nfs-path=/volume1/k8s-storage
+    options:
+      disableNameSuffixHash: true
+
+# Labels applied to all resources in this cluster
+commonLabels:
+  homelab.cluster: node2-storage
+  homelab.node-type: storage
+  homelab.storage-primary: "true"
+  homelab.workload-class: media
+
+# Annotations for storage management
+commonAnnotations:
+  homelab.io/cluster-role: storage
+  homelab.io/storage-backend: nfs
+  homelab.io/preferred-workloads: jellyfin,sonarr,radarr,prowlarr,lidarr
+
+# Storage-specific image versions
+images:
+  - name: democratic-csi/democratic-csi
+    newTag: latest
+  - name: jellyfin/jellyfin
+    newTag: latest
+  - name: linuxserver/sonarr
+    newTag: latest

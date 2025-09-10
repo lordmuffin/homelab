@@ -1,0 +1,447 @@
+# Prometheus Federation Configuration for Single-Node Clusters
+# Central monitoring with cluster-specific metrics collection
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    homelab.service: monitoring
+    name: monitoring
+---
+# Central Prometheus Federation Instance (on node3-general)
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: HelmRepository
+metadata:
+  name: prometheus-community
+  namespace: monitoring
+spec:
+  interval: 24h
+  url: https://prometheus-community.github.io/helm-charts
+---
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: prometheus-federation
+  namespace: monitoring
+spec:
+  interval: 15m
+  chart:
+    spec:
+      chart: kube-prometheus-stack
+      version: "48.3.1"
+      sourceRef:
+        kind: HelmRepository
+        name: prometheus-community
+        namespace: monitoring
+  values:
+    # Global configuration
+    global:
+      resolve_timeout: 5m
+
+    # Prometheus configuration
+    prometheus:
+      enabled: true
+      prometheusSpec:
+        serviceMonitorSelectorNilUsesHelmValues: false
+        serviceMonitorSelector: {}
+        ruleSelectorNilUsesHelmValues: false
+        ruleSelector: {}
+        retention: 30d
+        retentionSize: 15GB
+        replicas: 1
+        
+        # Federation configuration
+        additionalScrapeConfigs:
+        # Scrape from node1-compute cluster
+        - job_name: 'federate-compute'
+          scrape_interval: 30s
+          honor_labels: true
+          metrics_path: '/federate'
+          params:
+            'match[]':
+              - '{job=~"kubernetes-.*"}'
+              - '{job=~"node-exporter"}'
+              - '{job=~"gpu-.*"}'
+              - '{job=~"localai.*"}'
+              - '{job=~"qdrant.*"}'
+              - '{job=~"milvus.*"}'
+              - '{__name__=~"nvidia_.*"}'
+              - '{__name__=~"ai_.*"}'
+              - '{__name__=~"ml_.*"}'
+          static_configs:
+          - targets:
+            - '10.0.1.101:9090'
+            labels:
+              cluster: 'node1-compute'
+              cluster_role: 'compute'
+        
+        # Scrape from node2-storage cluster
+        - job_name: 'federate-storage'
+          scrape_interval: 30s
+          honor_labels: true
+          metrics_path: '/federate'
+          params:
+            'match[]':
+              - '{job=~"kubernetes-.*"}'
+              - '{job=~"node-exporter"}'
+              - '{job=~"jellyfin.*"}'
+              - '{job=~"sonarr.*"}'
+              - '{job=~"radarr.*"}'
+              - '{job=~"prowlarr.*"}'
+              - '{job=~"qbittorrent.*"}'
+              - '{__name__=~"media_.*"}'
+              - '{__name__=~"storage_.*"}'
+              - '{__name__=~"nfs_.*"}'
+          static_configs:
+          - targets:
+            - '10.0.1.102:9090'
+            labels:
+              cluster: 'node2-storage'
+              cluster_role: 'storage'
+        
+        # Cross-cluster service discovery
+        - job_name: 'kubernetes-cross-cluster-pods'
+          kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+              - monitoring
+              - flux-system
+              - argocd
+              - traefik-system
+          relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+
+        # Resource limits and node selection
+        resources:
+          requests:
+            cpu: 1000m
+            memory: 2Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+        
+        nodeSelector:
+          homelab.io/monitoring-primary: "true"
+        
+        # Storage configuration
+        storageSpec:
+          volumeClaimTemplate:
+            spec:
+              storageClassName: nfs-apps
+              accessModes: ["ReadWriteOnce"]
+              resources:
+                requests:
+                  storage: 50Gi
+
+    # Grafana configuration  
+    grafana:
+      enabled: true
+      adminPassword: "admin123!" # Change this in production
+      persistence:
+        enabled: true
+        storageClassName: nfs-apps
+        size: 10Gi
+      
+      # Grafana resources and placement
+      resources:
+        requests:
+          cpu: 200m
+          memory: 512Mi
+        limits:
+          cpu: 1000m
+          memory: 2Gi
+      
+      nodeSelector:
+        homelab.io/node-type: general
+      
+      # Data source configuration
+      additionalDataSources:
+      - name: Prometheus-Compute
+        type: prometheus
+        url: http://10.0.1.101:9090
+        access: proxy
+        isDefault: false
+        editable: true
+      
+      - name: Prometheus-Storage  
+        type: prometheus
+        url: http://10.0.1.102:9090
+        access: proxy
+        isDefault: false
+        editable: true
+      
+      # Dashboard configuration
+      dashboardProviders:
+        dashboardproviders.yaml:
+          apiVersion: 1
+          providers:
+          - name: 'homelab-dashboards'
+            orgId: 1
+            folder: 'HomeLab'
+            type: file
+            disableDeletion: false
+            editable: true
+            updateIntervalSeconds: 30
+            options:
+              path: /var/lib/grafana/dashboards/homelab
+
+      # Custom dashboards
+      dashboards:
+        homelab-dashboards:
+          cluster-overview:
+            gnetId: 15757
+            revision: 1
+            datasource: Prometheus
+          node-exporter:
+            gnetId: 1860
+            revision: 30
+            datasource: Prometheus
+          kubernetes-cluster:
+            gnetId: 7249
+            revision: 1
+            datasource: Prometheus
+          flux-cd:
+            gnetId: 16714
+            revision: 1
+            datasource: Prometheus
+
+    # Node Exporter (runs on all nodes)
+    nodeExporter:
+      enabled: true
+      
+    # Kube State Metrics
+    kubeStateMetrics:
+      enabled: true
+      
+    # Alert Manager
+    alertmanager:
+      enabled: true
+      alertmanagerSpec:
+        nodeSelector:
+          homelab.io/node-type: general
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        storage:
+          volumeClaimTemplate:
+            spec:
+              storageClassName: nfs-apps
+              accessModes: ["ReadWriteOnce"]
+              resources:
+                requests:
+                  storage: 5Gi
+
+---
+# ServiceMonitor for HAProxy External LB
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: haproxy-external-lb
+  namespace: monitoring
+  labels:
+    app: haproxy-external-lb
+spec:
+  selector:
+    matchLabels:
+      app: haproxy-exporter
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+    targetPort: 9101
+
+---
+# ServiceMonitor for Flux CD
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: flux-system
+  namespace: monitoring
+spec:
+  namespaceSelector:
+    matchNames:
+    - flux-system
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: flux
+  endpoints:
+  - port: http-prom
+    interval: 15s
+    path: /metrics
+
+---
+# PrometheusRule for HomeLab Alerts
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: homelab-alerts
+  namespace: monitoring
+  labels:
+    homelab.service: monitoring
+    homelab.component: alerts
+spec:
+  groups:
+  - name: homelab.cluster
+    rules:
+    - alert: ClusterNodeDown
+      expr: up{job="kubernetes-nodes"} == 0
+      for: 5m
+      labels:
+        severity: critical
+        cluster: "{{ $labels.cluster }}"
+      annotations:
+        summary: "Cluster node is down"
+        description: "Node {{ $labels.instance }} in cluster {{ $labels.cluster }} has been down for more than 5 minutes."
+
+    - alert: HighCPUUsage
+      expr: 100 - (avg by (cluster, instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+      for: 10m
+      labels:
+        severity: warning
+        cluster: "{{ $labels.cluster }}"
+      annotations:
+        summary: "High CPU usage detected"
+        description: "CPU usage on {{ $labels.instance }} in cluster {{ $labels.cluster }} is above 80% for more than 10 minutes."
+
+    - alert: HighMemoryUsage
+      expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+      for: 10m
+      labels:
+        severity: warning
+        cluster: "{{ $labels.cluster }}"
+      annotations:
+        summary: "High memory usage detected"
+        description: "Memory usage on {{ $labels.instance }} in cluster {{ $labels.cluster }} is above 85% for more than 10 minutes."
+
+    - alert: DiskSpaceLow
+      expr: (1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})) * 100 > 85
+      for: 15m
+      labels:
+        severity: warning
+        cluster: "{{ $labels.cluster }}"
+      annotations:
+        summary: "Disk space running low"
+        description: "Disk space on {{ $labels.instance }} in cluster {{ $labels.cluster }} is above 85% full."
+
+  - name: homelab.applications
+    rules:
+    - alert: PodCrashLooping
+      expr: rate(kube_pod_container_status_restarts_total[15m]) > 0
+      for: 5m
+      labels:
+        severity: warning
+        cluster: "{{ $labels.cluster }}"
+      annotations:
+        summary: "Pod is crash looping"
+        description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} is crash looping."
+
+    - alert: PodNotReady
+      expr: kube_pod_status_ready{condition="false"} == 1
+      for: 10m
+      labels:
+        severity: warning
+        cluster: "{{ $labels.cluster }}"
+      annotations:
+        summary: "Pod not ready"
+        description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has been not ready for more than 10 minutes."
+
+  - name: homelab.flux
+    rules:
+    - alert: FluxReconciliationFailure
+      expr: gotk_reconcile_condition{type="Ready",status="False"} == 1
+      for: 15m
+      labels:
+        severity: warning
+        cluster: "{{ $labels.cluster }}"
+      annotations:
+        summary: "Flux reconciliation failing"
+        description: "Flux reconciliation for {{ $labels.kind }}/{{ $labels.name }} in namespace {{ $labels.namespace }} has been failing for more than 15 minutes."
+
+    - alert: FluxSuspendedResource
+      expr: gotk_suspend_status == 1
+      for: 1h
+      labels:
+        severity: info
+        cluster: "{{ $labels.cluster }}"
+      annotations:
+        summary: "Flux resource suspended"
+        description: "Flux resource {{ $labels.kind }}/{{ $labels.name }} in namespace {{ $labels.namespace }} has been suspended for more than 1 hour."
+
+---
+# Alertmanager configuration
+apiVersion: v1
+kind: Secret
+metadata:
+  name: alertmanager-homelab
+  namespace: monitoring
+type: Opaque
+stringData:
+  alertmanager.yml: |
+    global:
+      resolve_timeout: 5m
+
+    route:
+      group_by: ['alertname', 'cluster']
+      group_wait: 10s
+      group_interval: 10s
+      repeat_interval: 1h
+      receiver: 'web.hook'
+
+    receivers:
+    - name: 'web.hook'
+      webhook_configs:
+      - url: 'http://localhost:9093/'
+        send_resolved: true
+
+    inhibit_rules:
+    - source_matchers:
+      - severity="critical"
+      target_matchers:
+      - severity="warning"
+      equal: ['alertname', 'cluster', 'service']
+
+---
+# Network Policy for monitoring access
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: monitoring-network-policy
+  namespace: monitoring
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: traefik-system
+    - namespaceSelector:
+        matchLabels:
+          name: flux-system
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    - podSelector: {}
+    ports:
+    - protocol: TCP
+      port: 9090
+    - protocol: TCP
+      port: 3000
+    - protocol: TCP
+      port: 9093
+  egress:
+  - {}  # Allow all egress for federation

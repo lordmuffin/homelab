@@ -1,0 +1,361 @@
+# Democratic CSI NFS Configuration for Single-Node Clusters
+# Provides shared storage across all clusters using NFS backend
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: democratic-csi
+  labels:
+    homelab.service: storage
+    homelab.component: democratic-csi
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: HelmRepository
+metadata:
+  name: democratic-csi
+  namespace: democratic-csi
+spec:
+  interval: 24h
+  url: https://democratic-csi.github.io/charts/
+---
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: democratic-csi-nfs
+  namespace: democratic-csi
+spec:
+  interval: 15m
+  chart:
+    spec:
+      chart: democratic-csi
+      version: "0.14.2"
+      sourceRef:
+        kind: HelmRepository
+        name: democratic-csi
+        namespace: democratic-csi
+  values:
+    csiDriver:
+      name: "org.democratic-csi.nfs"
+      attachRequired: false
+      storageCapacity: true
+      fsGroupPolicy: "File"
+
+    storageClasses:
+    - name: nfs-csi
+      defaultClass: false
+      reclaimPolicy: Retain
+      volumeBindingMode: Immediate
+      allowVolumeExpansion: true
+      parameters:
+        fsType: nfs
+        server: "${NFS_SERVER}"
+        share: "${NFS_BASE_PATH}"
+      mountOptions:
+      - nfsvers=4.2
+      - nconnect=8
+      - hard
+      - intr
+      - rsize=1048576
+      - wsize=1048576
+      - timeo=600
+      - retrans=2
+
+    # NFS-specific volume snapshot classes
+    volumeSnapshotClasses:
+    - name: nfs-csi
+      driver: org.democratic-csi.nfs
+      deletionPolicy: Delete
+      parameters:
+        dummy: "true"
+
+    driver:
+      config:
+        driver: nfs-client
+        instance_id: "homelab-nfs"
+        nfs:
+          shareHost: "${NFS_SERVER}"
+          shareBasePath: "${NFS_BASE_PATH}"
+          controllerBasePath: "/k8s-controller"
+          dirPermissionsMode: "0777"
+          dirPermissionsUser: "root"
+          dirPermissionsGroup: "root"
+
+    controller:
+      enabled: true
+      strategy: deployment
+      replicas: 1
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+      
+      # Anti-affinity to prevent multiple controllers on same node
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                  - democratic-csi-controller
+              topologyKey: kubernetes.io/hostname
+      
+      # Prefer scheduling on storage nodes but allow on any node
+      nodeSelector: {}
+      tolerations: []
+
+    node:
+      enabled: true
+      strategy: daemonset
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 200m
+          memory: 256Mi
+      
+      # Run on all nodes to provide NFS mounting capabilities
+      tolerations:
+      - operator: "Exists"
+      
+      hostNetwork: false
+      hostIPC: false
+      hostPID: false
+
+    # Monitoring and observability
+    metrics:
+      enabled: true
+      port: 9090
+
+---
+# Storage Class for Media content (optimized for large files)
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nfs-media
+  labels:
+    homelab.service: storage
+    homelab.component: media
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false"
+provisioner: org.democratic-csi.nfs
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+allowVolumeExpansion: true
+parameters:
+  fsType: nfs
+  server: "${NFS_SERVER}"
+  share: "${NFS_MEDIA_PATH}"
+mountOptions:
+- nfsvers=4.2
+- nconnect=16
+- hard
+- intr
+- rsize=1048576
+- wsize=1048576
+- timeo=600
+- retrans=2
+- fsc  # FS-Cache for better performance
+
+---
+# Storage Class for Application data (balanced performance)
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nfs-apps
+  labels:
+    homelab.service: storage
+    homelab.component: applications
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: org.democratic-csi.nfs
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+allowVolumeExpansion: true
+parameters:
+  fsType: nfs
+  server: "${NFS_SERVER}"
+  share: "${NFS_APPS_PATH}"
+mountOptions:
+- nfsvers=4.2
+- nconnect=8
+- hard
+- intr
+- rsize=262144
+- wsize=262144
+- timeo=600
+- retrans=3
+
+---
+# Storage Class for Backup data (optimized for reliability)
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nfs-backup
+  labels:
+    homelab.service: storage
+    homelab.component: backup
+provisioner: org.democratic-csi.nfs
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+allowVolumeExpansion: true
+parameters:
+  fsType: nfs
+  server: "${NFS_SERVER}"
+  share: "${NFS_BACKUP_PATH}"
+mountOptions:
+- nfsvers=4.2
+- nconnect=4
+- hard
+- intr
+- rsize=1048576
+- wsize=1048576
+- timeo=600
+- retrans=5
+- sync  # Ensure data integrity for backups
+
+---
+# Pre-created PVs for critical services
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: jellyfin-media-pv
+  labels:
+    homelab.service: media
+    homelab.component: jellyfin
+spec:
+  capacity:
+    storage: 4Ti
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: nfs-media
+  nfs:
+    server: "${NFS_SERVER}"
+    path: "${NFS_MEDIA_PATH}/jellyfin"
+  mountOptions:
+    - nfsvers=4.2
+    - nconnect=16
+    - hard
+    - intr
+    - rsize=1048576
+    - wsize=1048576
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: prometheus-data-pv
+  labels:
+    homelab.service: monitoring
+    homelab.component: prometheus
+spec:
+  capacity:
+    storage: 50Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: nfs-apps
+  nfs:
+    server: "${NFS_SERVER}"
+    path: "${NFS_APPS_PATH}/prometheus"
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: grafana-data-pv
+  labels:
+    homelab.service: monitoring
+    homelab.component: grafana
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: nfs-apps
+  nfs:
+    server: "${NFS_SERVER}"
+    path: "${NFS_APPS_PATH}/grafana"
+
+---
+# NFS Server Monitoring ServiceMonitor
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: nfs-server-monitor
+  namespace: monitoring
+  labels:
+    homelab.service: monitoring
+    homelab.component: nfs-metrics
+spec:
+  selector:
+    matchLabels:
+      app: nfs-server-metrics
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+
+---
+# NFS Performance Test Job
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: nfs-performance-test
+  namespace: democratic-csi
+  labels:
+    homelab.service: storage
+    homelab.component: performance-test
+  annotations:
+    homelab.io/run-once: "true"
+spec:
+  template:
+    spec:
+      containers:
+      - name: nfs-test
+        image: alpine:latest
+        command:
+        - sh
+        - -c
+        - |
+          apk add --no-cache fio &&
+          echo "Testing NFS performance..." &&
+          fio --name=nfs-seq-write --ioengine=libaio --rw=write --bs=1M --size=1G --numjobs=1 --filename=/mnt/test/testfile &&
+          fio --name=nfs-seq-read --ioengine=libaio --rw=read --bs=1M --size=1G --numjobs=1 --filename=/mnt/test/testfile &&
+          fio --name=nfs-rand-write --ioengine=libaio --rw=randwrite --bs=4K --size=100M --numjobs=4 --filename=/mnt/test/testfile2 &&
+          fio --name=nfs-rand-read --ioengine=libaio --rw=randread --bs=4K --size=100M --numjobs=4 --filename=/mnt/test/testfile2 &&
+          rm -f /mnt/test/testfile* &&
+          echo "NFS performance test completed"
+        volumeMounts:
+        - name: nfs-test
+          mountPath: /mnt/test
+      volumes:
+      - name: nfs-test
+        persistentVolumeClaim:
+          claimName: nfs-test-claim
+      restartPolicy: Never
+  backoffLimit: 3
+
+---
+# Test PVC for performance validation
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nfs-test-claim
+  namespace: democratic-csi
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: nfs-apps
+  resources:
+    requests:
+      storage: 2Gi

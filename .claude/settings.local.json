@@ -17,7 +17,14 @@
       "Bash(kubectl describe:*)",
       "Bash(git add:*)",
       "Bash(mkdir:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(chmod:*)",
+      "Bash(dos2unix:*)",
+      "Bash(sed:*)",
+      "Bash(tree:*)",
+      "Bash(python3 -m pytest tests/test_installer.py::TestStorageSetup::test_local_path_setup -v)",
+      "Bash(python3:*)",
+      "Bash(pip3 install:*)"
     ],
     "deny": []
   }

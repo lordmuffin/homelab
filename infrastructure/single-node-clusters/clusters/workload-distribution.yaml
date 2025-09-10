@@ -1,0 +1,396 @@
+# Workload Distribution Strategy for Single-Node Clusters
+# Defines how services are distributed across compute, storage, and general nodes
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: workload-distribution
+  namespace: flux-system
+  labels:
+    homelab.service: orchestration
+    homelab.component: workload-distribution
+data:
+  # Node1 - Compute Cluster (AI/ML focused)
+  node1-compute-workloads: |
+    # Primary AI/ML Services
+    - localai:
+        priority: high
+        resources:
+          requests:
+            cpu: "4"
+            memory: "8Gi"
+            nvidia.com/gpu: "1"
+          limits:
+            cpu: "8"
+            memory: "16Gi"
+            nvidia.com/gpu: "1"
+        nodeSelector:
+          homelab.io/node-type: compute
+        tolerations:
+          - key: homelab.io/compute
+            operator: Equal
+            value: "true"
+            effect: NoSchedule
+    
+    - qdrant:
+        priority: high
+        resources:
+          requests:
+            cpu: "2"
+            memory: "4Gi"
+          limits:
+            cpu: "4"
+            memory: "8Gi"
+        nodeSelector:
+          homelab.io/node-type: compute
+    
+    - milvus:
+        priority: medium
+        resources:
+          requests:
+            cpu: "2"
+            memory: "4Gi"
+          limits:
+            cpu: "6"
+            memory: "12Gi"
+        nodeSelector:
+          homelab.io/node-type: compute
+    
+    - turbopilot:
+        priority: medium
+        resources:
+          requests:
+            cpu: "2"
+            memory: "4Gi"
+            nvidia.com/gpu: "1"
+          limits:
+            cpu: "4"
+            memory: "8Gi"
+            nvidia.com/gpu: "1"
+        nodeSelector:
+          homelab.io/node-type: compute
+          homelab.io/gpu-enabled: "true"
+    
+    - chroma:
+        priority: low
+        resources:
+          requests:
+            cpu: "1"
+            memory: "2Gi"
+          limits:
+            cpu: "2"
+            memory: "4Gi"
+        nodeSelector:
+          homelab.io/node-type: compute
+
+  # Node2 - Storage Cluster (Media services)  
+  node2-storage-workloads: |
+    # Media Stack Services
+    - jellyfin:
+        priority: high
+        resources:
+          requests:
+            cpu: "2"
+            memory: "4Gi"
+          limits:
+            cpu: "4"
+            memory: "8Gi"
+        nodeSelector:
+          homelab.io/node-type: storage
+        tolerations:
+          - key: homelab.io/storage
+            operator: Equal
+            value: "true"
+            effect: NoSchedule
+        volumes:
+          - name: media-storage
+            persistentVolumeClaim:
+              claimName: jellyfin-media
+          - name: config
+            persistentVolumeClaim:
+              claimName: jellyfin-config
+    
+    - sonarr:
+        priority: high
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "1Gi"
+          limits:
+            cpu: "2"
+            memory: "4Gi"
+        nodeSelector:
+          homelab.io/node-type: storage
+        volumes:
+          - name: downloads
+            persistentVolumeClaim:
+              claimName: media-downloads
+          - name: tv
+            persistentVolumeClaim:
+              claimName: media-tv
+    
+    - radarr:
+        priority: high
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "1Gi"
+          limits:
+            cpu: "2"
+            memory: "4Gi"
+        nodeSelector:
+          homelab.io/node-type: storage
+        volumes:
+          - name: downloads
+            persistentVolumeClaim:
+              claimName: media-downloads
+          - name: movies
+            persistentVolumeClaim:
+              claimName: media-movies
+    
+    - prowlarr:
+        priority: medium
+        resources:
+          requests:
+            cpu: "200m"
+            memory: "512Mi"
+          limits:
+            cpu: "1"
+            memory: "2Gi"
+        nodeSelector:
+          homelab.io/node-type: storage
+    
+    - lidarr:
+        priority: low
+        resources:
+          requests:
+            cpu: "200m"
+            memory: "512Mi"
+          limits:
+            cpu: "1"
+            memory: "2Gi"
+        nodeSelector:
+          homelab.io/node-type: storage
+        volumes:
+          - name: downloads
+            persistentVolumeClaim:
+              claimName: media-downloads
+          - name: music
+            persistentVolumeClaim:
+              claimName: media-music
+    
+    - qbittorrent:
+        priority: medium
+        resources:
+          requests:
+            cpu: "1"
+            memory: "2Gi"
+          limits:
+            cpu: "2"
+            memory: "4Gi"
+        nodeSelector:
+          homelab.io/node-type: storage
+        volumes:
+          - name: downloads
+            persistentVolumeClaim:
+              claimName: media-downloads
+
+  # Node3 - General Cluster (Utility services)
+  node3-general-workloads: |
+    # Home Automation and Utility Services
+    - homeassistant:
+        priority: high
+        resources:
+          requests:
+            cpu: "1"
+            memory: "2Gi"
+          limits:
+            cpu: "2"
+            memory: "4Gi"
+        nodeSelector:
+          homelab.io/node-type: general
+        hostNetwork: true
+        volumes:
+          - name: config
+            persistentVolumeClaim:
+              claimName: homeassistant-config
+    
+    - adguard:
+        priority: high
+        resources:
+          requests:
+            cpu: "200m"
+            memory: "512Mi"
+          limits:
+            cpu: "1"
+            memory: "2Gi"
+        nodeSelector:
+          homelab.io/node-type: general
+        hostNetwork: true
+    
+    - unifi-controller:
+        priority: high
+        resources:
+          requests:
+            cpu: "1"
+            memory: "2Gi"
+          limits:
+            cpu: "2"
+            memory: "4Gi"
+        nodeSelector:
+          homelab.io/node-type: general
+        volumes:
+          - name: data
+            persistentVolumeClaim:
+              claimName: unifi-data
+    
+    - prometheus:
+        priority: high
+        resources:
+          requests:
+            cpu: "1"
+            memory: "2Gi"
+          limits:
+            cpu: "2"
+            memory: "4Gi"
+        nodeSelector:
+          homelab.io/monitoring-primary: "true"
+        volumes:
+          - name: data
+            persistentVolumeClaim:
+              claimName: prometheus-data
+    
+    - grafana:
+        priority: medium
+        resources:
+          requests:
+            cpu: "200m"
+            memory: "512Mi"
+          limits:
+            cpu: "1"
+            memory: "2Gi"
+        nodeSelector:
+          homelab.io/node-type: general
+        volumes:
+          - name: data
+            persistentVolumeClaim:
+              claimName: grafana-data
+
+  # Cross-Cluster Services (Can run on any node)
+  cross-cluster-workloads: |
+    # Infrastructure Services
+    - argocd:
+        priority: critical
+        replicas: 3
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "1Gi"
+          limits:
+            cpu: "1"
+            memory: "2Gi"
+        nodeSelector: {}
+        antiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app.kubernetes.io/name
+                      operator: In
+                      values:
+                        - argocd-server
+                topologyKey: kubernetes.io/hostname
+    
+    - traefik:
+        priority: critical
+        resources:
+          requests:
+            cpu: "200m"
+            memory: "512Mi"
+          limits:
+            cpu: "1"
+            memory: "2Gi"
+        nodeSelector: {}
+        hostNetwork: true
+    
+    - cert-manager:
+        priority: high
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+        nodeSelector: {}
+    
+    - external-dns:
+        priority: medium
+        resources:
+          requests:
+            cpu: "50m"
+            memory: "64Mi"
+          limits:
+            cpu: "200m"
+            memory: "256Mi"
+        nodeSelector: {}
+
+  # Backup and Recovery Services
+  backup-workloads: |
+    - velero:
+        priority: medium
+        resources:
+          requests:
+            cpu: "200m"
+            memory: "512Mi"
+          limits:
+            cpu: "1"
+            memory: "2Gi"
+        nodeSelector:
+          homelab.io/node-type: storage
+        volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: velero-backup
+
+  # Resource allocation by cluster type
+  resource-allocation: |
+    node1-compute:
+      total_cpu: 16
+      total_memory: 64Gi
+      reserved_cpu: 2     # For system and K3s
+      reserved_memory: 8Gi # For system and K3s
+      available_cpu: 14
+      available_memory: 56Gi
+      gpu_count: 1
+      workload_allocation:
+        ai_ml: 80%
+        infrastructure: 15%
+        monitoring: 5%
+    
+    node2-storage:
+      total_cpu: 8
+      total_memory: 32Gi  
+      reserved_cpu: 1
+      reserved_memory: 4Gi
+      available_cpu: 7
+      available_memory: 28Gi
+      storage_capacity: 4TB
+      workload_allocation:
+        media: 75%
+        infrastructure: 15%
+        backup: 10%
+    
+    node3-general:
+      total_cpu: 6
+      total_memory: 16Gi
+      reserved_cpu: 1
+      reserved_memory: 2Gi
+      available_cpu: 5
+      available_memory: 14Gi
+      workload_allocation:
+        home_automation: 40%
+        monitoring: 30%
+        infrastructure: 20%
+        utility: 10%

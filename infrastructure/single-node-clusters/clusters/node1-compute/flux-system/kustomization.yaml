@@ -1,0 +1,29 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Node1 Compute - Flux System Configuration
+# Specific settings for AI/ML compute cluster
+
+metadata:
+  name: flux-system-node1-compute
+  namespace: flux-system
+
+resources:
+  - flux-cluster-sync.yaml
+  - flux-sources.yaml
+
+# Flux-specific configuration for compute cluster
+configMapGenerator:
+  - name: flux-cluster-config
+    literals:
+      - cluster-name=node1-compute
+      - sync-interval=10m
+      - retry-interval=2m
+      - timeout=5m
+      - concurrent-syncs=5
+    options:
+      disableNameSuffixHash: true
+
+# Cluster-specific labels
+commonLabels:
+  homelab.flux-cluster: node1-compute

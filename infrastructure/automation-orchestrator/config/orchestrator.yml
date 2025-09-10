@@ -1,0 +1,75 @@
+# Automation Orchestrator Configuration
+# This file configures the behavior of the infrastructure discovery and inventory management system
+
+version: "1.0"
+debug: false
+log_level: "INFO"
+# log_file: "/var/log/automation-orchestrator.log"
+
+# Discovery Engine Configuration
+discovery:
+  # Network scanning timeouts (seconds)
+  network_timeout: 30
+  port_scan_timeout: 10
+  
+  # Parallel scanning limits
+  max_parallel_scans: 50
+  
+  # Default ports to scan for services
+  default_ports:
+    - 22    # SSH
+    - 80    # HTTP
+    - 443   # HTTPS
+    - 3389  # RDP
+    - 5900  # VNC
+    - 8006  # Proxmox
+    - 6443  # Kubernetes API
+    - 9090  # Prometheus
+    - 3000  # Grafana
+  
+  # Feature toggles
+  enable_gpu_detection: true
+  enable_service_detection: true
+  
+  # Custom nmap arguments
+  nmap_arguments: "-sS -O"
+
+# Asset Storage Configuration
+storage:
+  # Data storage directory (relative to orchestrator root)
+  data_directory: "data"
+  
+  # Version control settings
+  enable_git_versioning: true
+  auto_commit: true
+  
+  # Backup settings
+  backup_retention_days: 30
+  compression_enabled: true
+
+# Ansible Inventory Configuration
+ansible:
+  # Output format: yaml, json, or ini
+  output_format: "yaml"
+  
+  # Automatic grouping options
+  group_by_role: true
+  group_by_location: true
+  group_by_hardware: true
+  
+  # Include detailed metadata in inventory
+  include_metadata: true
+  
+  # Custom group definitions
+  custom_groups:
+    production:
+      environment: "production"
+      backup_required: true
+    
+    staging:
+      environment: "staging"
+      backup_required: false
+    
+    development:
+      environment: "development"
+      backup_required: false

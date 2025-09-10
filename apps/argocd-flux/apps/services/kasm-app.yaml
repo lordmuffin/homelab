@@ -1,0 +1,82 @@
+# KASM Workspaces Application converted from ArgoCD to FluxCD
+# Original: base/services/kasm.yaml  
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: kasm
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  chart:
+    spec:
+      chart: kasm-single-zone
+      version: '*'
+      sourceRef:
+        kind: GitRepository
+        name: kasm-helm
+        namespace: flux-system
+      interval: 5m0s
+  
+  targetNamespace: kasm
+  createNamespace: true
+  
+  # Converted Helm values from original ArgoCD Application
+  values:
+    global:
+      namespace: "kasm"
+      clusterDomain: "cluster.local"
+      ingressClassName: "traefik"
+      hostname: "kasm.lab.apj.dev"
+      image:
+        pullPolicy: IfNotPresent
+        restartPolicy: Always
+      # Using empty passwords as secrets are managed externally
+      kasmPasswords:
+        redisPassword: ""
+        dbPassword: ""
+        managerToken: ""
+        serviceToken: ""
+        adminPassword: ""
+        userPassword: ""
+    
+    kasmCerts:
+      ingress:
+        name: "lab-apj-dev-tls"
+        create: false
+      kasmProxy:
+        name: "lab-apj-dev-tls"
+        create: false
+      rdpGateway:
+        name: "lab-apj-dev-tls"
+        create: false
+      db:
+        name: "kasm-db-cert"
+        create: true
+    
+    kasmApp:
+      name: "kasm"
+      zoneName: "default"
+      applyHardening: true
+      deploymentSize: "small"
+  
+  # Ignore differences equivalent to ArgoCD ignoreDifferences
+  postRenderers:
+    - kustomize:
+        patches:
+          # Ignore secrets managed by external tools
+          - target:
+              kind: Secret
+              name: kasm-secrets
+            patch: |
+              - op: add
+                path: /metadata/annotations/flux.weave.works~1ignore
+                value: "true"
+  
+  # Retry configuration converted from ArgoCD
+  timeout: 15m0s
+  upgrade:
+    remediation:
+      retries: 5
+      remediateLastFailure: true
+  rollback:
+    timeout: 15m0s

@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - traefik-helm.yaml
+  - cert-manager-helm.yaml
+  - nvidia-helm.yaml
+  - monitoring-helm.yaml
+  - data-helm.yaml
+  - utilities-helm.yaml
+  - networking-helm.yaml
+  - gitea-helm.yaml
+  - mlops-helm.yaml
+
+commonLabels:
+  app.kubernetes.io/component: helm-source
+  source-type: helm

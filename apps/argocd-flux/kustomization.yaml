@@ -1,0 +1,41 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  # FluxCD System
+  - flux-system/gotk-components.yaml
+  - flux-system/gotk-sync.yaml
+  
+  # Namespaces (created before other resources)
+  - namespaces/
+  
+  # RBAC Policies (converted from ArgoCD AppProjects)
+  - rbac/
+  
+  # Git and Helm Sources
+  - sources/git/
+  - sources/helm/
+  
+  # Applications organized by category
+  - apps/core/
+  - apps/networking/
+  - apps/monitoring/
+  - apps/services/
+  - apps/data/
+  - apps/utilities/
+  - apps/secrets/
+  # Commented out initially, uncomment as needed
+  # - apps/mlops/
+  # - apps/matrix/
+  # - apps/media/
+  # - apps/arr/
+
+# Apply common labels to all resources
+commonLabels:
+  app.kubernetes.io/managed-by: flux
+  migration.source: argocd
+
+# Common annotations for all resources  
+commonAnnotations:
+  fluxcd.io/migrated-from: argocd
+  fluxcd.io/migration-date: "2024-12-09"
