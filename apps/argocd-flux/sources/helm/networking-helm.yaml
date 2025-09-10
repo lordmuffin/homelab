@@ -1,0 +1,38 @@
+# Networking Helm Repositories
+# Converted from various networking applications
+
+# Cilium CNI
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: HelmRepository
+metadata:
+  name: cilium
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  url: https://helm.cilium.io/
+  timeout: 60s
+
+# MetalLB
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: HelmRepository
+metadata:
+  name: metallb
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  url: https://metallb.github.io/metallb
+  timeout: 60s
+
+# KEDA
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: HelmRepository
+metadata:
+  name: kedacore
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  url: https://kedacore.github.io/charts
+  timeout: 60s

@@ -1,0 +1,26 @@
+# Data and Storage Helm Repositories
+# Converted from various data applications
+
+# Bitnami for databases
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: HelmRepository
+metadata:
+  name: bitnami
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  url: https://charts.bitnami.com/bitnami
+  timeout: 60s
+
+# CouchDB
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: HelmRepository
+metadata:
+  name: couchdb
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  url: https://apache.github.io/couchdb-helm
+  timeout: 60s

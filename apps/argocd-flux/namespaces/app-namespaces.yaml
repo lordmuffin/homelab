@@ -1,0 +1,32 @@
+# Application namespaces (converted from ArgoCD destinations)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: homepage
+  labels:
+    managed-by: flux
+    category: applications
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kasm
+  labels:
+    managed-by: flux
+    category: applications
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gitea
+  labels:
+    managed-by: flux
+    category: applications
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: homeassistant
+  labels:
+    managed-by: flux
+    category: applications

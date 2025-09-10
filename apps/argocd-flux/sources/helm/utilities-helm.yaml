@@ -1,0 +1,26 @@
+# Utilities Helm Repositories
+# Converted from various utility applications
+
+# Kubernetes utilities
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: HelmRepository
+metadata:
+  name: stakater
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  url: https://stakater.github.io/stakater-charts
+  timeout: 60s
+
+# Chaos Engineering
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: HelmRepository
+metadata:
+  name: chaos-mesh
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  url: https://charts.chaos-mesh.org
+  timeout: 60s

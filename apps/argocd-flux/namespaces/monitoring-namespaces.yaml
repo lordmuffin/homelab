@@ -1,0 +1,33 @@
+# Monitoring namespaces (converted from ArgoCD monitoring project destinations)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    managed-by: flux
+    category: monitoring
+    prometheus: enabled
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kube-prometheus
+  labels:
+    managed-by: flux
+    category: monitoring
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: grafana
+  labels:
+    managed-by: flux
+    category: monitoring
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: loki
+  labels:
+    managed-by: flux
+    category: monitoring

@@ -1,0 +1,40 @@
+# FluxCD RBAC for Cluster Project (converted from ArgoCD AppProject)
+# Original: base/projects/cluster.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: flux-cluster-sa
+  namespace: flux-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: flux-cluster-role
+rules:
+  # Cluster-wide resources
+  - apiGroups: [""]
+    resources: ["nodes", "persistentvolumes", "namespaces"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses", "volumeattachments"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Storage and data resources
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims", "pods", "services", "configmaps", "secrets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets", "daemonsets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: flux-cluster-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: flux-cluster-role
+subjects:
+  - kind: ServiceAccount
+    name: flux-cluster-sa
+    namespace: flux-system

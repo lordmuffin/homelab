@@ -1,0 +1,26 @@
+# Monitoring Helm Repositories
+# Converted from various monitoring applications
+
+# Prometheus Community
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: HelmRepository
+metadata:
+  name: prometheus-community
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  url: https://prometheus-community.github.io/helm-charts
+  timeout: 60s
+
+# Grafana
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: HelmRepository
+metadata:
+  name: grafana
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  url: https://grafana.github.io/helm-charts
+  timeout: 60s
