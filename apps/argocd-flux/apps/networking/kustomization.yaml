@@ -3,10 +3,10 @@ kind: Kustomization
 
 resources:
   - traefik-app.yaml
-  - cert-manager-app.yaml
-  - cilium-app.yaml
-  - headscale-app.yaml
-  # Add more as converted
+  # Missing files - add when ready:
+  # - cert-manager-app.yaml
+  # - cilium-app.yaml
+  # - headscale-app.yaml
   # - external-dns/
 
 namespace: flux-system

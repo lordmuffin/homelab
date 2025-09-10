@@ -15,15 +15,16 @@ resources:
   # Applications organized by category (enable gradually)
   - apps/core/
   - apps/networking/
-  - apps/monitoring/
   - apps/services/
-  - apps/data/
-  - apps/utilities/
-  - apps/secrets/
-  - apps/mlops/
-  - apps/matrix/
-  - apps/media/
-  - apps/arr/
+  # Missing directories - add when ready:
+  # - apps/monitoring/
+  # - apps/data/
+  # - apps/utilities/
+  # - apps/secrets/
+  # - apps/mlops/
+  # - apps/matrix/
+  # - apps/media/
+  # - apps/arr/
 
 # Apply common labels to all resources
 commonLabels:

@@ -3,10 +3,10 @@ kind: Kustomization
 
 resources:
   - kasm-app.yaml
-  - gitea-app.yaml
   - homepage-app.yaml
-  - n8n-app.yaml
-  # Add more as needed
+  # Missing files - add when ready:
+  # - gitea-app.yaml
+  # - n8n-app.yaml
   # - media/
   # - mlops/
 

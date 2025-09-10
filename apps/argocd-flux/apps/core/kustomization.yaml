@@ -3,12 +3,12 @@ kind: Kustomization
 
 resources:
   - argocd-app.yaml
-  - onepassword-app.yaml
-  - data-app.yaml
-  - networking-app.yaml
-  - services-app.yaml
-  - utilities-app.yaml
-  # Commented initially - uncomment as needed
+  # Missing files - add when ready:
+  # - onepassword-app.yaml
+  # - data-app.yaml
+  # - networking-app.yaml
+  # - services-app.yaml
+  # - utilities-app.yaml
   # - democratic-csi-app.yaml
   # - nvidia-apps.yaml
 
