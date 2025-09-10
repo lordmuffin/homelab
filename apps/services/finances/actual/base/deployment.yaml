@@ -3,6 +3,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: actual
+  namespace: services
   labels:
     app: actual
   annotations:
@@ -20,9 +21,26 @@ spec:
       labels:
         app: actual
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
       initContainers:
         - name: auto-restore
           image: alpine:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1001
+            runAsGroup: 1001
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
           env:
             - name: B2_APPLICATION_KEY_ID
               valueFrom:
@@ -134,6 +152,16 @@ spec:
       containers:
         - name: actual
           image: ghcr.io/actualbudget/actual-server:25.7.1
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1001
+            runAsGroup: 1001
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
           env:
             - name: TZ
               value: "America/Sao_Paulo"
