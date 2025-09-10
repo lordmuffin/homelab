@@ -15,7 +15,7 @@ j*.pem
 .DS_Store
 .history
 node_modules/*
-
+.claude-flow/*
 #Python
 venv
 __pycache__
