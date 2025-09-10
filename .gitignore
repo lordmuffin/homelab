@@ -16,6 +16,7 @@ j*.pem
 .history
 node_modules/*
 .claude-flow/*
+.claude-flow/metrics
 #Python
 venv
 __pycache__
