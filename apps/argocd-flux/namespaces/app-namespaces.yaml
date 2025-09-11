@@ -30,3 +30,84 @@ metadata:
   labels:
     managed-by: flux
     category: applications
+---
+# Storage-related namespaces for PVCs
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: services
+  labels:
+    managed-by: flux
+    category: applications
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: media
+  labels:
+    managed-by: flux
+    category: media-applications
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: paperless
+  labels:
+    managed-by: flux
+    category: applications
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tandoor
+  labels:
+    managed-by: flux
+    category: applications
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: vikunja
+  labels:
+    managed-by: flux
+    category: applications
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rss
+  labels:
+    managed-by: flux
+    category: applications
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: beszel
+  labels:
+    managed-by: flux
+    category: monitoring
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: headscale
+  labels:
+    managed-by: flux
+    category: networking
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mlops
+  labels:
+    managed-by: flux
+    category: mlops-applications
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: metabase
+  labels:
+    managed-by: flux
+    category: applications
