@@ -91,14 +91,6 @@ metadata:
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: headscale
-  labels:
-    managed-by: flux
-    category: networking
----
-apiVersion: v1
-kind: Namespace
-metadata:
   name: mlops
   labels:
     managed-by: flux
