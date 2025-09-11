@@ -1,0 +1,38 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  # Storage PVCs for all active apps
+  - actual-pvc.yaml
+  - archivebox-pvc.yaml
+  - beets-pvc.yaml
+  - beszel-pvc.yaml
+  - feedpushr-pvc.yaml
+  - finances-pvc.yaml
+  - ganymede-pvcs.yaml
+  - grocy-pvc.yaml
+  - headscale-pvcs.yaml
+  - jellyfin-pvcs.yaml
+  - jupyterlab-pvc.yaml
+  - lidarr-pvc.yaml
+  - librex-pvc.yaml
+  - litellm-pvc.yaml
+  - metabase-pvc.yaml
+  - n8n-pvc.yaml
+  - nitter-pvc.yaml
+  - paperless-pvcs.yaml
+  - tandoor-pvcs.yaml
+  - tanoshi-pvcs.yaml
+  - vikunja-pvcs.yaml
+  - wallabag-pvcs.yaml
+  - wger-pvcs.yaml
+
+# Note: Individual PVCs specify their target namespaces
+
+labels:
+  - pairs:
+      app.kubernetes.io/component: storage
+      category: data-storage
+
+commonAnnotations:
+  fluxcd.io/converted-from: "apps/data/storage"

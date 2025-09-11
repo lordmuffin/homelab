@@ -1,0 +1,13 @@
+# Nitter Storage PVC - Translated from apps/data/storage/base/nitter.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nitter-storage
+  namespace: services
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: freenas-iscsi-csi
+  resources:
+    requests:
+      storage: 1Gi

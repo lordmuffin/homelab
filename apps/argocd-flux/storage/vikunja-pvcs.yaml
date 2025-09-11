@@ -1,0 +1,26 @@
+# Vikunja Storage PVCs - Translated from apps/data/storage/base/vikunja.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vikunja-storage
+  namespace: vikunja
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: sata
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vikunja-database
+  namespace: vikunja
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ssd
+  resources:
+    requests:
+      storage: 5Gi

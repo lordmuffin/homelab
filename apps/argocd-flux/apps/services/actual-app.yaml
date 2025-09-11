@@ -15,6 +15,8 @@ spec:
     namespace: flux-system
   targetNamespace: services
   
+  # Note: Storage PVCs deployed via main kustomization ordering
+  
   # Health checks
   healthChecks:
     - apiVersion: apps/v1

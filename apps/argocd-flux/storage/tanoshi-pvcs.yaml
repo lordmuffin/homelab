@@ -1,0 +1,26 @@
+# Tanoshi Storage PVCs - Translated from apps/data/storage/base/tanoshi.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: tanoshi-storage
+  namespace: media
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: freenas-iscsi-csi
+  resources:
+    requests:
+      storage: 4Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: tanoshi-library
+  namespace: media
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: freenas-iscsi-csi
+  resources:
+    requests:
+      storage: 35Gi

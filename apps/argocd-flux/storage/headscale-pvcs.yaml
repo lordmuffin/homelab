@@ -1,0 +1,26 @@
+# Headscale Storage PVCs - Translated from apps/data/storage/base/headscale.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: headscale-data-pvc
+  namespace: headscale
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: sata
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: headscale-secret-pvc
+  namespace: headscale
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: sata
+  resources:
+    requests:
+      storage: 5Gi

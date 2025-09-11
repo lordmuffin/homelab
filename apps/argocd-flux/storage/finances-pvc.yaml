@@ -1,0 +1,13 @@
+# Finances/Extratos Storage PVC - Translated from apps/data/storage/base/finances.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: extratos-storage
+  namespace: services
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: freenas-iscsi-csi
+  resources:
+    requests:
+      storage: 1Gi

@@ -1,0 +1,13 @@
+# LibreX Storage PVC - Translated from apps/data/storage/base/librex.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: librex-storage
+  namespace: services
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: freenas-iscsi-csi
+  resources:
+    requests:
+      storage: 3Gi

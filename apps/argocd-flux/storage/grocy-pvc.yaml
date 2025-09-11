@@ -1,0 +1,13 @@
+# Grocy Storage PVC - Translated from apps/data/storage/base/grocy.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grocy-storage
+  namespace: services
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: freenas-iscsi-csi
+  resources:
+    requests:
+      storage: 5Gi

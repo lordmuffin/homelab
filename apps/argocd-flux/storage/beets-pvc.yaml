@@ -1,0 +1,13 @@
+# Beets Storage PVC - Translated from apps/data/storage/base/beets.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: beets-storage
+  namespace: media
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: freenas-iscsi-csi
+  resources:
+    requests:
+      storage: 1Gi

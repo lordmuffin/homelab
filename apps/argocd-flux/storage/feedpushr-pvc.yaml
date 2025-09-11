@@ -1,0 +1,13 @@
+# FeedPushr Storage PVC - Translated from apps/data/storage/base/feedpushr.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: feedpushr-database
+  namespace: rss
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: freenas-iscsi-csi
+  resources:
+    requests:
+      storage: 10Gi

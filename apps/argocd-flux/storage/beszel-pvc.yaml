@@ -1,0 +1,13 @@
+# Beszel Storage PVC - Translated from apps/data/storage/base/beszel.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: beszel-data
+  namespace: beszel
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: sata
+  resources:
+    requests:
+      storage: 5Gi

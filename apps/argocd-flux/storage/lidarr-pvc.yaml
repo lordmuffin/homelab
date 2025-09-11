@@ -1,0 +1,13 @@
+# Lidarr Storage PVC - Translated from apps/data/storage/base/lidarr.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: lidarr-storage
+  namespace: media
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: freenas-iscsi-csi
+  resources:
+    requests:
+      storage: 2Gi

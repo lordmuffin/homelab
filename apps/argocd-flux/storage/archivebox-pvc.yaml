@@ -1,0 +1,13 @@
+# ArchiveBox Storage PVC - Translated from apps/data/storage/base/archivebox.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: archivebox-storage
+  namespace: services
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: freenas-iscsi-csi
+  resources:
+    requests:
+      storage: 20Gi

@@ -12,6 +12,9 @@ resources:
   - sources/git/
   - sources/helm/
   
+  # Storage resources (deployed before applications)
+  - storage/
+  
   # Applications organized by category (enable gradually)
   - apps/core/
   - apps/networking/

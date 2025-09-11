@@ -1,0 +1,26 @@
+# Wallabag Storage PVCs - Translated from apps/data/storage/base/wallabag.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: wallabag-media
+  namespace: services
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: freenas-iscsi-csi
+  resources:
+    requests:
+      storage: 15Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: wallabag-data
+  namespace: services
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: freenas-iscsi-csi
+  resources:
+    requests:
+      storage: 5Gi

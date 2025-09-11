@@ -1,0 +1,13 @@
+# Metabase Storage PVC - Translated from apps/data/metabase/base/pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: metabase-storage
+  namespace: metabase
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: freenas-iscsi-csi
+  resources:
+    requests:
+      storage: 5Gi
