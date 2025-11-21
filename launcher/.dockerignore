@@ -1,0 +1,48 @@
+# Git files
+.git
+.gitignore
+.gitattributes
+
+# GitHub
+.github
+
+# Documentation
+README.md
+*.md
+docs/
+
+# Kairos configurations (not needed in launcher image)
+kairos/
+
+# CI/CD
+.gitlab-ci.yml
+.travis.yml
+Jenkinsfile
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.log
+*.tmp
+tmp/
+temp/
+
+# Build artifacts
+*.tar
+*.tar.gz
+*.zip
+
+# Test files
+test/
+tests/
+*_test.go
+*.test

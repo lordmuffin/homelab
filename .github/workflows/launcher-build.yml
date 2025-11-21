@@ -1,0 +1,206 @@
+name: Build and Push Launcher Image
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'launcher/**'
+      - '.github/workflows/launcher-build.yml'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version override (e.g., v0.2.1)'
+        required: false
+        type: string
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: lordmuffin/homelab-launcher
+  KUBECTL_VERSION: '1.28.2'
+  KUSTOMIZE_VERSION: '5.4.1'
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for semantic versioning
+
+      - name: Generate version
+        id: version
+        run: |
+          if [[ "${{ github.event.inputs.version }}" != "" ]]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            # Get latest tag or default to v0.1.0
+            LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.1.0")
+
+            # Extract version numbers
+            MAJOR=$(echo $LATEST_TAG | sed 's/v\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\)/\1/')
+            MINOR=$(echo $LATEST_TAG | sed 's/v\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\)/\2/')
+            PATCH=$(echo $LATEST_TAG | sed 's/v\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\)/\3/')
+
+            # Auto-increment patch version
+            PATCH=$((PATCH + 1))
+            VERSION="v${MAJOR}.${MINOR}.${PATCH}"
+          fi
+
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "short_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "Generated version: ${VERSION}"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: |
+            image=moby/buildkit:latest
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ steps.version.outputs.version }}
+            type=raw,value=sha-${{ steps.version.outputs.short_sha }}
+          labels: |
+            org.opencontainers.image.title=Homelab Launcher
+            org.opencontainers.image.description=DevOps tooling container with kubectl, helm, terraform, and more
+            org.opencontainers.image.vendor=lordmuffin
+            org.opencontainers.image.version=${{ steps.version.outputs.version }}
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./launcher
+          file: ./launcher/Dockerfile
+          platforms: linux/amd64
+          build-args: |
+            TARGETOS=linux
+            TARGETARCH=amd64
+            KUBECTL_VERSION=${{ env.KUBECTL_VERSION }}
+            KUSTOMIZE_VERSION=${{ env.KUSTOMIZE_VERSION }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          load: true  # Load image for scanning
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '0'  # Don't fail on vulnerabilities, just report
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Run Trivy vulnerability scanner (table output)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Push Docker image to GHCR
+        uses: docker/build-push-action@v5
+        with:
+          context: ./launcher
+          file: ./launcher/Dockerfile
+          platforms: linux/amd64
+          build-args: |
+            TARGETOS=linux
+            TARGETARCH=amd64
+            KUBECTL_VERSION=${{ env.KUBECTL_VERSION }}
+            KUSTOMIZE_VERSION=${{ env.KUSTOMIZE_VERSION }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          push: true
+
+      - name: Generate build summary
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY <<EOF
+          ## 🚀 Launcher Image Build Summary
+
+          **Version:** \`${{ steps.version.outputs.version }}\`
+          **Commit:** \`${{ steps.version.outputs.short_sha }}\`
+          **Registry:** \`${{ env.REGISTRY }}\`
+
+          ### 📦 Published Images
+
+          \`\`\`
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ steps.version.outputs.short_sha }}
+          \`\`\`
+
+          ### 🔧 Build Configuration
+
+          - **Platform:** linux/amd64
+          - **kubectl:** v${{ env.KUBECTL_VERSION }}
+          - **kustomize:** v${{ env.KUSTOMIZE_VERSION }}
+
+          ### 📥 Pull Command
+
+          \`\`\`bash
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
+          \`\`\`
+          EOF
+
+      - name: Create GitHub Release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: launcher-${{ steps.version.outputs.version }}
+          name: Launcher ${{ steps.version.outputs.version }}
+          body: |
+            ## Homelab Launcher ${{ steps.version.outputs.version }}
+
+            Automated release from commit ${{ steps.version.outputs.short_sha }}
+
+            ### Container Images
+
+            ```bash
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
+            ```
+
+            ### Included Tools
+
+            - kubectl v${{ env.KUBECTL_VERSION }}
+            - kustomize v${{ env.KUSTOMIZE_VERSION }}
+            - helm v3.13.3
+            - terraform v1.6.6
+            - argocd v3.5.2
+            - And more DevOps tools
+
+            ### What's Changed
+
+            See commit history for detailed changes.
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

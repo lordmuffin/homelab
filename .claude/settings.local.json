@@ -27,5 +27,10 @@
       "Bash(pip3 install:*)"
     ],
     "deny": []
-  }
+  },
+  "enabledMcpjsonServers": [
+    "claude-flow",
+    "ruv-swarm"
+  ],
+  "enableAllProjectMcpServers": true
 }
