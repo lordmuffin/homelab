@@ -21,46 +21,46 @@ spec:
               args:
                 - |
                   set -euo pipefail
-                  
+
                   MAX_RETRIES=3
                   RETRY_DELAYS=(30 60 120)
-                  
+
                   log_info() {
                       echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] INFO: $*" >&2
                   }
-                  
+
                   log_error() {
                       echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] ERROR: $*" >&2
                   }
-                  
+
                   error_trap() {
                       local exit_code=$?
                       local line_number=$1
                       log_error "ArchiveBox backup failed at line $line_number with exit code $exit_code"
                       exit $exit_code
                   }
-                  
+
                   trap 'error_trap $LINENO' ERR
-                  
+
                   retry_with_backoff() {
                       local cmd="$1"
                       local attempt=1
-                      
+
                       while [[ $attempt -le $MAX_RETRIES ]]; do
                           log_info "Attempt $attempt/$MAX_RETRIES: $cmd"
-                          
+
                           if eval "$cmd"; then
                               log_info "Command succeeded on attempt $attempt"
                               return 0
                           else
                               local exit_code=$?
                               log_error "Command failed on attempt $attempt with exit code $exit_code"
-                              
+
                               if [[ $attempt -eq $MAX_RETRIES ]]; then
                                   log_error "All $MAX_RETRIES attempts failed"
                                   return $exit_code
                               fi
-                              
+
                               local delay=${RETRY_DELAYS[$((attempt-1))]}
                               log_info "Waiting $delay seconds before next attempt..."
                               sleep "$delay"
@@ -68,18 +68,18 @@ spec:
                           fi
                       done
                   }
-                  
+
                   TIMESTAMP=$(date +%Y%m%d_%H%M%S)
                   INDEX_BACKUP_FILE="archivebox_index_backup_${TIMESTAMP}.sql.gz"
                   ARCHIVE_BACKUP_FILE="archivebox_data_backup_${TIMESTAMP}.tar.gz"
-                  
+
                   log_info "🔄 Starting ArchiveBox backup..."
-                  
+
                   cd /data
-                  
+
                   # 1. Export ArchiveBox index/database
                   log_info "📊 Creating index backup: $INDEX_BACKUP_FILE"
-                  
+
                   # Use ArchiveBox's built-in export functionality
                   if [[ -f "index.sqlite3" ]]; then
                       # SQLite database backup
@@ -90,22 +90,22 @@ spec:
                       log_error "ArchiveBox index.sqlite3 not found"
                       exit 1
                   fi
-                  
+
                   # Validate index backup
                   if [[ ! -f "/mnt/backup/$INDEX_BACKUP_FILE" ]] || [[ ! -s "/mnt/backup/$INDEX_BACKUP_FILE" ]]; then
                       log_error "Index backup failed or is empty"
                       exit 1
                   fi
-                  
+
                   INDEX_SIZE=$(du -h "/mnt/backup/$INDEX_BACKUP_FILE" | cut -f1)
                   log_info "✅ Index backup completed: $INDEX_BACKUP_FILE ($INDEX_SIZE)"
-                  
+
                   # 2. Create incremental backup of archive data
                   log_info "📁 Creating archive data backup: $ARCHIVE_BACKUP_FILE"
-                  
+
                   # Create list of recent archives (last 7 days) for incremental backup
                   RECENT_ARCHIVES=$(find archive -type d -name "*" -newermt "7 days ago" 2>/dev/null | head -1000)
-                  
+
                   if [[ -n "$RECENT_ARCHIVES" ]]; then
                       # Backup recent archives + config files
                       tar -czf "/mnt/backup/$ARCHIVE_BACKUP_FILE" \
@@ -120,29 +120,29 @@ spec:
                           ./ArchiveBox.conf \
                           2>/dev/null || true
                   fi
-                  
+
                   # Validate archive backup
                   if [[ ! -f "/mnt/backup/$ARCHIVE_BACKUP_FILE" ]] || [[ ! -s "/mnt/backup/$ARCHIVE_BACKUP_FILE" ]]; then
                       log_error "Archive data backup failed or is empty"
                       exit 1
                   fi
-                  
+
                   # Test tar file integrity
                   if ! tar -tzf "/mnt/backup/$ARCHIVE_BACKUP_FILE" >/dev/null; then
                       log_error "Archive data backup file is corrupted"
                       exit 1
                   fi
-                  
+
                   ARCHIVE_SIZE=$(du -h "/mnt/backup/$ARCHIVE_BACKUP_FILE" | cut -f1)
                   log_info "✅ Archive data backup completed: $ARCHIVE_BACKUP_FILE ($ARCHIVE_SIZE)"
-                  
+
                   # 3. Create backup metadata with statistics
                   METADATA_FILE="archivebox_backup_metadata_${TIMESTAMP}.json"
-                  
+
                   # Get ArchiveBox stats
                   TOTAL_ARCHIVES=$(sqlite3 index.sqlite3 "SELECT COUNT(*) FROM core_snapshot;" 2>/dev/null || echo "unknown")
                   RECENT_ARCHIVES_COUNT=$(find archive -type d -name "*" -newermt "7 days ago" 2>/dev/null | wc -l)
-                  
+
                   cat > "/mnt/backup/$METADATA_FILE" << EOF
                   {
                     "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
@@ -156,12 +156,12 @@ spec:
                     "archivebox_version": "$(archivebox version 2>/dev/null | head -1 || echo 'unknown')"
                   }
                   EOF
-                  
+
                   log_info "📝 Backup metadata created: $METADATA_FILE"
-                  
+
                   # Signal completion
                   touch /mnt/backup/.archivebox_done
-                  
+
                   log_info "✅ ArchiveBox backup completed successfully"
               volumeMounts:
                 - name: backup-storage
@@ -187,37 +187,37 @@ spec:
               args:
                 - |
                   set -euo pipefail
-                  
+
                   MAX_RETRIES=3
                   RETRY_DELAYS=(60 120 300)
-                  
+
                   log_info() {
                       echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] INFO: $*" >&2
                   }
-                  
+
                   log_error() {
                       echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] ERROR: $*" >&2
                   }
-                  
+
                   retry_with_backoff() {
                       local cmd="$1"
                       local attempt=1
-                      
+
                       while [[ $attempt -le $MAX_RETRIES ]]; do
                           log_info "Attempt $attempt/$MAX_RETRIES: $cmd"
-                          
+
                           if eval "$cmd"; then
                               log_info "Command succeeded on attempt $attempt"
                               return 0
                           else
                               local exit_code=$?
                               log_error "Command failed on attempt $attempt with exit code $exit_code"
-                              
+
                               if [[ $attempt -eq $MAX_RETRIES ]]; then
                                   log_error "All $MAX_RETRIES attempts failed"
                                   return $exit_code
                               fi
-                              
+
                               local delay=${RETRY_DELAYS[$((attempt-1))]}
                               log_info "Waiting $delay seconds before next attempt..."
                               sleep "$delay"
@@ -225,9 +225,9 @@ spec:
                           fi
                       done
                   }
-                  
+
                   log_info "🔄 Starting B2 upload process for ArchiveBox backups..."
-                  
+
                   # Wait for ArchiveBox backup completion (allow up to 4 hours for large archives)
                   timeout=14400  # 4 hours
                   elapsed=0
@@ -240,14 +240,14 @@ spec:
                       sleep 30
                       ((elapsed+=30))
                   done
-                  
+
                   # Get timestamp from any backup file
                   TIMESTAMP=$(ls /mnt/backup/archivebox_*_backup_*.* | head -1 | sed -n 's/.*_\([0-9]\{8\}_[0-9]\{6\}\).*/\1/p')
                   if [[ -z "$TIMESTAMP" ]]; then
                       log_error "Could not determine backup timestamp"
                       exit 1
                   fi
-                  
+
                   # Upload index backup (high priority)
                   INDEX_BACKUP="archivebox_index_backup_${TIMESTAMP}.sql.gz"
                   if [[ -f "/mnt/backup/$INDEX_BACKUP" ]] && [[ -s "/mnt/backup/$INDEX_BACKUP" ]]; then
@@ -258,7 +258,7 @@ spec:
                       log_error "Index backup file not found or empty: $INDEX_BACKUP"
                       exit 1
                   fi
-                  
+
                   # Upload archive data backup (can be large)
                   ARCHIVE_BACKUP="archivebox_data_backup_${TIMESTAMP}.tar.gz"
                   if [[ -f "/mnt/backup/$ARCHIVE_BACKUP" ]] && [[ -s "/mnt/backup/$ARCHIVE_BACKUP" ]]; then
@@ -269,7 +269,7 @@ spec:
                       log_error "Archive data backup file not found or empty: $ARCHIVE_BACKUP"
                       exit 1
                   fi
-                  
+
                   # Upload metadata
                   METADATA_FILE="archivebox_backup_metadata_${TIMESTAMP}.json"
                   if [[ -f "/mnt/backup/$METADATA_FILE" ]]; then
@@ -277,7 +277,7 @@ spec:
                       log_info "Uploading metadata to B2: $UPLOAD_PATH"
                       retry_with_backoff "b2v4 file upload '$B2_BUCKET_NAME' '/mnt/backup/$METADATA_FILE' '$UPLOAD_PATH'"
                   fi
-                  
+
                   log_info "✅ B2 upload completed successfully for all ArchiveBox backup components"
               volumeMounts:
                 - name: backup-storage
@@ -321,27 +321,27 @@ spec:
               args:
                 - |
                   set -euo pipefail
-                  
+
                   log_info() {
                       echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] INFO: $*" >&2
                   }
-                  
+
                   log_info "🔄 Starting ArchiveBox backup cleanup (keeping last 8 weeks)..."
-                  
+
                   # Keep more backups for ArchiveBox due to incremental nature
                   CUTOFF_DATE=$(date -d '56 days ago' +%Y%m%d)  # 8 weeks
-                  
+
                   # Function to clean backup files in a specific path
                   cleanup_path() {
                       local path=$1
                       local pattern=$2
-                      
+
                       b2v4 file ls "$B2_BUCKET_NAME" "$path" | while read -r file_info; do
                           filename=$(echo "$file_info" | awk '{print $2}')
-                          
+
                           if [[ $filename =~ $pattern ]]; then
                               file_date=${BASH_REMATCH[1]}
-                              
+
                               if [[ $file_date < $CUTOFF_DATE ]]; then
                                   log_info "Deleting old backup: $filename (date: $file_date)"
                                   file_id=$(echo "$file_info" | awk '{print $1}')
@@ -350,15 +350,15 @@ spec:
                           fi
                       done
                   }
-                  
+
                   # Clean index backups
                   cleanup_path "archivebox/index/" "archivebox_index_backup_([0-9]{8})_[0-9]{6}\.sql\.gz$"
-                  
+
                   # Clean data backups
                   cleanup_path "archivebox/data/" "archivebox_data_backup_([0-9]{8})_[0-9]{6}\.tar\.gz$"
-                  
+
                   # Clean metadata files
                   cleanup_path "archivebox/metadata/" "archivebox_backup_metadata_([0-9]{8})_[0-9]{6}\.json$"
-                  
+
                   log_info "✅ ArchiveBox backup cleanup completed"
           restartPolicy: OnFailure
