@@ -33,7 +33,7 @@ locals {
       local.base_config,
       {
         machine = merge(local.base_config.machine, {
-          network = merge(local.base_config.machine.network, {
+          network = merge(try(local.base_config.machine.network, {}), {
             interfaces = [
               {
                 interface = "eth0"
@@ -44,13 +44,13 @@ locals {
               }
             ]
           })
-          install = merge(local.base_config.machine.install, {
+          install = merge(try(local.base_config.machine.install, {}), {
             disk = "/dev/sda"
             image = "factory.talos.dev/installer/${talos_image_factory_schematic.this.id}:${var.talos_version}"
           })
         })
         cluster = merge(local.base_config.cluster, {
-          network = merge(local.base_config.cluster.network, {
+          network = merge(try(local.base_config.cluster.network, {}), {
             cni = {
               name = "none"
             }

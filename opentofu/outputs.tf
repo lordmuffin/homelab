@@ -6,9 +6,11 @@ output "talos_secrets_yaml" {
 
 output "control_plane_bootstrap_ip" {
   description = "IP address of the first control plane node for bootstrapping."
-  value       = [for vm in proxmox_virtual_environment_vm.controlplane : vm.ipv4_addresses[1][0] if length(vm.ipv4_addresses) > 1 && length(vm.ipv4_addresses[1]) > 0][0]
-  # Note: bpg/proxmox IP address handling can be tricky depending on QEMU agent reporting order.
-  # Usually ipv4_addresses returns a list of lists (interfaces -> ips).
+  # Safely try to get the IP, defaulting to "Pending" if not yet available
+  value = try(
+    [for vm in proxmox_virtual_environment_vm.controlplane : vm.ipv4_addresses[1][0] if length(vm.ipv4_addresses) > 1 && length(vm.ipv4_addresses[1]) > 0][0],
+    "Pending"
+  )
 }
 
 output "kubernetes_vip_ip" {
