@@ -1,0 +1,3 @@
+redis-ha:
+  haproxy:
+    enabled: false

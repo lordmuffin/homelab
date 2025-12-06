@@ -132,5 +132,4 @@ terraform/vault/secrets/*
 test/storage/*
 tilt_modules
 utilities/*
-values.yaml
 venv
