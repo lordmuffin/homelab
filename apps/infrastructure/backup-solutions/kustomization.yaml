@@ -7,6 +7,8 @@ resources:
   - restore-templates.yaml
   - backup-policies.yaml
 
+namespace: infrastructure
+
 commonLabels:
   app.kubernetes.io/component: backup-solutions
   app.kubernetes.io/part-of: homelab-infrastructure

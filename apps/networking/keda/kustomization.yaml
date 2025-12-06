@@ -7,4 +7,3 @@ namespace: keda
 
 resources:
 - https://github.com/kedacore/keda/releases/download/v2.13.1/keda-2.13.1.yaml
-- https://github.com/kedacore/keda/releases/download/v2.13.1/keda-2.13.1-core.yaml
