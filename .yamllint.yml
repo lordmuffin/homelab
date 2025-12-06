@@ -64,7 +64,12 @@ ignore: |
   **/values-*.yaml
 
   # Ignore vendored/external sources and legacy directories
-  argocd-flux/sources/
-  config/
-  structure/
-  r/kairos/
+  apps/argocd-flux/sources/
+  pulumi/config/
+  infrastructure/automation-orchestrator/
+  launcher/kairos/
+  dockercompose-arr/
+
+  # Ignore generated Flux files
+  **/flux-system/gotk-*.yaml
+  **/flux-system/kustomization.yaml
