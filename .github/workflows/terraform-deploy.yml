@@ -64,7 +64,7 @@ jobs:
     name: 🔍 Terraform Plan
     runs-on: ubuntu-latest
     if: github.event.inputs.operation != 'apply' && github.event.inputs.operation != 'destroy'
-    
+
     strategy:
       fail-fast: false
       matrix:
@@ -94,7 +94,7 @@ jobs:
             working_dir: terraform/modules/vultr
             depends_on: '["main"]'
             auto_approve: true
-          
+
           # Prod Lab Environment
           - environment: prod-lab
             module: main
@@ -126,11 +126,11 @@ jobs:
             working_dir: terraform/modules/b2
             depends_on: '["main"]'
             auto_approve: false
-    
+
     outputs:
       plan-status-${{ matrix.environment }}-${{ matrix.module }}: ${{ steps.terraform-plan.outputs.exitcode }}
       has-changes-${{ matrix.environment }}-${{ matrix.module }}: ${{ steps.terraform-plan.outputs.has-changes }}
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -183,10 +183,10 @@ jobs:
             -out=tfplan-${{ matrix.environment }}-${{ matrix.module }}.out \
             -detailed-exitcode \
             -no-color | tee plan-output.txt
-          
+
           plan_exitcode=${PIPESTATUS[0]}
           echo "exitcode=$plan_exitcode" >> $GITHUB_OUTPUT
-          
+
           case $plan_exitcode in
             0)
               echo "has-changes=false" >> $GITHUB_OUTPUT
@@ -242,7 +242,7 @@ jobs:
       (github.ref == 'refs/heads/main' || github.event.inputs.operation == 'apply') &&
       github.event_name != 'pull_request'
     needs: terraform-plan
-    
+
     strategy:
       fail-fast: false
       max-parallel: 1  # Sequential deployment for dependency management
@@ -277,7 +277,7 @@ jobs:
             depends_on: '["main"]'
             apply_order: 4
             auto_approve: true
-          
+
           # Prod Lab Environment - Requires approval
           - environment: prod-lab
             module: main
@@ -314,11 +314,11 @@ jobs:
             depends_on: '["main"]'
             apply_order: 5
             auto_approve: false
-    
+
     environment:
       name: ${{ matrix.environment }}
       url: ${{ steps.terraform-apply.outputs.dashboard_url }}
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -361,9 +361,9 @@ jobs:
             -input=false \
             -no-color \
             tfplan-${{ matrix.environment }}-${{ matrix.module }}.out
-          
+
           echo "✅ Terraform apply completed successfully"
-          
+
           # Extract outputs for environment URL
           dashboard_url=$(terraform output -raw dashboard_url 2>/dev/null || echo "")
           echo "dashboard_url=$dashboard_url" >> $GITHUB_OUTPUT
@@ -376,14 +376,14 @@ jobs:
         working-directory: ${{ matrix.working_dir }}
         run: |
           echo "🔍 Running post-deployment validation..."
-          
+
           # Refresh state
           terraform refresh -input=false -no-color
-          
+
           # Check for drift
           terraform plan -input=false -detailed-exitcode -no-color
           drift_exitcode=$?
-          
+
           case $drift_exitcode in
             0)
               echo "✅ No drift detected"
@@ -407,7 +407,7 @@ jobs:
         run: |
           cat > deployment-report-${{ matrix.environment }}-${{ matrix.module }}.md << EOF
           # Deployment Report: ${{ matrix.environment }}/${{ matrix.module }}
-          
+
           **Environment**: ${{ matrix.environment }}
           **Module**: ${{ matrix.module }}
           **Priority**: ${{ matrix.priority }}
@@ -415,16 +415,16 @@ jobs:
           **Timestamp**: $(date -u +%Y-%m-%dT%H:%M:%SZ)
           **Commit**: ${{ github.sha }}
           **Triggered by**: ${{ github.actor }}
-          
+
           ## Deployment Details
           - Working Directory: ${{ matrix.working_dir }}
           - Dependencies: ${{ matrix.depends_on }}
           - Auto-approve: ${{ matrix.auto_approve }}
           - Apply Order: ${{ matrix.apply_order }}
-          
+
           ## Infrastructure State
           $(terraform show -no-color 2>/dev/null | head -50)
-          
+
           EOF
         working-directory: ${{ matrix.working_dir }}
 
@@ -442,7 +442,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [terraform-plan, terraform-apply]
     if: always()
-    
+
     steps:
       - name: Generate Deployment Summary
         run: |
@@ -453,18 +453,18 @@ jobs:
           echo "**Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
           echo "**Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           # Matrix job results summary
           echo "## 📋 Plan Results" >> $GITHUB_STEP_SUMMARY
           echo "| Environment | Module | Status | Changes |" >> $GITHUB_STEP_SUMMARY
           echo "|-------------|---------|---------|---------|" >> $GITHUB_STEP_SUMMARY
-          
+
           # Note: In a real implementation, we'd collect actual results
           echo "| dev-lab | main | ✅ | No changes |" >> $GITHUB_STEP_SUMMARY
           echo "| dev-lab | vault | ✅ | No changes |" >> $GITHUB_STEP_SUMMARY
           echo "| prod-lab | main | ✅ | Changes detected |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           if [ "${{ contains(needs.*.result, 'failure') }}" == "true" ]; then
             echo "## ❌ Some deployments failed" >> $GITHUB_STEP_SUMMARY
             echo "Please review the failed jobs and fix issues before proceeding." >> $GITHUB_STEP_SUMMARY

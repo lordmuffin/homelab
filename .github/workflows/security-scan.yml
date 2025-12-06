@@ -50,7 +50,7 @@ jobs:
     name: 🐳 Container Image Security
     runs-on: ubuntu-latest
     if: github.event.inputs.scan_type != 'secrets-only' && github.event.inputs.scan_type != 'infrastructure-only'
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -63,7 +63,7 @@ jobs:
       - name: Extract container images from manifests
         run: |
           echo "🐳 Extracting container images from Kubernetes manifests..."
-          
+
           # Extract images from YAML files
           find apps -name "*.yaml" -o -name "*.yml" | xargs grep -h "image:" | \
             sed 's/.*image: *//g' | \
@@ -71,26 +71,26 @@ jobs:
             grep -v "^#" | \
             grep -E "^[a-zA-Z0-9][a-zA-Z0-9._/-]*:[a-zA-Z0-9._-]+$" | \
             sort -u > container_images.txt
-          
+
           # Extract images from kustomization files
           find apps -name "kustomization.yaml" -exec grep -A 10 "images:" {} \; | \
             grep "newName:\|newTag:" | \
             cut -d: -f2- | \
             tr -d ' "' | \
             sort -u >> container_images.txt
-          
+
           # Clean up and deduplicate
           sort -u container_images.txt > unique_images.txt
           mv unique_images.txt container_images.txt
-          
+
           image_count=$(wc -l < container_images.txt)
           echo "📊 Found $image_count unique container images to scan"
-          
+
           if [ $image_count -eq 0 ]; then
             echo "⚠️ No container images found to scan"
             echo "busybox:latest" > container_images.txt  # Fallback for testing
           fi
-          
+
           echo "📋 Container images to scan:"
           head -20 container_images.txt
           [ $image_count -gt 20 ] && echo "... and $((image_count - 20)) more"
@@ -98,26 +98,26 @@ jobs:
       - name: Scan container images with Trivy
         run: |
           echo "🔍 Scanning container images for vulnerabilities..."
-          
+
           mkdir -p trivy_reports
           high_vulns=0
           critical_vulns=0
           total_images=0
           failed_scans=0
-          
+
           while IFS= read -r image; do
             if [ -z "$image" ] || [[ "$image" =~ ^[[:space:]]*$ ]]; then
               continue
             fi
-            
+
             total_images=$((total_images + 1))
             echo ""
             echo "🔍 Scanning: $image"
-            
+
             # Generate safe filename
             safe_name=$(echo "$image" | tr '/:' '_-')
             report_file="trivy_reports/${safe_name}.json"
-            
+
             # Scan with Trivy
             if timeout 300 trivy image \
               --format json \
@@ -125,17 +125,17 @@ jobs:
               --quiet \
               --no-progress \
               "$image"; then
-              
+
               # Extract vulnerability counts
               if [ -f "$report_file" ]; then
                 critical=$(jq -r '[.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL")] | length' "$report_file" 2>/dev/null || echo 0)
                 high=$(jq -r '[.Results[]?.Vulnerabilities[]? | select(.Severity == "HIGH")] | length' "$report_file" 2>/dev/null || echo 0)
-                
+
                 echo "  Critical: $critical, High: $high"
-                
+
                 critical_vulns=$((critical_vulns + critical))
                 high_vulns=$((high_vulns + high))
-                
+
                 if [ "$critical" -gt 0 ] || [ "$high" -gt 0 ]; then
                   echo "⚠️ $image has $critical critical and $high high vulnerabilities"
                 fi
@@ -144,22 +144,22 @@ jobs:
               echo "❌ Failed to scan: $image"
               failed_scans=$((failed_scans + 1))
             fi
-            
+
             # Limit scans to prevent timeout
             if [ $total_images -ge 50 ]; then
               echo "ℹ️ Limiting scan to first 50 images to prevent timeout"
               break
             fi
-            
+
           done < container_images.txt
-          
+
           echo ""
           echo "📊 Container Security Scan Summary:"
           echo "- Images scanned: $total_images"
           echo "- Failed scans: $failed_scans"
           echo "- Critical vulnerabilities: $critical_vulns"
           echo "- High vulnerabilities: $high_vulns"
-          
+
           # Save summary
           cat > trivy_summary.json << EOF
           {
@@ -170,7 +170,7 @@ jobs:
             "scan_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           }
           EOF
-          
+
           # Set output for other jobs
           echo "critical_vulns=$critical_vulns" >> $GITHUB_OUTPUT
           echo "high_vulns=$high_vulns" >> $GITHUB_OUTPUT
@@ -180,55 +180,55 @@ jobs:
         if: always()
         run: |
           echo "📊 Generating comprehensive vulnerability report..."
-          
+
           cat > vulnerability_report.md << EOF
           # Container Security Scan Report
-          
+
           **Scan Date**: $(date -u +%Y-%m-%d\ %H:%M:%S\ UTC)
           **Repository**: ${{ github.repository }}
           **Branch**: ${{ github.ref_name }}
           **Commit**: ${{ github.sha }}
-          
+
           ## Summary
-          
+
           EOF
-          
+
           if [ -f trivy_summary.json ]; then
             images_scanned=$(jq -r '.images_scanned' trivy_summary.json)
             critical_vulns=$(jq -r '.critical_vulnerabilities' trivy_summary.json)
             high_vulns=$(jq -r '.high_vulnerabilities' trivy_summary.json)
-            
+
             cat >> vulnerability_report.md << EOF
           - **Images Scanned**: $images_scanned
           - **Critical Vulnerabilities**: $critical_vulns
           - **High Vulnerabilities**: $high_vulns
-          
+
           EOF
-            
+
             if [ "$critical_vulns" -gt 0 ] || [ "$high_vulns" -gt 0 ]; then
               cat >> vulnerability_report.md << EOF
           ## ⚠️ Action Required
-          
+
           Critical or high-severity vulnerabilities were found. Please review the detailed reports and update the affected images.
-          
+
           EOF
             else
               cat >> vulnerability_report.md << EOF
           ## ✅ No Critical Issues
-          
+
           No critical or high-severity vulnerabilities were detected in the scanned images.
-          
+
           EOF
             fi
           fi
-          
+
           # Add top vulnerable images
           if [ -d trivy_reports ] && [ "$(ls -A trivy_reports)" ]; then
             echo "## Most Vulnerable Images" >> vulnerability_report.md
             echo "" >> vulnerability_report.md
             echo "| Image | Critical | High | Medium | Low |" >> vulnerability_report.md
             echo "|-------|----------|------|--------|-----|" >> vulnerability_report.md
-            
+
             for report in trivy_reports/*.json; do
               if [ -f "$report" ]; then
                 image_name=$(basename "$report" .json | tr '_-' '/:')
@@ -236,7 +236,7 @@ jobs:
                 high=$(jq -r '[.Results[]?.Vulnerabilities[]? | select(.Severity == "HIGH")] | length' "$report" 2>/dev/null || echo 0)
                 medium=$(jq -r '[.Results[]?.Vulnerabilities[]? | select(.Severity == "MEDIUM")] | length' "$report" 2>/dev/null || echo 0)
                 low=$(jq -r '[.Results[]?.Vulnerabilities[]? | select(.Severity == "LOW")] | length' "$report" 2>/dev/null || echo 0)
-                
+
                 if [ "$critical" -gt 0 ] || [ "$high" -gt 0 ]; then
                   echo "| \`$image_name\` | $critical | $high | $medium | $low |" >> vulnerability_report.md
                 fi
@@ -261,14 +261,17 @@ jobs:
     name: 🏗️ Infrastructure Security
     runs-on: ubuntu-latest
     if: github.event.inputs.scan_type != 'secrets-only' && github.event.inputs.scan_type != 'containers-only'
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Setup kube-score
         run: |
-          curl -L https://github.com/zegl/kube-score/releases/latest/download/kube-score_linux_amd64.tar.gz | tar xz
+          LATEST_URL=$(curl -Ls -o /dev/null -w %{url_effective} https://github.com/zegl/kube-score/releases/latest)
+          LATEST_TAG=$(basename "$LATEST_URL")
+          VERSION=${LATEST_TAG#v}
+          curl -L "https://github.com/zegl/kube-score/releases/download/${LATEST_TAG}/kube-score_${VERSION}_linux_amd64.tar.gz" | tar xz
           sudo mv kube-score /usr/local/bin/
           kube-score version
 
@@ -280,20 +283,20 @@ jobs:
       - name: Kubernetes security analysis with kube-score
         run: |
           echo "🏗️ Running Kubernetes security analysis..."
-          
+
           mkdir -p kube_score_reports
           mkdir -p temp_manifests
-          
+
           # Generate manifests from kustomizations
           find apps -name "kustomization.yaml" -type f | while IFS= read -r kustomization; do
             dir=$(dirname "$kustomization")
             output_file="temp_manifests/$(echo "$dir" | tr '/' '_').yaml"
-            
+
             if kustomize build "$dir" > "$output_file" 2>/dev/null; then
               echo "Generated: $output_file"
             fi
           done
-          
+
           # Find standalone YAML files
           find apps -name "*.yaml" -type f -not -name "kustomization.yaml" | while IFS= read -r yaml_file; do
             dir=$(dirname "$yaml_file")
@@ -301,32 +304,32 @@ jobs:
               cp "$yaml_file" "temp_manifests/$(echo "$yaml_file" | tr '/' '_')"
             fi
           done
-          
+
           total_manifests=$(find temp_manifests -name "*.yaml" -type f | wc -l)
           echo "📊 Analyzing $total_manifests manifests with kube-score"
-          
+
           if [ $total_manifests -eq 0 ]; then
             echo "⚠️ No manifests found for analysis"
             exit 0
           fi
-          
+
           # Run kube-score analysis
           overall_score=0
           critical_issues=0
-          
+
           for manifest in temp_manifests/*.yaml; do
             if [ -f "$manifest" ]; then
               manifest_name=$(basename "$manifest" .yaml)
               report_file="kube_score_reports/${manifest_name}.txt"
-              
+
               echo "🔍 Analyzing: $manifest_name"
-              
+
               # Run kube-score and capture output
               if kube-score score "$manifest" > "$report_file" 2>&1; then
                 # Count critical issues (score < 5)
                 critical_count=$(grep -c "CRITICAL\|FAILED" "$report_file" 2>/dev/null || echo 0)
                 critical_issues=$((critical_issues + critical_count))
-                
+
                 if [ $critical_count -gt 0 ]; then
                   echo "  ⚠️ $critical_count critical issues found"
                 else
@@ -337,12 +340,12 @@ jobs:
               fi
             fi
           done
-          
+
           echo ""
           echo "📊 Infrastructure Security Analysis Summary:"
           echo "- Manifests analyzed: $total_manifests"
           echo "- Critical issues: $critical_issues"
-          
+
           # Generate summary report
           cat > infrastructure_security_summary.json << EOF
           {
@@ -351,44 +354,44 @@ jobs:
             "analysis_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           }
           EOF
-          
+
           echo "critical_issues=$critical_issues" >> $GITHUB_OUTPUT
 
       - name: Pulumi/Terraform security check
         run: |
           echo "🔍 Checking Infrastructure as Code security..."
-          
+
           # Check for Pulumi files
           pulumi_files=$(find pulumi -name "*.py" -o -name "*.ts" -o -name "*.go" 2>/dev/null | wc -l || echo 0)
-          
-          # Check for Terraform files  
+
+          # Check for Terraform files
           terraform_files=$(find . -name "*.tf" -o -name "*.tfvars" 2>/dev/null | wc -l || echo 0)
-          
+
           echo "📊 Infrastructure files found:"
           echo "- Pulumi files: $pulumi_files"
           echo "- Terraform files: $terraform_files"
-          
+
           if [ $pulumi_files -gt 0 ]; then
             echo "🐍 Analyzing Pulumi configurations..."
-            
+
             # Basic security checks for Pulumi
             iac_issues=0
-            
+
             # Check for hardcoded secrets
             if find pulumi -name "*.py" -exec grep -l "password\|secret\|key.*=" {} \; 2>/dev/null | grep -q .; then
               echo "⚠️ Potential hardcoded secrets in Pulumi files"
               iac_issues=$((iac_issues + 1))
             fi
-            
+
             # Check for public access configurations
             if find pulumi -name "*.py" -exec grep -l "0\.0\.0\.0/0\|::/0" {} \; 2>/dev/null | grep -q .; then
               echo "⚠️ Potential overly permissive network access in Pulumi files"
               iac_issues=$((iac_issues + 1))
             fi
-            
+
             echo "Pulumi security issues: $iac_issues"
           fi
-          
+
           if [ $terraform_files -gt 0 ]; then
             echo "🏗️ Analyzing Terraform configurations..."
             echo "ℹ️ Terraform files found but detailed analysis not implemented yet"
@@ -409,7 +412,7 @@ jobs:
     name: 🔐 Secret Detection
     runs-on: ubuntu-latest
     if: github.event.inputs.scan_type != 'containers-only' && github.event.inputs.scan_type != 'infrastructure-only'
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -418,54 +421,57 @@ jobs:
 
       - name: Setup GitLeaks
         run: |
-          curl -L https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks_linux_x64.tar.gz | tar xz
+          LATEST_URL=$(curl -Ls -o /dev/null -w %{url_effective} https://github.com/gitleaks/gitleaks/releases/latest)
+          LATEST_TAG=$(basename "$LATEST_URL")
+          VERSION=${LATEST_TAG#v}
+          curl -L "https://github.com/gitleaks/gitleaks/releases/download/${LATEST_TAG}/gitleaks_${VERSION}_linux_x64.tar.gz" | tar xz
           sudo mv gitleaks /usr/local/bin/
           gitleaks version
 
       - name: Run GitLeaks secret detection
         run: |
           echo "🔐 Running GitLeaks secret detection..."
-          
+
           # Create gitleaks config if not exists
           if [ ! -f .gitleaks.toml ]; then
             echo "Creating default GitLeaks configuration..."
             cat > .gitleaks.toml << 'EOF'
           title = "GitLeaks Configuration for Homelab"
-          
+
           [extend]
           useDefault = true
-          
+
           [[rules]]
           description = "Kubernetes Secret"
           id = "kubernetes-secret"
           regex = '''(?i)(password|passwd|secret|key|token)\s*[:=]\s*['"][^'"\s]{8,}['"]'''
           path = '''apps/.*\.ya?ml$'''
-          
+
           [[rules]]
           description = "Private Key"
           id = "private-key"
           regex = '''-----BEGIN [A-Z]+ PRIVATE KEY-----'''
-          
+
           [[rules]]
           description = "API Key Pattern"
           id = "api-key"
           regex = '''(?i)api[_-]?key\s*[:=]\s*['"][a-zA-Z0-9]{16,}['"]'''
-          
+
           # Allowlist patterns for legitimate configurations
           [[rules.allowlist]]
           description = "1Password References"
           regex = '''<path:kv/data/.*>'''
-          
+
           [[rules.allowlist]]
           description = "Environment Variable References"
           regex = '''\$\{[A-Z_]+\}'''
-          
+
           [[rules.allowlist]]
           description = "Kubernetes Secret References"
           regex = '''secretName:\s*[a-zA-Z0-9-]+'''
           EOF
           fi
-          
+
           # Run GitLeaks
           if gitleaks detect \
             --config .gitleaks.toml \
@@ -478,7 +484,7 @@ jobs:
             echo "🚨 Potential secrets detected!"
             secrets_found=$(jq length gitleaks-report.json 2>/dev/null || echo 0)
             echo "Number of potential secrets: $secrets_found"
-            
+
             # Show summary (without revealing actual secrets)
             if [ -f gitleaks-report.json ] && [ $secrets_found -gt 0 ]; then
               echo ""
@@ -486,13 +492,13 @@ jobs:
               jq -r '.[] | "- File: \(.File), Line: \(.StartLine), Rule: \(.RuleID)"' gitleaks-report.json 2>/dev/null | head -10
             fi
           fi
-          
+
           echo "secrets_found=$secrets_found" >> $GITHUB_OUTPUT
 
       - name: Additional secret pattern checks
         run: |
           echo "🔍 Running additional secret pattern checks..."
-          
+
           # Define patterns to check for
           patterns=(
             "password\s*[:=]\s*['\"][^'\"]{8,}['\"]"
@@ -503,10 +509,10 @@ jobs:
             "-----BEGIN CERTIFICATE-----"
             "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
           )
-          
+
           additional_secrets=0
           echo "🔎 Checking for additional secret patterns..."
-          
+
           for pattern in "${patterns[@]}"; do
             if grep -r -E -i "$pattern" apps/ --include="*.yaml" --include="*.yml" --exclude-dir=charts 2>/dev/null; then
               # Exclude 1Password references and environment variables
@@ -516,13 +522,13 @@ jobs:
               fi
             fi
           done
-          
+
           if [ $additional_secrets -eq 0 ]; then
             echo "✅ No additional secret patterns detected"
           else
             echo "⚠️ $additional_secrets additional potential secret patterns found"
           fi
-          
+
           echo "additional_secrets=$additional_secrets" >> $GITHUB_OUTPUT
 
       - name: Upload secret detection reports
@@ -540,7 +546,7 @@ jobs:
     name: 📦 Dependency Security
     runs-on: ubuntu-latest
     if: github.event.inputs.scan_type != 'containers-only' && github.event.inputs.scan_type != 'secrets-only'
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -557,16 +563,16 @@ jobs:
       - name: Scan Python dependencies
         run: |
           echo "🐍 Scanning Python dependencies..."
-          
+
           # Find Python requirements files
           python_deps=0
           if find . -name "requirements*.txt" -o -name "Pipfile" -o -name "pyproject.toml" | grep -q .; then
             python_deps=1
             echo "📦 Found Python dependency files"
-            
+
             # Create combined requirements for scanning
             find . -name "requirements*.txt" -exec cat {} \; > all_requirements.txt
-            
+
             if [ -s all_requirements.txt ]; then
               echo "🔍 Running Safety check on Python dependencies..."
               if safety check -r all_requirements.txt --json --output safety-report.json; then
@@ -581,29 +587,29 @@ jobs:
             echo "ℹ️ No Python dependency files found"
             python_vulns=0
           fi
-          
+
           echo "python_vulns=$python_vulns" >> $GITHUB_OUTPUT
 
       - name: Scan Node.js dependencies
         run: |
           echo "📦 Scanning Node.js dependencies..."
-          
+
           # Find package.json files
           if find . -name "package.json" | grep -q .; then
             echo "📦 Found Node.js package files"
-            
+
             # Setup Node.js
             curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
             export NVM_DIR="$HOME/.nvm"
             [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
             nvm install 18
             nvm use 18
-            
+
             node_vulns=0
             for package_json in $(find . -name "package.json"); do
               dir=$(dirname "$package_json")
               echo "🔍 Checking: $package_json"
-              
+
               cd "$dir"
               if [ -f package-lock.json ] || [ -f yarn.lock ]; then
                 if npm audit --audit-level=high --json > npm-audit.json 2>/dev/null; then
@@ -616,22 +622,22 @@ jobs:
               fi
               cd - > /dev/null
             done
-            
+
             echo "📊 Total Node.js vulnerabilities: $node_vulns"
           else
             echo "ℹ️ No Node.js package files found"
             node_vulns=0
           fi
-          
+
           echo "node_vulns=$node_vulns" >> $GITHUB_OUTPUT
 
       - name: Enhanced inventory security check
         run: |
           echo "📊 Running enhanced inventory security check..."
-          
+
           if [ -f scripts/inventory-check.py ]; then
             python scripts/inventory-check.py --format json --output enhanced-inventory.json
-            
+
             # Extract detailed security metrics
             if [ -f enhanced-inventory.json ]; then
               security_score=$(jq -r '.security_assessment.security_score // 0' enhanced-inventory.json)
@@ -639,20 +645,20 @@ jobs:
               high_risk_apps=$(jq -r '.security_assessment.high_risk_applications // 0' enhanced-inventory.json)
               outdated_components=$(jq -r '.security_assessment.outdated_components // 0' enhanced-inventory.json)
               version_mismatches=$(jq -r '.security_assessment.version_mismatches // 0' enhanced-inventory.json)
-              
+
               echo "📊 Enhanced Security Metrics:"
               echo "- Security Score: $security_score/100"
               echo "- Total CVEs: $total_cves"
               echo "- High-Risk Applications: $high_risk_apps"
               echo "- Outdated Components: $outdated_components"
               echo "- Version Mismatches: $version_mismatches"
-              
+
               # Generate recommendations
               echo "📋 Security Recommendations:"
               jq -r '.recommendations[]' enhanced-inventory.json 2>/dev/null | head -5 | while read -r rec; do
                 echo "- $rec"
               done
-              
+
               echo "inventory_security_score=$security_score" >> $GITHUB_OUTPUT
               echo "inventory_cves=$total_cves" >> $GITHUB_OUTPUT
               echo "inventory_high_risk=$high_risk_apps" >> $GITHUB_OUTPUT
@@ -677,7 +683,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [container-security, infrastructure-security, secret-detection, dependency-security]
     if: always()
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -685,7 +691,7 @@ jobs:
       - name: Generate comprehensive security report
         run: |
           echo "📊 Generating comprehensive security report..."
-          
+
           # Collect results from all jobs
           critical_vulns="${{ needs.container-security.outputs.critical_vulns || 0 }}"
           high_vulns="${{ needs.container-security.outputs.high_vulns || 0 }}"
@@ -698,10 +704,10 @@ jobs:
           inventory_score="${{ needs.dependency-security.outputs.inventory_security_score || 0 }}"
           inventory_cves="${{ needs.dependency-security.outputs.inventory_cves || 0 }}"
           inventory_high_risk="${{ needs.dependency-security.outputs.inventory_high_risk || 0 }}"
-          
+
           # Calculate overall security score
           total_issues=$((critical_vulns + high_vulns + critical_issues + secrets_found + additional_secrets + python_vulns + node_vulns + inventory_cves))
-          
+
           if [ $total_issues -eq 0 ]; then
             overall_status="✅ Excellent"
             overall_score=95
@@ -715,59 +721,59 @@ jobs:
             overall_status="🔴 Poor"
             overall_score=30
           fi
-          
+
           # Generate detailed report
           cat > comprehensive_security_report.md << EOF
           # 🔒 Comprehensive Security Report
-          
+
           **Scan Date**: $(date -u +%Y-%m-%d\ %H:%M:%S\ UTC)
           **Repository**: ${{ github.repository }}
           **Branch**: ${{ github.ref_name }}
           **Commit**: ${{ github.sha }}
           **Workflow**: ${{ github.workflow }}
-          
+
           ## 📊 Executive Summary
-          
+
           - **Overall Security Status**: $overall_status
           - **Security Score**: $overall_score/100
           - **Total Security Issues**: $total_issues
           - **Requires Immediate Action**: $([ $critical_vulns -gt 0 ] || [ $secrets_found -gt 0 ] && echo 'Yes' || echo 'No')
-          
+
           ## 🐳 Container Security
-          
+
           - **Images Scanned**: $total_images
           - **Critical Vulnerabilities**: $critical_vulns
           - **High Vulnerabilities**: $high_vulns
           - **Status**: $([ $critical_vulns -gt 0 ] && echo '🚨 Action Required' || echo '✅ Secure')
-          
+
           ## 🏗️ Infrastructure Security
-          
+
           - **Critical Issues**: $critical_issues
           - **Status**: $([ $critical_issues -gt 0 ] && echo '🚨 Action Required' || echo '✅ Secure')
-          
+
           ## 🔐 Secret Detection
-          
+
           - **Secrets Found**: $secrets_found
           - **Additional Patterns**: $additional_secrets
           - **Status**: $([ $secrets_found -gt 0 ] && echo '🚨 Action Required' || echo '✅ Secure')
-          
+
           ## 📦 Dependency Security
-          
+
           - **Python Vulnerabilities**: $python_vulns
           - **Node.js Vulnerabilities**: $node_vulns
           - **Status**: $([ $python_vulns -gt 0 ] || [ $node_vulns -gt 0 ] && echo '⚠️ Issues Found' || echo '✅ Secure')
-          
+
           ## 📋 Application Inventory Security
-          
+
           - **Security Score**: $inventory_score/100
           - **Total CVEs**: $inventory_cves
           - **High-Risk Applications**: $inventory_high_risk
           - **Status**: $([ $inventory_high_risk -gt 0 ] && echo '🚨 Action Required' || echo '✅ Secure')
-          
+
           ## 🎯 Action Items
-          
+
           EOF
-          
+
           # Add specific action items based on findings
           if [ $critical_vulns -gt 0 ]; then
             echo "### 🚨 Critical Container Vulnerabilities" >> comprehensive_security_report.md
@@ -775,27 +781,27 @@ jobs:
             echo "- Review container vulnerability reports for specific CVE details" >> comprehensive_security_report.md
             echo "" >> comprehensive_security_report.md
           fi
-          
+
           if [ $secrets_found -gt 0 ]; then
             echo "### 🔐 Secret Exposure" >> comprehensive_security_report.md
             echo "- Review and remove $secrets_found potential secrets from the repository" >> comprehensive_security_report.md
             echo "- Implement proper secret management using 1Password or Kubernetes secrets" >> comprehensive_security_report.md
             echo "" >> comprehensive_security_report.md
           fi
-          
+
           if [ $inventory_high_risk -gt 0 ]; then
             echo "### 📋 High-Risk Applications" >> comprehensive_security_report.md
             echo "- Update $inventory_high_risk applications with known CVEs" >> comprehensive_security_report.md
             echo "- Priority: cert-manager, ArgoCD, monitoring stack" >> comprehensive_security_report.md
             echo "" >> comprehensive_security_report.md
           fi
-          
+
           if [ $total_issues -eq 0 ]; then
             echo "### ✅ No Action Required" >> comprehensive_security_report.md
             echo "All security scans passed. Maintain current security practices." >> comprehensive_security_report.md
             echo "" >> comprehensive_security_report.md
           fi
-          
+
           echo "## 📈 Recommendations" >> comprehensive_security_report.md
           echo "" >> comprehensive_security_report.md
           echo "1. **Implement automated security scanning** in CI/CD pipeline" >> comprehensive_security_report.md
@@ -806,7 +812,7 @@ jobs:
           echo "" >> comprehensive_security_report.md
           echo "---" >> comprehensive_security_report.md
           echo "*Generated by GitHub Actions Security Scanning Workflow*" >> comprehensive_security_report.md
-          
+
           # Create JSON summary for programmatic access
           cat > security_summary.json << EOF
           {
@@ -861,7 +867,7 @@ jobs:
         run: |
           echo "# 🔒 Security Scanning Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           if [ -f comprehensive_security_report.md ]; then
             cat comprehensive_security_report.md >> $GITHUB_STEP_SUMMARY
           fi
@@ -872,11 +878,11 @@ jobs:
           critical_vulns="${{ needs.container-security.outputs.critical_vulns || 0 }}"
           secrets_found="${{ needs.secret-detection.outputs.secrets_found || 0 }}"
           inventory_high_risk="${{ needs.dependency-security.outputs.inventory_high_risk || 0 }}"
-          
+
           if [ "$critical_vulns" -gt 5 ] || [ "$secrets_found" -gt 0 ] || [ "$inventory_high_risk" -gt 2 ]; then
             echo "🚨 Critical security issues detected - failing the workflow"
             echo "- Critical container vulnerabilities: $critical_vulns"
-            echo "- Secrets found: $secrets_found"  
+            echo "- Secrets found: $secrets_found"
             echo "- High-risk applications: $inventory_high_risk"
             exit 1
           else

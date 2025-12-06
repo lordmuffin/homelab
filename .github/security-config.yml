@@ -11,26 +11,26 @@ security:
         - "--include-passed"
         - "--detailed-exit-code"
         - "--soft-fail"
-      
+
     checkov:
       version: "v3.1.34"
       frameworks:
         - "terraform"
         - "kubernetes"
-        - "dockerfile" 
+        - "dockerfile"
         - "secrets"
         - "github_configuration"
       args:
         - "--soft-fail"
         - "--quiet"
         - "--compact"
-      
+
     terrascan:
       version: "v1.18.11"
       checksum: "sha256:f9d94a7f3e5c6b8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2"
       policy_types:
         - "aws"
-        - "azure" 
+        - "azure"
         - "gcp"
         - "kubernetes"
       args:
@@ -43,13 +43,13 @@ security:
       high: 5
       fail_on_critical: true
       fail_on_high: false
-      
+
     staging:
       critical: 2
       high: 10
       fail_on_critical: true
       fail_on_high: false
-      
+
     development:
       critical: 5
       high: 20
@@ -62,12 +62,12 @@ security:
       - "terraform/"
       - "pulumi/"
       - "**/infrastructure/"
-      
+
     kubernetes:
       - "apps/"
       - "charts/"
       - "manifests/"
-      
+
     containers:
       - "apps/**/deployment.yaml"
       - "apps/**/statefulset.yaml"
@@ -80,13 +80,13 @@ security:
       - "json"
       - "sarif"
       - "markdown"
-      
+
     retention_days: 30
-    
+
     sarif:
       upload_to_github: true
       merge_reports: true
-      
+
     artifacts:
       - "security-reports/"
       - "sarif-reports/"
@@ -106,26 +106,26 @@ security:
     parallel_scans: true
     cache_tools: true
     timeout_minutes: 30
-    
+
     # Custom rules and policies
     custom_policies:
       terraform:
         - ".security/terraform-policies/"
       kubernetes:
         - ".security/k8s-policies/"
-    
+
     # Exclusions and allowlists
     exclusions:
       paths:
         - "examples/"
         - "test/"
         - "**/vendor/"
-      
+
       rules:
         # Example: Exclude specific rules that are not applicable
         - "AWS002"  # S3 bucket public read
         - "GCP001"  # Example GCP rule
-      
+
       files:
         - "*.example.tf"
         - "test-*.yaml"
@@ -135,14 +135,14 @@ security:
     github_code_scanning:
       enabled: true
       category_prefix: "security-scan"
-      
+
     slack_notifications:
       enabled: false
       webhook_url: ""  # Set in GitHub Secrets
       channels:
         critical: "#security-alerts"
         summary: "#devops-notifications"
-        
+
     jira_integration:
       enabled: false
       project_key: "SEC"
@@ -157,16 +157,16 @@ environments:
         high: 0
         fail_on_critical: true
         fail_on_high: true
-      
+
       advanced:
         timeout_minutes: 60
-        
+
   staging:
     security:
       thresholds:
         critical: 1
         high: 5
-        
+
   development:
     security:
       advanced:

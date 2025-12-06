@@ -6,16 +6,16 @@ network_discovery:
   # Preferred discovery methods in order of preference
   preferred_methods:
     - "ping"
-    - "port_scan" 
+    - "port_scan"
     - "ssh_banner"
     - "http_probe"
     - "snmp_walk"
-  
+
   # Skip discovery for these IP ranges
   exclude_ranges:
     - "169.254.0.0/16"  # Link-local
     - "224.0.0.0/4"     # Multicast
-  
+
   # Priority networks (scanned first)
   priority_networks:
     - "192.168.1.0/24"
@@ -30,43 +30,43 @@ service_detection:
       probe_path: "/api/"
       identification_headers:
         - "Home Assistant"
-    
+
     plex:
       ports: [32400]
       probe_path: "/web/index.html"
       identification_headers:
         - "Plex"
-    
+
     truenas:
       ports: [80, 443]
       probe_path: "/ui/"
       identification_headers:
         - "TrueNAS"
-    
+
     unifi:
       ports: [8443]
       probe_path: "/manage"
       identification_headers:
         - "UniFi"
-  
+
   # Service categorization rules
   categories:
     infrastructure:
       services: ["ssh", "snmp", "dhcp", "dns"]
-    
+
     web:
       services: ["http", "https", "apache", "nginx"]
-    
+
     database:
       services: ["mysql", "postgresql", "mongodb", "redis"]
-    
+
     monitoring:
       services: ["prometheus", "grafana", "influxdb", "node_exporter"]
-    
+
     homelab:
       services: ["plex", "home_assistant", "truenas", "unifi"]
 
-# Hardware Detection Rules  
+# Hardware Detection Rules
 hardware_detection:
   # GPU detection patterns
   gpu_patterns:
@@ -79,7 +79,7 @@ hardware_detection:
         - "GeForce"
         - "Quadro"
         - "Tesla"
-    
+
     amd:
       commands:
         - "rocm-smi"
@@ -88,7 +88,7 @@ hardware_detection:
         - "AMD"
         - "Radeon"
         - "RDNA"
-  
+
   # CPU detection patterns
   cpu_patterns:
     intel:
@@ -96,14 +96,14 @@ hardware_detection:
         - "Intel"
         - "Xeon"
         - "Core i"
-    
+
     amd:
       indicators:
         - "AMD"
         - "Ryzen"
         - "EPYC"
         - "Threadripper"
-  
+
   # Memory thresholds for classification
   memory_thresholds:
     low: 8          # GB
@@ -116,18 +116,18 @@ os_detection:
   ssh_patterns:
     ubuntu: ["Ubuntu"]
     debian: ["Debian"]
-    centos: ["CentOS"] 
+    centos: ["CentOS"]
     fedora: ["Fedora"]
     opensuse: ["openSUSE"]
     freebsd: ["FreeBSD"]
     openbsd: ["OpenBSD"]
-  
+
   # HTTP server header patterns
   http_patterns:
     windows_iis: ["Microsoft-IIS"]
     nginx: ["nginx"]
     apache: ["Apache"]
-    
+
 # Hostname Analysis Rules
 hostname_analysis:
   # Patterns that indicate specific roles
@@ -135,39 +135,39 @@ hostname_analysis:
     k8s_master:
       patterns: ["master", "control", "api"]
       confidence: 0.9
-    
+
     k8s_worker:
       patterns: ["worker", "node"]
       confidence: 0.8
-    
+
     storage:
       patterns: ["nas", "storage", "file", "backup"]
       confidence: 0.9
-    
+
     database:
       patterns: ["db", "mysql", "postgres", "mongo"]
       confidence: 0.8
-    
+
     web:
       patterns: ["web", "www", "http", "nginx", "apache"]
       confidence: 0.7
-    
+
     monitoring:
       patterns: ["monitor", "metrics", "grafana", "prometheus"]
       confidence: 0.8
-    
+
     ai_compute:
       patterns: ["ai", "ml", "gpu", "cuda", "tensor"]
       confidence: 0.9
-  
+
   # Location patterns
   location_patterns:
     datacenter:
       patterns: ["dc", "datacenter", "rack"]
-    
+
     office:
       patterns: ["office", "desk"]
-    
+
     home:
       patterns: ["home", "lab", "personal"]
 
@@ -180,21 +180,21 @@ security_assessment:
     - "http"  # Unencrypted
     - "rlogin"
     - "rsh"
-  
+
   # Medium-risk services
   medium_risk_services:
     - "ssh"
     - "rdp"
     - "vnc"
     - "snmp"
-  
+
   # Suspicious port patterns
   suspicious_ports:
     - 1234  # Common backdoor
     - 31337 # Elite/leet port
     - 12345 # NetBus
     - 54321 # Back Orifice
-  
+
   # Default credentials patterns
   default_credentials:
     - username: "admin"

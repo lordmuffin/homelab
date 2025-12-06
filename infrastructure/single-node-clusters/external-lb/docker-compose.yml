@@ -38,7 +38,7 @@ services:
 
   keepalived:
     image: osixia/keepalived:2.0.20
-    container_name: homelab-keepalived  
+    container_name: homelab-keepalived
     restart: unless-stopped
     privileged: true
     network_mode: "host"
@@ -132,6 +132,6 @@ volumes:
   haproxy_logs:
     driver: local
   keepalived_logs:
-    driver: local  
+    driver: local
   config_backups:
     driver: local

@@ -31,7 +31,7 @@ data:
             operator: Equal
             value: "true"
             effect: NoSchedule
-    
+
     - qdrant:
         priority: high
         resources:
@@ -43,7 +43,7 @@ data:
             memory: "8Gi"
         nodeSelector:
           homelab.io/node-type: compute
-    
+
     - milvus:
         priority: medium
         resources:
@@ -55,7 +55,7 @@ data:
             memory: "12Gi"
         nodeSelector:
           homelab.io/node-type: compute
-    
+
     - turbopilot:
         priority: medium
         resources:
@@ -70,7 +70,7 @@ data:
         nodeSelector:
           homelab.io/node-type: compute
           homelab.io/gpu-enabled: "true"
-    
+
     - chroma:
         priority: low
         resources:
@@ -83,7 +83,7 @@ data:
         nodeSelector:
           homelab.io/node-type: compute
 
-  # Node2 - Storage Cluster (Media services)  
+  # Node2 - Storage Cluster (Media services)
   node2-storage-workloads: |
     # Media Stack Services
     - jellyfin:
@@ -109,7 +109,7 @@ data:
           - name: config
             persistentVolumeClaim:
               claimName: jellyfin-config
-    
+
     - sonarr:
         priority: high
         resources:
@@ -128,7 +128,7 @@ data:
           - name: tv
             persistentVolumeClaim:
               claimName: media-tv
-    
+
     - radarr:
         priority: high
         resources:
@@ -147,7 +147,7 @@ data:
           - name: movies
             persistentVolumeClaim:
               claimName: media-movies
-    
+
     - prowlarr:
         priority: medium
         resources:
@@ -159,7 +159,7 @@ data:
             memory: "2Gi"
         nodeSelector:
           homelab.io/node-type: storage
-    
+
     - lidarr:
         priority: low
         resources:
@@ -178,7 +178,7 @@ data:
           - name: music
             persistentVolumeClaim:
               claimName: media-music
-    
+
     - qbittorrent:
         priority: medium
         resources:
@@ -214,7 +214,7 @@ data:
           - name: config
             persistentVolumeClaim:
               claimName: homeassistant-config
-    
+
     - adguard:
         priority: high
         resources:
@@ -227,7 +227,7 @@ data:
         nodeSelector:
           homelab.io/node-type: general
         hostNetwork: true
-    
+
     - unifi-controller:
         priority: high
         resources:
@@ -243,7 +243,7 @@ data:
           - name: data
             persistentVolumeClaim:
               claimName: unifi-data
-    
+
     - prometheus:
         priority: high
         resources:
@@ -259,7 +259,7 @@ data:
           - name: data
             persistentVolumeClaim:
               claimName: prometheus-data
-    
+
     - grafana:
         priority: medium
         resources:
@@ -301,7 +301,7 @@ data:
                       values:
                         - argocd-server
                 topologyKey: kubernetes.io/hostname
-    
+
     - traefik:
         priority: critical
         resources:
@@ -313,7 +313,7 @@ data:
             memory: "2Gi"
         nodeSelector: {}
         hostNetwork: true
-    
+
     - cert-manager:
         priority: high
         resources:
@@ -324,7 +324,7 @@ data:
             cpu: "500m"
             memory: "512Mi"
         nodeSelector: {}
-    
+
     - external-dns:
         priority: medium
         resources:
@@ -368,10 +368,10 @@ data:
         ai_ml: 80%
         infrastructure: 15%
         monitoring: 5%
-    
+
     node2-storage:
       total_cpu: 8
-      total_memory: 32Gi  
+      total_memory: 32Gi
       reserved_cpu: 1
       reserved_memory: 4Gi
       available_cpu: 7
@@ -381,7 +381,7 @@ data:
         media: 75%
         infrastructure: 15%
         backup: 10%
-    
+
     node3-general:
       total_cpu: 6
       total_memory: 16Gi

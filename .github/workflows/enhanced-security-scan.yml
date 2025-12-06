@@ -40,13 +40,13 @@ on:
           - terraform-only
           - kubernetes-only
           - containers-only
-      
+
       fail_on_high:
         description: 'Fail on high severity issues'
         required: false
         default: false
         type: boolean
-      
+
       upload_sarif:
         description: 'Upload SARIF to GitHub Code Scanning'
         required: false
@@ -55,9 +55,9 @@ on:
 
 env:
   TERRAFORM_VERSION: "1.8.0"
-  CHECKOV_VERSION: "v3.1.34"
-  TFSEC_VERSION: "v1.28.4"
-  TERRASCAN_VERSION: "v1.18.11"
+  CHECKOV_VERSION: "3.1.34"
+  TFSEC_VERSION: "1.28.4"
+  TERRASCAN_VERSION: "1.18.11"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -76,13 +76,13 @@ jobs:
       scan-terraform: ${{ steps.determine-scope.outputs.scan-terraform }}
       scan-kubernetes: ${{ steps.determine-scope.outputs.scan-kubernetes }}
       scan-containers: ${{ steps.determine-scope.outputs.scan-containers }}
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
+
       - name: Detect file changes
         id: changes
         uses: dorny/paths-filter@v3
@@ -104,12 +104,12 @@ jobs:
               - '.github/workflows/*security*'
               - '.github/actions/security-scan/**'
               - 'scripts/security/**'
-      
+
       - name: Determine scan scope
         id: determine-scope
         run: |
           echo "🎯 Determining scan scope based on changes and inputs..."
-          
+
           # Default to full scan for scheduled runs
           if [[ "${{ github.event_name }}" == "schedule" ]]; then
             echo "📅 Scheduled run - performing full scan"
@@ -118,7 +118,7 @@ jobs:
             echo "scan-containers=true" >> $GITHUB_OUTPUT
             exit 0
           fi
-          
+
           # Handle manual dispatch inputs
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             case "${{ github.event.inputs.scan_scope }}" in
@@ -145,12 +145,12 @@ jobs:
             esac
             exit 0
           fi
-          
+
           # Auto-detect based on file changes
           echo "scan-terraform=${{ steps.changes.outputs.terraform }}" >> $GITHUB_OUTPUT
           echo "scan-kubernetes=${{ steps.changes.outputs.kubernetes }}" >> $GITHUB_OUTPUT
           echo "scan-containers=${{ steps.changes.outputs.containers }}" >> $GITHUB_OUTPUT
-          
+
           if [[ "${{ steps.changes.outputs.security }}" == "true" ]]; then
             echo "🔒 Security files changed - enabling full scan"
             echo "scan-terraform=true" >> $GITHUB_OUTPUT
@@ -164,7 +164,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: change-detection
     if: needs.change-detection.outputs.scan-terraform == 'true'
-    
+
     outputs:
       tfsec-critical: ${{ steps.terraform-scan.outputs.tfsec-critical }}
       tfsec-high: ${{ steps.terraform-scan.outputs.tfsec-high }}
@@ -175,16 +175,16 @@ jobs:
       total-critical: ${{ steps.terraform-scan.outputs.total-critical }}
       total-high: ${{ steps.terraform-scan.outputs.total-high }}
       security-score: ${{ steps.terraform-scan.outputs.security-score }}
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TERRAFORM_VERSION }}
-      
+
       - name: Run enhanced security scan on Terraform
         id: terraform-scan
         uses: ./.github/actions/security-scan
@@ -199,7 +199,7 @@ jobs:
           high-threshold: '10'
           upload-sarif: ${{ github.event.inputs.upload_sarif || 'true' }}
           enable-checksum-verification: 'true'
-      
+
       - name: Upload Terraform security reports
         uses: actions/upload-artifact@v4
         if: always()
@@ -216,39 +216,47 @@ jobs:
     runs-on: ubuntu-latest
     needs: change-detection
     if: needs.change-detection.outputs.scan-kubernetes == 'true'
-    
+
     outputs:
       kube-score-critical: ${{ steps.kube-analysis.outputs.critical-issues }}
       policy-violations: ${{ steps.policy-check.outputs.violations }}
       security-score: ${{ steps.kube-analysis.outputs.security-score }}
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
+
       - name: Setup Kubernetes tools
         run: |
           # Install kube-score
-          curl -L https://github.com/zegl/kube-score/releases/latest/download/kube-score_linux_amd64.tar.gz | tar xz
+          LATEST_URL=$(curl -Ls -o /dev/null -w %{url_effective} https://github.com/zegl/kube-score/releases/latest)
+          LATEST_TAG=$(basename "$LATEST_URL")
+          VERSION=${LATEST_TAG#v}
+          curl -L "https://github.com/zegl/kube-score/releases/download/${LATEST_TAG}/kube-score_${VERSION}_linux_amd64.tar.gz" | tar xz
           sudo mv kube-score /usr/local/bin/
-          
+
           # Install kustomize
-          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+          LATEST_KUSTOMIZE_URL=$(curl -Ls -o /dev/null -w %{url_effective} https://github.com/kubernetes-sigs/kustomize/releases/latest)
+          LATEST_KUSTOMIZE_TAG=$(basename "$LATEST_KUSTOMIZE_URL")
+          curl -L "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2F${LATEST_KUSTOMIZE_TAG}/kustomize_${LATEST_KUSTOMIZE_TAG}_linux_amd64.tar.gz" | tar xz
           sudo mv kustomize /usr/local/bin/
-          
+
           # Install Polaris for policy checking
-          curl -L https://github.com/FairwindsOps/polaris/releases/latest/download/polaris_linux_amd64.tar.gz | tar xz
+          LATEST_POLARIS_URL=$(curl -Ls -o /dev/null -w %{url_effective} https://github.com/FairwindsOps/polaris/releases/latest)
+          LATEST_POLARIS_TAG=$(basename "$LATEST_POLARIS_URL")
+          VERSION_POLARIS=${LATEST_POLARIS_TAG#v}
+          curl -L "https://github.com/FairwindsOps/polaris/releases/download/${LATEST_POLARIS_TAG}/polaris_linux_amd64.tar.gz" | tar xz
           sudo mv polaris /usr/local/bin/
-      
+
       - name: Generate Kubernetes manifests
         run: |
           echo "🔧 Generating Kubernetes manifests from kustomizations..."
           mkdir -p k8s-manifests
-          
+
           find apps -name "kustomization.yaml" -type f | while read -r kustomization; do
             dir=$(dirname "$kustomization")
             output_file="k8s-manifests/$(echo "$dir" | tr '/' '_').yaml"
-            
+
             echo "Processing: $dir"
             if kustomize build "$dir" > "$output_file" 2>/dev/null; then
               echo "✅ Generated: $output_file"
@@ -256,7 +264,7 @@ jobs:
               echo "⚠️ Failed to generate: $dir"
             fi
           done
-          
+
           # Copy standalone YAML files
           find apps -name "*.yaml" -type f -not -name "kustomization.yaml" | while read -r yaml_file; do
             dir=$(dirname "$yaml_file")
@@ -264,32 +272,32 @@ jobs:
               cp "$yaml_file" "k8s-manifests/$(echo "$yaml_file" | tr '/' '_')"
             fi
           done
-          
+
           manifest_count=$(find k8s-manifests -name "*.yaml" -type f | wc -l)
           echo "📊 Generated $manifest_count manifest files"
-      
+
       - name: Run kube-score security analysis
         id: kube-analysis
         run: |
           echo "🔍 Running kube-score security analysis..."
-          
+
           mkdir -p security-reports
           critical_issues=0
           total_manifests=0
-          
+
           for manifest in k8s-manifests/*.yaml; do
             if [[ -f "$manifest" ]]; then
               manifest_name=$(basename "$manifest" .yaml)
               report_file="security-reports/kube-score-${manifest_name}.txt"
-              
+
               total_manifests=$((total_manifests + 1))
               echo "🔍 Analyzing: $manifest_name"
-              
+
               if kube-score score "$manifest" > "$report_file" 2>&1; then
                 # Count critical issues
                 critical_count=$(grep -c "CRITICAL\|FAILED" "$report_file" 2>/dev/null || echo 0)
                 critical_issues=$((critical_issues + critical_count))
-                
+
                 if [[ $critical_count -gt 0 ]]; then
                   echo "  ⚠️ $critical_count critical issues found"
                 else
@@ -300,7 +308,7 @@ jobs:
               fi
             fi
           done
-          
+
           # Calculate security score
           if [[ $total_manifests -gt 0 ]]; then
             issue_ratio=$((critical_issues * 100 / total_manifests))
@@ -309,27 +317,27 @@ jobs:
           else
             security_score=100
           fi
-          
+
           echo "📊 Kubernetes Security Analysis:"
           echo "- Manifests analyzed: $total_manifests"
           echo "- Critical issues: $critical_issues"
           echo "- Security score: $security_score/100"
-          
+
           echo "critical-issues=$critical_issues" >> $GITHUB_OUTPUT
           echo "security-score=$security_score" >> $GITHUB_OUTPUT
-      
+
       - name: Run Polaris policy validation
         id: policy-check
         run: |
           echo "🔍 Running Polaris policy validation..."
-          
+
           # Run Polaris on generated manifests
           polaris audit \
             --audit-path k8s-manifests/ \
             --format json \
             --output-file security-reports/polaris-results.json \
             || echo "Polaris analysis completed with findings"
-          
+
           # Count policy violations
           if [[ -f security-reports/polaris-results.json ]]; then
             violations=$(jq '[.results[] | select(.grade == "F" or .grade == "D")] | length' security-reports/polaris-results.json 2>/dev/null || echo 0)
@@ -338,13 +346,13 @@ jobs:
           else
             echo "violations=0" >> $GITHUB_OUTPUT
           fi
-      
+
       - name: Generate Kubernetes security SARIF
         run: |
           echo "📋 Generating SARIF report for Kubernetes security..."
-          
+
           mkdir -p sarif-reports
-          
+
           # Convert kube-score results to SARIF format
           cat > sarif-reports/kubernetes-security.sarif << 'EOF'
           {
@@ -364,9 +372,9 @@ jobs:
             ]
           }
           EOF
-          
+
           echo "✅ SARIF report generated"
-      
+
       - name: Upload Kubernetes security reports
         uses: actions/upload-artifact@v4
         if: always()
@@ -384,33 +392,33 @@ jobs:
     runs-on: ubuntu-latest
     needs: change-detection
     if: needs.change-detection.outputs.scan-containers == 'true'
-    
+
     outputs:
       critical-vulns: ${{ steps.container-scan.outputs.critical-vulns }}
       high-vulns: ${{ steps.container-scan.outputs.high-vulns }}
       images-scanned: ${{ steps.container-scan.outputs.images-scanned }}
       security-score: ${{ steps.container-scan.outputs.security-score }}
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
+
       - name: Setup container security tools
         run: |
           # Install Trivy
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
-          
+
           # Install Grype (Anchore)
           curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
-          
+
           # Install Syft for SBOM generation
           curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
-      
+
       - name: Extract container images
         id: extract-images
         run: |
           echo "🐳 Extracting container images from manifests..."
-          
+
           # Extract images from YAML files
           find apps -name "*.yaml" -o -name "*.yml" | xargs grep -h "image:" | \
             sed 's/.*image: *//g' | \
@@ -418,49 +426,49 @@ jobs:
             grep -v "^#" | \
             grep -E "^[a-zA-Z0-9][a-zA-Z0-9._/-]*:[a-zA-Z0-9._-]+$" | \
             sort -u > container_images.txt
-          
+
           # Extract images from kustomization files
           find apps -name "kustomization.yaml" -exec grep -A 10 "images:" {} \; | \
             grep "newName:\|newTag:" | \
             cut -d: -f2- | \
             tr -d ' "' | \
             sort -u >> container_images.txt
-          
+
           # Clean up and deduplicate
           sort -u container_images.txt > unique_images.txt
           mv unique_images.txt container_images.txt
-          
+
           image_count=$(wc -l < container_images.txt)
           echo "📊 Found $image_count unique container images to scan"
           echo "images-count=$image_count" >> $GITHUB_OUTPUT
-          
+
           if [[ $image_count -eq 0 ]]; then
             echo "⚠️ No container images found to scan"
             echo "busybox:latest" > container_images.txt  # Fallback for testing
           fi
-      
+
       - name: Scan container images with Trivy
         id: container-scan
         run: |
           echo "🔍 Scanning container images for vulnerabilities..."
-          
+
           mkdir -p {trivy-reports,sarif-reports}
           critical_vulns=0
           high_vulns=0
           total_images=0
           failed_scans=0
-          
+
           while IFS= read -r image; do
-            if [[ -z "$image" || "$image" =~ ^[[:space:]]*$ ]]; then
+            if [[ -z "$image" || "$image" == "." || "$image" =~ ^[[:space:]]*$ ]]; then
               continue
             fi
-            
+
             total_images=$((total_images + 1))
             echo "🔍 Scanning: $image"
-            
+
             # Generate safe filename
             safe_name=$(echo "$image" | tr '/:' '_-')
-            
+
             # Scan with Trivy (JSON format)
             if timeout 300 trivy image \
               --format json \
@@ -468,38 +476,38 @@ jobs:
               --quiet \
               --no-progress \
               "$image"; then
-              
+
               # Extract vulnerability counts
               if [[ -f "trivy-reports/${safe_name}.json" ]]; then
                 critical=$(jq -r '[.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL")] | length' "trivy-reports/${safe_name}.json" 2>/dev/null || echo 0)
                 high=$(jq -r '[.Results[]?.Vulnerabilities[]? | select(.Severity == "HIGH")] | length' "trivy-reports/${safe_name}.json" 2>/dev/null || echo 0)
-                
+
                 critical_vulns=$((critical_vulns + critical))
                 high_vulns=$((high_vulns + high))
-                
+
                 echo "  Critical: $critical, High: $high"
               fi
-              
+
               # Generate SARIF format
               trivy image \
                 --format sarif \
                 --output "sarif-reports/${safe_name}.sarif" \
                 --quiet \
                 "$image" || echo "SARIF generation failed for $image"
-              
+
             else
               echo "❌ Failed to scan: $image"
               failed_scans=$((failed_scans + 1))
             fi
-            
+
             # Limit scans to prevent timeout (GitHub Actions has 6-hour limit)
             if [[ $total_images -ge 50 ]]; then
               echo "ℹ️ Limiting scan to first 50 images to prevent timeout"
               break
             fi
-            
+
           done < container_images.txt
-          
+
           # Calculate security score
           if [[ $total_images -gt 0 ]]; then
             # Score based on vulnerability density
@@ -510,19 +518,19 @@ jobs:
           else
             security_score=100
           fi
-          
+
           echo "📊 Container Security Summary:"
           echo "- Images scanned: $total_images"
           echo "- Failed scans: $failed_scans"
           echo "- Critical vulnerabilities: $critical_vulns"
           echo "- High vulnerabilities: $high_vulns"
           echo "- Security score: $security_score/100"
-          
+
           echo "critical-vulns=$critical_vulns" >> $GITHUB_OUTPUT
           echo "high-vulns=$high_vulns" >> $GITHUB_OUTPUT
           echo "images-scanned=$total_images" >> $GITHUB_OUTPUT
           echo "security-score=$security_score" >> $GITHUB_OUTPUT
-      
+
       - name: Upload container security reports
         uses: actions/upload-artifact@v4
         if: always()
@@ -540,38 +548,38 @@ jobs:
     runs-on: ubuntu-latest
     needs: [terraform-security, kubernetes-security, container-security]
     if: always()
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
+
       - name: Download all security reports
         uses: actions/download-artifact@v4
         with:
           path: all-security-reports
-      
+
       - name: Generate comprehensive security summary
         run: |
           echo "📊 Generating comprehensive security summary..."
-          
+
           # Collect results from all security scans
           terraform_critical="${{ needs.terraform-security.outputs.total-critical || 0 }}"
           terraform_high="${{ needs.terraform-security.outputs.total-high || 0 }}"
           terraform_score="${{ needs.terraform-security.outputs.security-score || 100 }}"
-          
+
           k8s_critical="${{ needs.kubernetes-security.outputs.kube-score-critical || 0 }}"
           k8s_violations="${{ needs.kubernetes-security.outputs.policy-violations || 0 }}"
           k8s_score="${{ needs.kubernetes-security.outputs.security-score || 100 }}"
-          
+
           container_critical="${{ needs.container-security.outputs.critical-vulns || 0 }}"
           container_high="${{ needs.container-security.outputs.high-vulns || 0 }}"
           container_score="${{ needs.container-security.outputs.security-score || 100 }}"
-          
+
           # Calculate overall metrics
           total_critical=$((terraform_critical + k8s_critical + container_critical))
           total_high=$((terraform_high + container_high))
           overall_score=$(((terraform_score + k8s_score + container_score) / 3))
-          
+
           # Determine overall status
           if [[ $total_critical -eq 0 && $total_high -le 5 ]]; then
             overall_status="🟢 SECURE"
@@ -580,31 +588,31 @@ jobs:
           else
             overall_status="🔴 CRITICAL"
           fi
-          
+
           # Generate comprehensive report
           cat > comprehensive-security-report.md << EOF
           # 🔒 Comprehensive Security Report
-          
+
           **Scan Date**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
           **Repository**: ${{ github.repository }}
           **Branch**: ${{ github.ref_name }}
           **Commit**: ${{ github.sha }}
           **Overall Status**: $overall_status
           **Overall Score**: $overall_score/100
-          
+
           ## 📊 Executive Summary
-          
+
           | Category | Critical | High | Score | Status |
           |----------|----------|------|-------|--------|
           | Terraform Infrastructure | $terraform_critical | $terraform_high | $terraform_score/100 | $([ $terraform_critical -gt 0 ] && echo '🚨' || echo '✅') |
           | Kubernetes Configuration | $k8s_critical | $k8s_violations violations | $k8s_score/100 | $([ $k8s_critical -gt 0 ] && echo '🚨' || echo '✅') |
           | Container Images | $container_critical | $container_high | $container_score/100 | $([ $container_critical -gt 0 ] && echo '🚨' || echo '✅') |
           | **TOTAL** | **$total_critical** | **$total_high** | **$overall_score/100** | **$overall_status** |
-          
+
           ## 🎯 Key Findings
-          
+
           EOF
-          
+
           # Add specific findings and recommendations
           if [[ $total_critical -gt 0 ]]; then
             echo "### 🚨 Critical Issues Requiring Immediate Action" >> comprehensive-security-report.md
@@ -614,7 +622,7 @@ jobs:
             [[ $container_critical -gt 0 ]] && echo "- **Containers**: $container_critical critical vulnerabilities in container images" >> comprehensive-security-report.md
             echo "" >> comprehensive-security-report.md
           fi
-          
+
           echo "## 📋 Recommendations" >> comprehensive-security-report.md
           echo "" >> comprehensive-security-report.md
           echo "1. **Review critical issues** in the detailed security reports" >> comprehensive-security-report.md
@@ -624,7 +632,7 @@ jobs:
           echo "" >> comprehensive-security-report.md
           echo "---" >> comprehensive-security-report.md
           echo "*Generated by Enhanced Security Scanning Workflow (Azure DevOps Migration)*" >> comprehensive-security-report.md
-          
+
           # Create JSON summary for integration
           cat > security-summary.json << EOF
           {
@@ -653,20 +661,20 @@ jobs:
             }
           }
           EOF
-      
+
       - name: Upload SARIF files to GitHub Code Scanning
         if: ${{ github.event.inputs.upload_sarif != 'false' }}
         run: |
           echo "📤 Uploading SARIF files to GitHub Code Scanning..."
-          
+
           # Combine all SARIF files
           find all-security-reports -name "*.sarif" -type f | while read -r sarif_file; do
             echo "📤 Uploading: $sarif_file"
-            
+
             # Upload each SARIF file individually with unique category
             category=$(basename "$(dirname "$sarif_file")")
             filename=$(basename "$sarif_file" .sarif)
-            
+
             gh api \
               --method POST \
               --field "sarif=@$sarif_file" \
@@ -679,17 +687,17 @@ jobs:
           done
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - name: Update job summary
         if: always()
         run: |
           echo "# 🔒 Enhanced Security Scanning Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           if [[ -f comprehensive-security-report.md ]]; then
             cat comprehensive-security-report.md >> $GITHUB_STEP_SUMMARY
           fi
-      
+
       - name: Upload comprehensive security report
         uses: actions/upload-artifact@v4
         if: always()
@@ -699,16 +707,16 @@ jobs:
             comprehensive-security-report.md
             security-summary.json
           retention-days: 90
-      
+
       - name: Fail workflow on critical security issues
         if: always()
         run: |
           total_critical="${{ needs.terraform-security.outputs.total-critical || 0 }}"
           total_critical=$((total_critical + ${{ needs.kubernetes-security.outputs.kube-score-critical || 0 }}))
           total_critical=$((total_critical + ${{ needs.container-security.outputs.critical-vulns || 0 }}))
-          
+
           echo "📊 Total critical security issues: $total_critical"
-          
+
           if [[ $total_critical -gt 5 ]]; then
             echo "🚨 FAILURE: Too many critical security issues found ($total_critical > 5)"
             echo "Please review the security reports and address critical issues before proceeding."

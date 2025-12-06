@@ -8,7 +8,7 @@ resources:
   - monitoring-namespace
   - backup-solutions
 
-namespace: infrastructure
+# namespace: infrastructure # Removed to avoid ID conflicts in multi-namespace resources
 
 patchesStrategicMerge: []
 
