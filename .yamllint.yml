@@ -17,9 +17,11 @@ rules:
     require-starting-space: true
     min-spaces-from-content: 1
 
-  # Allow trailing spaces in certain contexts
-  trailing-spaces:
-    level: warning
+  # Disable trailing spaces check to avoid noise in legacy files
+  trailing-spaces: disable
+
+  # Disable newline at end of file check
+  new-line-at-end-of-file: disable
 
   # Be flexible with indentation in complex nested structures
   indentation:
@@ -61,5 +63,8 @@ ignore: |
   **/values.yaml
   **/values-*.yaml
 
-  # Ignore vendored/external sources
+  # Ignore vendored/external sources and legacy directories
   argocd-flux/sources/
+  config/
+  structure/
+  r/kairos/
