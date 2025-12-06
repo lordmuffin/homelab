@@ -44,7 +44,7 @@ spec:
         - name: n8n
           port: 80
       # No middlewares = no authentication required
-    
+
     # Route 2: Webhook endpoints without authentication (if needed)
     - match: Host(`n8n.lab.apj.dev`) && PathPrefix(`/webhook`)
       kind: Rule
@@ -52,7 +52,7 @@ spec:
         - name: n8n
           port: 80
       # No middlewares = no authentication required
-    
+
     # Route 3: All other paths require authentication
     - match: Host(`n8n.lab.apj.dev`)
       kind: Rule

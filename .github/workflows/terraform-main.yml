@@ -14,7 +14,7 @@ on:
       - 'terraform/**'
       - '.github/workflows/**'
       - '.github/actions/**'
-  
+
   pull_request:
     branches:
       - main
@@ -45,19 +45,19 @@ env:
   TF_IN_AUTOMATION: 'true'
   TF_INPUT: 'false'
   TF_CLI_ARGS: '-no-color'
-  
+
   # Azure Authentication
   ARM_USE_AZUREAD: 'true'
-  ARM_USE_CLI: 'true' 
+  ARM_USE_CLI: 'true'
   ARM_STORAGE_USE_AZUREAD: 'true'
   ARM_SKIP_PROVIDER_REGISTRATION: 'false'
   ARM_USE_OIDC: 'true'
-  
+
   # Security Tool Versions
   TFSEC_VERSION: '1.28.4'
   CHECKOV_VERSION: '3.1.34'
   TERRASCAN_VERSION: '1.18.11'
-  
+
   # Quality Gates
   MAX_SECURITY_ISSUES: '0'
   MAX_DRIFT_THRESHOLD: '5'
@@ -74,12 +74,12 @@ jobs:
   # ============================================================================
   # PLAN STAGE: Validation and Planning (Always Run)
   # ============================================================================
-  
+
   plan:
     name: 🔍 Plan (${{ matrix.environment }}/${{ matrix.module }})
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    
+
     strategy:
       fail-fast: false
       max-parallel: 3
@@ -102,7 +102,7 @@ jobs:
             module: 'vultr'
             priority: 'low'
             timeout: 25
-          
+
           # Production Environment
           - environment: 'prod-lab'
             module: 'main'
@@ -146,7 +146,7 @@ jobs:
           echo "working-dir=$WORKING_DIR" >> $GITHUB_OUTPUT
           echo "state-key=${{ matrix.environment }}/${{ matrix.module }}/terraform.tfstate" >> $GITHUB_OUTPUT
           echo "artifact-name=terraform-plan-${{ matrix.environment }}-${{ matrix.module }}" >> $GITHUB_OUTPUT
-          
+
           echo "### 📋 Configuration Summary" >> $GITHUB_STEP_SUMMARY
           echo "- **Environment**: ${{ matrix.environment }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Module**: ${{ matrix.module }}" >> $GITHUB_STEP_SUMMARY
@@ -186,13 +186,13 @@ jobs:
         working-directory: ${{ steps.setup.outputs.working-dir }}
         run: |
           echo "🔄 Initializing Terraform with retry logic..."
-          
+
           MAX_RETRIES=3
           RETRY_DELAY=30
-          
+
           for attempt in $(seq 1 $MAX_RETRIES); do
             echo "🔄 Terraform Init attempt $attempt of $MAX_RETRIES"
-            
+
             if terraform init \
               -backend-config="resource_group_name=${{ secrets.AZURE_BACKEND_RESOURCE_GROUP }}" \
               -backend-config="storage_account_name=${{ secrets.AZURE_BACKEND_STORAGE_ACCOUNT }}" \
@@ -233,20 +233,20 @@ jobs:
           TF_VAR_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
         run: |
           echo "📋 Creating Terraform plan..."
-          
+
           set +e
           terraform plan \
             -input=false \
             -out=tfplan-${{ matrix.environment }}-${{ matrix.module }}.out \
             -detailed-exitcode \
             -no-color
-          
+
           PLAN_EXIT_CODE=$?
           echo "plan-exit-code=$PLAN_EXIT_CODE" >> $GITHUB_OUTPUT
-          
+
           # Generate human-readable plan output
           terraform show -no-color tfplan-${{ matrix.environment }}-${{ matrix.module }}.out > plan-output.txt
-          
+
           case $PLAN_EXIT_CODE in
             0)
               echo "✅ No changes detected"
@@ -293,28 +293,28 @@ jobs:
           script: |
             const fs = require('fs');
             const path = require('path');
-            
+
             const workingDir = '${{ steps.setup.outputs.working-dir }}';
             const planOutputPath = path.join(workingDir, 'plan-output.txt');
-            
+
             let planOutput = '';
             try {
               planOutput = fs.readFileSync(planOutputPath, 'utf8');
             } catch (error) {
               planOutput = 'Plan output not available';
             }
-            
+
             // Truncate if too long
             if (planOutput.length > 60000) {
               planOutput = planOutput.substring(0, 60000) + '\n\n... (truncated)';
             }
-            
+
             const planStatus = '${{ steps.plan.outputs.status }}';
             const securityStatus = '${{ steps.security.outputs.status }}';
-            const statusEmoji = planStatus === 'Failed' ? '❌' : 
+            const statusEmoji = planStatus === 'Failed' ? '❌' :
                                planStatus === 'Changes Detected' ? '📋' : '✅';
             const securityEmoji = securityStatus === 'Pass' ? '✅' : '⚠️';
-            
+
             const comment = `## ${statusEmoji} Terraform Plan: ${{ matrix.environment }}/${{ matrix.module }}
 
             **Status:** ${planStatus}
@@ -345,16 +345,16 @@ jobs:
   # ============================================================================
   # PRE-APPLY VALIDATION
   # ============================================================================
-  
+
   pre-apply-validation:
     name: 🔍 Pre-Apply Validation
     runs-on: ubuntu-latest
     needs: plan
     if: |
-      always() && 
+      always() &&
       needs.plan.result == 'success' &&
       (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
-    
+
     steps:
       - name: 🔍 Validate Plan Integrity
         run: |
@@ -364,20 +364,20 @@ jobs:
   # ============================================================================
   # PRODUCTION APPROVAL (Environment Protection)
   # ============================================================================
-  
+
   production-approval:
     name: 🚦 Production Approval
     runs-on: ubuntu-latest
     needs: [plan, pre-apply-validation]
     if: |
-      always() && 
+      always() &&
       needs.pre-apply-validation.result == 'success' &&
       contains(github.ref, 'main') &&
       contains(toJson(needs.plan.outputs), 'prod-lab')
-    environment: 
+    environment:
       name: production-terraform
       url: https://portal.azure.com
-    
+
     steps:
       - name: 🚦 Production Deployment Checklist
         run: |
@@ -397,18 +397,18 @@ jobs:
   # ============================================================================
   # APPLY STAGE: Infrastructure Deployment
   # ============================================================================
-  
+
   apply:
     name: 🚀 Apply (${{ matrix.environment }}/${{ matrix.module }})
     runs-on: ubuntu-latest
     timeout-minutes: 90
     needs: [plan, pre-apply-validation, production-approval]
     if: |
-      always() && 
+      always() &&
       needs.pre-apply-validation.result == 'success' &&
       (needs.production-approval.result == 'success' || needs.production-approval.result == 'skipped') &&
       (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
-    
+
     strategy:
       fail-fast: false
       max-parallel: 1  # Sequential for dependency management
@@ -510,7 +510,7 @@ jobs:
         working-directory: ${{ steps.setup.outputs.working-dir }}
         run: |
           PLAN_FILE="tfplan-${{ matrix.environment }}-${{ matrix.module }}.out"
-          
+
           if [ -f "$PLAN_FILE" ]; then
             PLAN_SIZE=$(stat -c%s "$PLAN_FILE")
             if [ "$PLAN_SIZE" -eq 0 ]; then
@@ -545,17 +545,17 @@ jobs:
           TF_VAR_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
         run: |
           echo "🔍 Post-Apply Validation Starting..."
-          
+
           # Refresh Terraform state
           echo "🔄 Refreshing Terraform state..."
           terraform refresh -input=false -no-color
-          
+
           # Run drift detection
           echo "🔍 Running drift detection..."
           set +e
           terraform plan -input=false -detailed-exitcode -no-color
           DRIFT_EXIT_CODE=$?
-          
+
           case $DRIFT_EXIT_CODE in
             0)
               echo "✅ No infrastructure drift detected"
@@ -589,11 +589,11 @@ jobs:
           echo "🔍 Drift Status: ${{ env.DRIFT_STATUS }}"
           echo ""
           echo "🔧 Infrastructure changes have been deployed successfully"
-          
+
           # Add to job summary
           cat >> $GITHUB_STEP_SUMMARY << EOF
           ## ✅ Deployment Successful: ${{ matrix.environment }}/${{ matrix.module }}
-          
+
           | Property | Value |
           |----------|-------|
           | Environment | ${{ matrix.environment }} |
@@ -608,13 +608,13 @@ jobs:
   # ============================================================================
   # NOTIFICATION & REPORTING
   # ============================================================================
-  
+
   notify:
     name: 📢 Notify Results
     runs-on: ubuntu-latest
     needs: [plan, apply]
     if: always()
-    
+
     steps:
       - name: 📊 Generate Summary Report
         run: |
@@ -639,7 +639,7 @@ jobs:
           STATUS="${{ (needs.plan.result == 'success' && (needs.apply.result == 'success' || needs.apply.result == 'skipped')) && 'success' || 'failure' }}"
           COLOR=$( [ "$STATUS" = "success" ] && echo "00FF00" || echo "FF0000" )
           EMOJI=$( [ "$STATUS" = "success" ] && echo "✅" || echo "❌" )
-          
+
           curl -H "Content-Type: application/json" -d "{
             \"@type\": \"MessageCard\",
             \"@context\": \"http://schema.org/extensions\",

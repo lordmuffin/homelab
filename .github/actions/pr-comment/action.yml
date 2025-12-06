@@ -32,7 +32,7 @@ runs:
       shell: bash
       run: |
         echo "📋 Generating Terraform plan summary..."
-        
+
         # Determine status based on exit code
         case "${{ inputs.plan_status }}" in
           "0")
@@ -41,7 +41,7 @@ runs:
             status_color="success"
             ;;
           "1")
-            status_emoji="❌" 
+            status_emoji="❌"
             status_text="Plan failed"
             status_color="failure"
             ;;
@@ -56,7 +56,7 @@ runs:
             status_color="neutral"
             ;;
         esac
-        
+
         echo "status_emoji=$status_emoji" >> $GITHUB_OUTPUT
         echo "status_text=$status_text" >> $GITHUB_OUTPUT
         echo "status_color=$status_color" >> $GITHUB_OUTPUT
@@ -66,28 +66,28 @@ runs:
       shell: bash
       run: |
         echo "📝 Processing Terraform plan output..."
-        
+
         if [ -f "${{ inputs.terraform_plan_file }}" ]; then
           # Read plan output
           plan_content=$(cat "${{ inputs.terraform_plan_file }}")
-          
+
           # Extract key metrics
           resources_add=$(echo "$plan_content" | grep -o "Plan: [0-9]* to add" | grep -o "[0-9]*" || echo "0")
           resources_change=$(echo "$plan_content" | grep -o "[0-9]* to change" | grep -o "[0-9]*" || echo "0")
           resources_destroy=$(echo "$plan_content" | grep -o "[0-9]* to destroy" | grep -o "[0-9]*" || echo "0")
-          
+
           # Truncate plan output if too long (GitHub comment limit)
           if [ ${#plan_content} -gt 60000 ]; then
             plan_content="${plan_content:0:60000}
 
 ... (output truncated due to length limit)"
           fi
-          
+
           # Escape special characters for JSON
           plan_content_escaped=$(echo "$plan_content" | sed 's/\\/\\\\/g; s/"/\\"/g; s/$/\\n/' | tr -d '\n')
-          
+
           echo "resources_add=$resources_add" >> $GITHUB_OUTPUT
-          echo "resources_change=$resources_change" >> $GITHUB_OUTPUT  
+          echo "resources_change=$resources_change" >> $GITHUB_OUTPUT
           echo "resources_destroy=$resources_destroy" >> $GITHUB_OUTPUT
           echo "plan_content<<EOF" >> $GITHUB_OUTPUT
           echo "$plan_content" >> $GITHUB_OUTPUT
@@ -105,45 +105,45 @@ runs:
       shell: bash
       run: |
         echo "💬 Creating pull request comment..."
-        
+
         # Generate comment body
         cat > comment.md << 'EOF'
         ## ${{ steps.plan-summary.outputs.status_emoji }} Terraform Plan: ${{ inputs.environment }}/${{ inputs.module }}
-        
-        **Status:** ${{ steps.plan-summary.outputs.status_text }}  
-        **Environment:** `${{ inputs.environment }}`  
-        **Module:** `${{ inputs.module }}`  
-        **Commit:** `${{ github.event.pull_request.head.sha || github.sha }}`  
-        
+
+        **Status:** ${{ steps.plan-summary.outputs.status_text }}
+        **Environment:** `${{ inputs.environment }}`
+        **Module:** `${{ inputs.module }}`
+        **Commit:** `${{ github.event.pull_request.head.sha || github.sha }}`
+
         ### 📊 Plan Summary
-        
+
         | Action | Resources |
         |--------|-----------|
         | ➕ Add | ${{ steps.process-plan.outputs.resources_add }} |
         | 🔄 Change | ${{ steps.process-plan.outputs.resources_change }} |
         | ➖ Destroy | ${{ steps.process-plan.outputs.resources_destroy }} |
-        
+
         <details>
         <summary>📋 Full Plan Output</summary>
-        
+
         ```terraform
         ${{ steps.process-plan.outputs.plan_content }}
         ```
-        
+
         </details>
-        
+
         ---
         *Plan generated at $(date -u +"%Y-%m-%d %H:%M:%S UTC") by [Terraform GitHub Actions](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})*
         EOF
-        
+
         # Post comment using GitHub API
         comment_body=$(cat comment.md)
-        
+
         # Create JSON payload
         jq -n \
           --arg body "$comment_body" \
           '{body: $body}' > comment_payload.json
-        
+
         # Post comment
         response=$(curl -s -X POST \
           -H "Authorization: Bearer ${{ inputs.github_token }}" \
@@ -151,10 +151,10 @@ runs:
           -H "Content-Type: application/json" \
           -d @comment_payload.json \
           "${{ github.api_url }}/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments")
-        
+
         # Extract comment URL
         comment_url=$(echo "$response" | jq -r '.html_url // empty')
-        
+
         if [ -n "$comment_url" ]; then
           echo "✅ Comment posted successfully: $comment_url"
           echo "comment_url=$comment_url" >> $GITHUB_OUTPUT
@@ -171,7 +171,7 @@ runs:
       shell: bash
       run: |
         echo "📊 Updating commit status check..."
-        
+
         # Determine status based on plan results
         case "${{ inputs.plan_status }}" in
           "0"|"2")
@@ -187,7 +187,7 @@ runs:
             description="Unknown terraform plan status"
             ;;
         esac
-        
+
         # Create status check
         curl -s -X POST \
           -H "Authorization: Bearer ${{ inputs.github_token }}" \
@@ -200,7 +200,7 @@ runs:
           }" \
           "${{ github.api_url }}/repos/${{ github.repository }}/statuses/${{ github.event.pull_request.head.sha || github.sha }}" \
           > /dev/null
-        
+
         echo "✅ Status check updated: $state"
       env:
         GITHUB_TOKEN: ${{ inputs.github_token }}

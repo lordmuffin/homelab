@@ -11,19 +11,19 @@ data:
   prometheus-validation.sh: |
     #!/bin/bash
     set -euo pipefail
-    
+
     echo "📊 Starting Prometheus validation..."
-    
+
     # Check Prometheus targets
     PROM_URL="http://prometheus.monitoring.svc.cluster.local:9090"
-    
+
     # Validate scraping targets
     curl -s "\$PROM_URL/api/v1/targets" | jq -r '
-        .data.activeTargets[] | 
-        select(.health != "up") | 
+        .data.activeTargets[] |
+        select(.health != "up") |
         "\(.labels.job): \(.health) - \(.lastError // "unknown error")"
     ' || echo "⚠️  Unable to check Prometheus targets"
-    
+
     # Check critical metrics availability
     CRITICAL_METRICS=(
         "up"
@@ -32,7 +32,7 @@ data:
         "container_cpu_usage_seconds_total"
         "kube_pod_status_phase"
     )
-    
+
     for metric in "\${CRITICAL_METRICS[@]}"; do
         echo "Checking metric: \$metric"
         RESULT=\$(curl -s "\$PROM_URL/api/v1/query?query=\$metric" | jq -r '.data.result | length')
@@ -42,26 +42,26 @@ data:
             echo "✅ Metric \$metric available (\$RESULT series)"
         fi
     done
-    
+
     echo "✅ Prometheus validation complete"
 
   # Alert rule validation
   alert-validation.sh: |
     #!/bin/bash
     set -euo pipefail
-    
+
     echo "🚨 Starting alert rule validation..."
-    
+
     PROM_URL="http://prometheus.monitoring.svc.cluster.local:9090"
-    
+
     # Check alert rules
     curl -s "\$PROM_URL/api/v1/rules" | jq -r '
-        .data.groups[] | 
-        .rules[] | 
-        select(.type == "alerting") | 
+        .data.groups[] |
+        .rules[] |
+        select(.type == "alerting") |
         "\(.name): \(.state) - \(.health)"
     ' || echo "⚠️  Unable to check alert rules"
-    
+
     # Validate critical alerts are configured
     CRITICAL_ALERTS=(
         "NodeDown"
@@ -71,9 +71,9 @@ data:
         "HighCPUUsage"
         "HighMemoryUsage"
     )
-    
+
     CONFIGURED_ALERTS=\$(curl -s "\$PROM_URL/api/v1/rules" | jq -r '.data.groups[].rules[] | select(.type == "alerting") | .name')
-    
+
     for alert in "\${CRITICAL_ALERTS[@]}"; do
         if echo "\$CONFIGURED_ALERTS" | grep -q "\$alert"; then
             echo "✅ Alert \$alert is configured"
@@ -81,18 +81,18 @@ data:
             echo "⚠️  Alert \$alert is missing"
         fi
     done
-    
+
     echo "✅ Alert validation complete"
 
   # Grafana dashboard validation
   grafana-validation.sh: |
     #!/bin/bash
     set -euo pipefail
-    
+
     echo "📈 Starting Grafana validation..."
-    
+
     GRAFANA_URL="http://grafana.monitoring.svc.cluster.local:3000"
-    
+
     # Check Grafana health
     HEALTH=\$(curl -s "\$GRAFANA_URL/api/health" | jq -r '.status')
     if [ "\$HEALTH" = "ok" ]; then
@@ -100,13 +100,13 @@ data:
     else
         echo "❌ Grafana health check failed: \$HEALTH"
     fi
-    
+
     # Check data sources
     curl -s "\$GRAFANA_URL/api/datasources" | jq -r '
-        .[] | 
+        .[] |
         "\(.name): \(.type) - \(.access)"
     ' || echo "⚠️  Unable to check Grafana data sources"
-    
+
     # Validate essential dashboards exist
     ESSENTIAL_DASHBOARDS=(
         "kubernetes-cluster-monitoring"
@@ -114,9 +114,9 @@ data:
         "postgresql-database"
         "application-overview"
     )
-    
+
     AVAILABLE_DASHBOARDS=\$(curl -s "\$GRAFANA_URL/api/search" | jq -r '.[].title' | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
-    
+
     for dashboard in "\${ESSENTIAL_DASHBOARDS[@]}"; do
         if echo "\$AVAILABLE_DASHBOARDS" | grep -q "\$dashboard"; then
             echo "✅ Dashboard \$dashboard is available"
@@ -124,45 +124,45 @@ data:
             echo "⚠️  Dashboard \$dashboard is missing"
         fi
     done
-    
+
     echo "✅ Grafana validation complete"
 
   # Log aggregation validation
   logs-validation.sh: |
     #!/bin/bash
     set -euo pipefail
-    
+
     echo "📝 Starting log aggregation validation..."
-    
+
     # Check if log aggregation is configured (Loki/ELK/etc.)
     if kubectl get pods -n monitoring | grep -q loki; then
         echo "Validating Loki log aggregation..."
-        
+
         LOKI_URL="http://loki.monitoring.svc.cluster.local:3100"
-        
+
         # Check Loki health
         curl -s "\$LOKI_URL/ready" && echo "✅ Loki is ready" || echo "❌ Loki is not ready"
-        
+
         # Check log ingestion
         RECENT_LOGS=\$(curl -s "\$LOKI_URL/loki/api/v1/query_range?query={namespace=\"tandoor\"}&start=\$(date -d '5 minutes ago' --iso-8601)&end=\$(date --iso-8601)" | jq -r '.data.result | length')
-        
+
         if [ "\$RECENT_LOGS" -gt 0 ]; then
             echo "✅ Recent logs found: \$RECENT_LOGS entries"
         else
             echo "⚠️  No recent logs found for tandoor namespace"
         fi
-        
+
     elif kubectl get pods -n monitoring | grep -q elasticsearch; then
         echo "Validating Elasticsearch log aggregation..."
         # Add Elasticsearch validation here
-        
+
     else
         echo "⚠️  No log aggregation system detected"
     fi
-    
+
     # Validate log retention policies
     echo "Checking log retention policies..."
-    
+
     echo "✅ Log validation complete"
 
 ---

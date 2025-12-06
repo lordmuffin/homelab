@@ -8,12 +8,12 @@ custom_classification:
     description: "High-performance AI/ML compute nodes with GPU"
     conditions:
       gpu_info.has_gpu: true
-      cpu_info.logical_cores: 
+      cpu_info.logical_cores:
         min: 8
       memory_info.total:
         min: 16000000000  # 16GB in bytes
-    
-  # High-memory database servers  
+
+  # High-memory database servers
   database_servers_high_mem:
     description: "Database servers with high memory"
     conditions:
@@ -21,7 +21,7 @@ custom_classification:
         contains_any: ["mysql", "postgresql", "mongodb"]
       memory_info.total:
         min: 32000000000  # 32GB in bytes
-  
+
   # Kubernetes infrastructure nodes
   k8s_infrastructure:
     description: "Kubernetes infrastructure components"
@@ -29,7 +29,7 @@ custom_classification:
       services:
         contains_any: ["etcd", "kubernetes"]
       classification: "k8s_node"
-  
+
   # Media servers
   media_servers:
     description: "Media streaming and management servers"
@@ -38,7 +38,7 @@ custom_classification:
         pattern: "plex|jellyfin|emby|media"
       services:
         contains_any: ["http", "https"]
-  
+
   # Development workstations
   dev_workstations:
     description: "Development and build workstations"
@@ -52,45 +52,45 @@ custom_classification:
 location_groups:
   enable: true
   prefix: "location_"
-  
+
   # Map location names to group names
   mappings:
     "Home Lab": "home_lab"
-    "Data Center": "datacenter" 
+    "Data Center": "datacenter"
     "Office": "office"
     "Remote": "remote"
 
 # Hardware-based Groups
 hardware_groups:
   enable: true
-  
+
   # GPU-based grouping
   gpu_groups:
     nvidia_gpu_nodes:
       condition: "gpu_info.gpu_type == 'nvidia'"
-      
+
     amd_gpu_nodes:
       condition: "gpu_info.gpu_type == 'amd'"
-      
+
     multi_gpu_nodes:
       condition: "gpu_info.gpu_count > 1"
-  
+
   # CPU-based grouping
   cpu_groups:
     high_cpu_nodes:
       condition: "cpu_info.logical_cores >= 16"
-      
+
     intel_nodes:
       condition: "cpu_info.vendor == 'intel'"
-      
+
     amd_nodes:
       condition: "cpu_info.vendor == 'amd'"
-  
+
   # Memory-based grouping
   memory_groups:
     high_memory_nodes:
       condition: "memory_info.total >= 32000000000"  # 32GB
-      
+
     low_memory_nodes:
       condition: "memory_info.total < 8000000000"   # 8GB
 
@@ -98,119 +98,119 @@ hardware_groups:
 role_groups:
   enable: true
   prefix: "role_"
-  
+
   # Infrastructure roles
   infrastructure_roles:
     dns:
       services: ["dns", "bind", "dnsmasq"]
-      
+
     dhcp:
       services: ["dhcp", "isc-dhcp"]
-      
+
     ntp:
       services: ["ntp", "chrony"]
-      
+
     proxy:
       services: ["squid", "haproxy", "nginx"]
-  
+
   # Application roles
   application_roles:
     web:
       services: ["http", "https", "apache", "nginx"]
-      
+
     database:
       services: ["mysql", "postgresql", "mongodb", "redis"]
-      
+
     cache:
       services: ["redis", "memcached"]
-      
+
     queue:
       services: ["rabbitmq", "kafka"]
-  
+
   # Monitoring roles
   monitoring_roles:
     metrics:
       services: ["prometheus", "influxdb"]
-      
+
     visualization:
       services: ["grafana", "kibana"]
-      
+
     alerting:
       services: ["alertmanager"]
-      
+
     logging:
       services: ["elasticsearch", "logstash"]
 
 # Service-based Groups
 service_groups:
   enable: true
-  
+
   # Web services
   web_services:
     apache_servers:
       service_pattern: "apache"
-      
+
     nginx_servers:
       service_pattern: "nginx"
-      
+
     web_servers:
       services: ["http", "https"]
-  
+
   # Database services
   database_services:
     mysql_servers:
       service_pattern: "mysql"
-      
+
     postgresql_servers:
       service_pattern: "postgresql"
-      
+
     mongodb_servers:
       service_pattern: "mongodb"
-      
+
     redis_servers:
       service_pattern: "redis"
-  
+
   # Container services
   container_services:
     docker_hosts:
       service_pattern: "docker"
-      
+
     kubernetes_nodes:
       services: ["kubernetes", "kubelet"]
 
 # Environment-based Groups
 environment_groups:
   enable: true
-  
+
   # Environment detection rules
   detection_rules:
     production:
       hostname_patterns: ["prod", "production", "prd"]
       network_patterns: ["192.168.1.0/24"]  # Production network
-      
+
     staging:
       hostname_patterns: ["stage", "staging", "stg"]
       network_patterns: ["192.168.2.0/24"]  # Staging network
-      
+
     development:
       hostname_patterns: ["dev", "development", "test"]
       network_patterns: ["192.168.3.0/24"]  # Dev network
 
-# Security-based Groups  
+# Security-based Groups
 security_groups:
   enable: true
-  
+
   # Security assessment groups
   risk_groups:
     high_risk_hosts:
       condition: "security.risk_level == 'high'"
-      
+
     internet_facing:
       condition: "location == 'DMZ' or network_name == 'public'"
-      
+
     privileged_access:
       services: ["ssh", "rdp", "vnc"]
-      
+
     unencrypted_services:
       services: ["telnet", "ftp", "http"]
 
@@ -223,14 +223,14 @@ variable_groups:
       backup_enabled: true
       backup_schedule: "0 2 * * *"  # Daily at 2 AM
       backup_retention: 30
-  
+
   # Monitoring configuration
   monitoring_agents:
     exclude_pattern: ["test*", "temp*"]
     variables:
       node_exporter_enabled: true
       filebeat_enabled: true
-      
+
   # Security hardening
   security_hardened:
     hosts_pattern: ["*prod*", "*db*"]
@@ -245,12 +245,12 @@ group_metadata:
     description: "GPU-enabled nodes for AI/ML workloads"
     documentation: "https://wiki.example.com/ai-nodes"
     contacts: ["ai-team@example.com"]
-    
+
   storage_nodes:
-    description: "Network-attached storage systems" 
+    description: "Network-attached storage systems"
     documentation: "https://wiki.example.com/storage"
     contacts: ["storage-team@example.com"]
-    
+
   k8s_masters:
     description: "Kubernetes control plane nodes"
     documentation: "https://wiki.example.com/kubernetes"

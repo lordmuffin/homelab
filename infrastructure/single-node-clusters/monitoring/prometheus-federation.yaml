@@ -50,7 +50,7 @@ spec:
         retention: 30d
         retentionSize: 15GB
         replicas: 1
-        
+
         # Federation configuration
         additionalScrapeConfigs:
         # Scrape from node1-compute cluster
@@ -75,7 +75,7 @@ spec:
             labels:
               cluster: 'node1-compute'
               cluster_role: 'compute'
-        
+
         # Scrape from node2-storage cluster
         - job_name: 'federate-storage'
           scrape_interval: 30s
@@ -99,7 +99,7 @@ spec:
             labels:
               cluster: 'node2-storage'
               cluster_role: 'storage'
-        
+
         # Cross-cluster service discovery
         - job_name: 'kubernetes-cross-cluster-pods'
           kubernetes_sd_configs:
@@ -127,10 +127,10 @@ spec:
           limits:
             cpu: 2000m
             memory: 4Gi
-        
+
         nodeSelector:
           homelab.io/monitoring-primary: "true"
-        
+
         # Storage configuration
         storageSpec:
           volumeClaimTemplate:
@@ -141,7 +141,7 @@ spec:
                 requests:
                   storage: 50Gi
 
-    # Grafana configuration  
+    # Grafana configuration
     grafana:
       enabled: true
       adminPassword: "admin123!" # Change this in production
@@ -149,7 +149,7 @@ spec:
         enabled: true
         storageClassName: nfs-apps
         size: 10Gi
-      
+
       # Grafana resources and placement
       resources:
         requests:
@@ -158,10 +158,10 @@ spec:
         limits:
           cpu: 1000m
           memory: 2Gi
-      
+
       nodeSelector:
         homelab.io/node-type: general
-      
+
       # Data source configuration
       additionalDataSources:
       - name: Prometheus-Compute
@@ -170,14 +170,14 @@ spec:
         access: proxy
         isDefault: false
         editable: true
-      
-      - name: Prometheus-Storage  
+
+      - name: Prometheus-Storage
         type: prometheus
         url: http://10.0.1.102:9090
         access: proxy
         isDefault: false
         editable: true
-      
+
       # Dashboard configuration
       dashboardProviders:
         dashboardproviders.yaml:
@@ -216,11 +216,11 @@ spec:
     # Node Exporter (runs on all nodes)
     nodeExporter:
       enabled: true
-      
+
     # Kube State Metrics
     kubeStateMetrics:
       enabled: true
-      
+
     # Alert Manager
     alertmanager:
       enabled: true

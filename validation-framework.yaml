@@ -11,58 +11,58 @@ data:
   k8s-validate.sh: |
     #!/bin/bash
     set -euo pipefail
-    
+
     echo "🔍 Starting Kubernetes manifest validation..."
-    
+
     # Dry-run validation for all manifests
     find /manifests -name "*.yaml" -o -name "*.yml" | while read -r manifest; do
         echo "Validating: $manifest"
         kubectl apply --dry-run=server -f "$manifest" || echo "❌ Failed: $manifest"
     done
-    
+
     # Resource quota validation
     kubectl top nodes || echo "⚠️  Resource metrics unavailable"
     kubectl top pods --all-namespaces || echo "⚠️  Pod metrics unavailable"
-    
+
     # PVC validation
     kubectl get pvc --all-namespaces -o wide
-    
+
     echo "✅ Manifest validation complete"
 
   # Network connectivity tests
   network-tests.sh: |
     #!/bin/bash
     set -euo pipefail
-    
+
     echo "🌐 Starting network connectivity tests..."
-    
+
     # DNS resolution tests
     nslookup kubernetes.default.svc.cluster.local
     nslookup tandoor-database-rw.tandoor.svc.cluster.local || echo "⚠️  Tandoor DB DNS failed"
-    
+
     # Service connectivity tests
     kubectl run network-test --image=alpine --rm -it --restart=Never -- sh -c "
         apk add --no-cache curl netcat-openbsd
-        
+
         # Test cluster DNS
         nslookup kubernetes.default.svc.cluster.local
-        
+
         # Test internal services
         nc -zv tandoor-database-rw.tandoor.svc.cluster.local 5432 || echo 'DB port check failed'
-        
+
         # Test external connectivity
         curl -s --connect-timeout 5 https://httpbin.org/status/200 || echo 'External connectivity failed'
     "
-    
+
     echo "✅ Network tests complete"
 
   # Storage provisioning tests
   storage-tests.sh: |
     #!/bin/bash
     set -euo pipefail
-    
+
     echo "💾 Starting storage provisioning tests..."
-    
+
     # Test PVC creation and mounting
     cat <<EOF | kubectl apply -f -
     apiVersion: v1
@@ -78,10 +78,10 @@ data:
           storage: 1Gi
       storageClassName: sata
     EOF
-    
+
     # Wait for PVC to be bound
     kubectl wait --for=condition=Bound pvc/test-pvc --timeout=60s
-    
+
     # Test pod with PVC
     cat <<EOF | kubectl apply -f -
     apiVersion: v1
@@ -103,37 +103,37 @@ data:
           claimName: test-pvc
       restartPolicy: Never
     EOF
-    
+
     # Wait for pod completion
     kubectl wait --for=condition=Complete pod/storage-test --timeout=60s
     kubectl logs storage-test
-    
+
     # Cleanup
     kubectl delete pod storage-test
     kubectl delete pvc test-pvc
-    
+
     echo "✅ Storage tests complete"
 
   # Database validation
   db-validation.sh: |
     #!/bin/bash
     set -euo pipefail
-    
+
     echo "🗄️  Starting database validation..."
-    
+
     # Test PostgreSQL cluster health
     kubectl get clusters.postgresql.cnpg.io -n tandoor
     kubectl describe clusters.postgresql.cnpg.io tandoor-database -n tandoor
-    
+
     # Test database connectivity
     kubectl run db-test --image=postgres:16 --rm -it --restart=Never -- sh -c "
         export PGPASSWORD=\$(kubectl get secret tandoor-db-postgres-creds-1password -n tandoor -o jsonpath='{.data.password}' | base64 -d)
         export PGUSER=\$(kubectl get secret tandoor-db-postgres-creds-1password -n tandoor -o jsonpath='{.data.username}' | base64 -d)
-        
+
         psql -h tandoor-database-rw.tandoor.svc.cluster.local -U \$PGUSER -d tandoor -c 'SELECT version();'
         psql -h tandoor-database-rw.tandoor.svc.cluster.local -U \$PGUSER -d tandoor -c 'SELECT COUNT(*) FROM information_schema.tables;'
     "
-    
+
     echo "✅ Database validation complete"
 
 ---

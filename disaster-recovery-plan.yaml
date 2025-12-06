@@ -10,26 +10,26 @@ data:
   # Backup Strategy Documentation
   backup-strategy.md: |
     # Backup Strategy
-    
+
     ## Service Classifications
     - **Critical**: Database, user data, configurations (RPO: 1h, RTO: 2h)
-    - **Important**: Application state, logs (RPO: 4h, RTO: 4h)  
+    - **Important**: Application state, logs (RPO: 4h, RTO: 4h)
     - **Standard**: Static files, temporary data (RPO: 24h, RTO: 8h)
-    
+
     ## Backup Frequencies
     - **Database**: Daily at 2AM via CronJob
     - **Media Files**: Weekly on Sunday at 3AM
     - **Configuration**: On every change via GitOps
     - **Secrets**: Manual backup quarterly
-    
+
     ## Storage Locations
     - **Primary**: Backblaze B2 bucket (cloud-homelab-backups)
     - **Secondary**: Local NAS (democratic-csi NFS)
     - **Tertiary**: Git repository for configurations
-    
+
     ## Retention Policies
     - Daily backups: 30 days
-    - Weekly backups: 12 weeks  
+    - Weekly backups: 12 weeks
     - Monthly backups: 12 months
     - Yearly backups: 7 years
 
@@ -37,143 +37,143 @@ data:
   backup-test.sh: |
     #!/bin/bash
     set -euo pipefail
-    
+
     echo "🧪 Starting automated backup testing..."
-    
+
     # Test database backup restoration
     test_db_backup() {
         echo "Testing database backup restoration..."
-        
+
         # Create test database
         kubectl run backup-test --image=postgres:16 --rm -it --restart=Never -- sh -c "
             export PGPASSWORD=test123
             createdb -h tandoor-database-rw.tandoor.svc.cluster.local -U postgres test_restore
-            
+
             # Download latest backup from B2
             apk add --no-cache curl
             curl -L https://github.com/Backblaze/B2_Command_Line_Tool/releases/latest/download/b2-linux -o /usr/local/bin/b2
             chmod +x /usr/local/bin/b2
-            
+
             /usr/local/bin/b2 authorize-account \$B2_APPLICATION_KEY_ID \$B2_APPLICATION_KEY
             LATEST_BACKUP=\$(/usr/local/bin/b2 ls b2://cloud-homelab-backups/tandoor/ | grep pg_backup | sort -r | head -n1 | awk '{print \$NF}')
-            
+
             /usr/local/bin/b2 file download b2://cloud-homelab-backups/tandoor/\$LATEST_BACKUP /tmp/test_backup.sql.gz
-            
+
             # Test restoration
             gunzip -c /tmp/test_backup.sql.gz | psql -h tandoor-database-rw.tandoor.svc.cluster.local -U postgres test_restore
-            
+
             # Validate data
             psql -h tandoor-database-rw.tandoor.svc.cluster.local -U postgres test_restore -c 'SELECT COUNT(*) FROM cookbook_recipe;'
-            
+
             # Cleanup
             dropdb -h tandoor-database-rw.tandoor.svc.cluster.local -U postgres test_restore
         "
     }
-    
+
     # Test media backup integrity
     test_media_backup() {
         echo "Testing media backup integrity..."
-        
+
         kubectl run media-test --image=alpine --rm -it --restart=Never -- sh -c "
             apk add --no-cache curl tar
             curl -L https://github.com/Backblaze/B2_Command_Line_Tool/releases/latest/download/b2-linux -o /usr/local/bin/b2
             chmod +x /usr/local/bin/b2
-            
+
             /usr/local/bin/b2 authorize-account \$B2_APPLICATION_KEY_ID \$B2_APPLICATION_KEY
             LATEST_MEDIA=\$(/usr/local/bin/b2 ls b2://cloud-homelab-backups/tandoor/media/ | grep tandoor_media | sort -r | head -n1 | awk '{print \$NF}')
-            
+
             /usr/local/bin/b2 file download b2://cloud-homelab-backups/tandoor/media/\$LATEST_MEDIA /tmp/media_test.tar.gz
-            
+
             # Test archive integrity
             tar -tzf /tmp/media_test.tar.gz > /dev/null
             echo 'Media backup integrity: PASSED'
         "
     }
-    
+
     test_db_backup
     test_media_backup
-    
+
     echo "✅ Backup testing complete"
 
   # Recovery procedures
   recovery-procedures.sh: |
     #!/bin/bash
     set -euo pipefail
-    
+
     echo "🚨 Starting disaster recovery procedures..."
-    
+
     RECOVERY_TYPE=\${1:-"full"}  # full, partial, data-only
-    
+
     case \$RECOVERY_TYPE in
         "full")
             echo "🔄 Full system recovery initiated..."
-            
+
             # 1. Restore cluster configuration
             echo "Step 1: Restoring cluster configuration..."
             kubectl apply -k /recovery/cluster-config/
-            
+
             # 2. Restore secrets
             echo "Step 2: Restoring secrets..."
             kubectl apply -f /recovery/secrets/
-            
+
             # 3. Restore persistent volumes
             echo "Step 3: Restoring persistent volumes..."
             kubectl apply -f /recovery/pv-claims/
-            
+
             # 4. Restore applications
             echo "Step 4: Restoring applications..."
             kubectl apply -k /recovery/applications/
-            
+
             # 5. Verify recovery
             echo "Step 5: Verifying recovery..."
             /scripts/recovery-verification.sh
             ;;
-            
+
         "partial")
             echo "🔄 Partial recovery initiated..."
             # Recovery logic for specific services
             ;;
-            
+
         "data-only")
             echo "🔄 Data-only recovery initiated..."
             # Database and media restoration only
             ;;
     esac
-    
+
     echo "✅ Recovery procedures complete"
 
   # Recovery verification
   recovery-verification.sh: |
     #!/bin/bash
     set -euo pipefail
-    
+
     echo "✅ Starting recovery verification..."
-    
+
     # Check cluster health
     kubectl get nodes -o wide
     kubectl get pods --all-namespaces
-    
+
     # Verify services are running
     kubectl wait --for=condition=Available deployment/tandoor -n tandoor --timeout=300s
     kubectl wait --for=condition=Ready pod -l cnpg.io/cluster=tandoor-database -n tandoor --timeout=300s
-    
+
     # Test application functionality
     kubectl run recovery-test --image=alpine --rm -it --restart=Never -- sh -c "
         apk add --no-cache curl
         # Test Tandoor web interface
         curl -s -o /dev/null -w '%{http_code}' http://tandoor.tandoor.svc.cluster.local:8080/
     "
-    
+
     # Validate data integrity
     kubectl run db-verify --image=postgres:16 --rm -it --restart=Never -- sh -c "
         export PGPASSWORD=\$(kubectl get secret tandoor-db-postgres-creds-1password -n tandoor -o jsonpath='{.data.password}' | base64 -d)
         export PGUSER=\$(kubectl get secret tandoor-db-postgres-creds-1password -n tandoor -o jsonpath='{.data.username}' | base64 -d)
-        
+
         # Verify table counts match expected values
         psql -h tandoor-database-rw.tandoor.svc.cluster.local -U \$PGUSER -d tandoor -c 'SELECT COUNT(*) as recipe_count FROM cookbook_recipe;'
         psql -h tandoor-database-rw.tandoor.svc.cluster.local -U \$PGUSER -d tandoor -c 'SELECT COUNT(*) as user_count FROM auth_user;'
     "
-    
+
     echo "✅ Recovery verification complete"
 
 ---
