@@ -93,6 +93,13 @@ resource "proxmox_virtual_environment_vm" "controlplane" {
 
   bios = "ovmf"
 
+  # Required for OVMF
+  efi_disk {
+    datastore_id = var.storage_pool
+    file_format  = "raw"
+    type         = "4m"
+  }
+
   cpu {
     cores = var.cp_vcpus
     type  = "host"
@@ -134,4 +141,24 @@ resource "proxmox_virtual_environment_vm" "controlplane" {
   }
 
   started = true
+}
+
+# ------------------------------------------------------------------------------
+# Talos Bootstrap & Access
+# ------------------------------------------------------------------------------
+
+resource "talos_machine_bootstrap" "this" {
+  depends_on = [proxmox_virtual_environment_vm.controlplane]
+
+  # We use the first node's IP for bootstrapping
+  node = try(proxmox_virtual_environment_vm.controlplane[0].ipv4_addresses[1][0], "")
+
+  client_configuration = talos_machine_secrets.controlplane_secrets.client_configuration
+}
+
+resource "talos_cluster_kubeconfig" "this" {
+  depends_on = [talos_machine_bootstrap.this]
+
+  client_configuration = talos_machine_secrets.controlplane_secrets.client_configuration
+  node                 = try(proxmox_virtual_environment_vm.controlplane[0].ipv4_addresses[1][0], "")
 }

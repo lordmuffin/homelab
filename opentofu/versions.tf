@@ -3,7 +3,7 @@ terraform {
   required_providers {
     proxmox = {
       source  = "bpg/proxmox"
-      version = "~> 0.69.0" # Updated to a newer version as 0.38 is old
+      version = "~> 0.69.0"
     }
     talos = {
       source  = "siderolabs/talos"
@@ -12,6 +12,14 @@ terraform {
     template = {
       source  = "hashicorp/template"
       version = "~> 2.2.0"
+    }
+    flux = {
+      source  = "fluxcd/flux"
+      version = "~> 1.2.0"
+    }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.27.0"
     }
   }
 }
@@ -28,3 +36,9 @@ provider "proxmox" {
 }
 
 provider "talos" {}
+
+# Providers for Flux and Kubernetes will be configured in flux.tf
+# or here if we want global config, but they rely on resources that don't exist yet
+# (the kubeconfig).
+# However, provider configs in Terraform are static.
+# We usually pass the config via the provider block using resource attributes.

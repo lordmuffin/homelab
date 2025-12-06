@@ -89,3 +89,23 @@ variable "cp_disk_size" {
   type        = number
   default     = 20
 }
+
+################################################################################
+# Flux / GitHub Variables
+################################################################################
+
+variable "github_token" {
+  description = "GitHub token for Flux bootstrap"
+  type        = string
+  sensitive   = true
+}
+
+variable "github_org" {
+  description = "GitHub organization or user for the repository"
+  type        = string
+}
+
+variable "github_repository" {
+  description = "GitHub repository name"
+  type        = string
+}
