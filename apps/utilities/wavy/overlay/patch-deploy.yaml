@@ -7,6 +7,10 @@ metadata:
     app.kubernetes.io/name: wavy
     app.kubernetes.io/component: webhook-server
 spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: wavy
+      app.kubernetes.io/component: webhook-server
   template:
     spec:
       containers:
