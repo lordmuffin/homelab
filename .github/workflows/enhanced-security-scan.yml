@@ -229,15 +229,23 @@ jobs:
       - name: Setup Kubernetes tools
         run: |
           # Install kube-score
-          curl -L https://github.com/zegl/kube-score/releases/latest/download/kube-score_linux_amd64.tar.gz | tar xz
+          LATEST_URL=$(curl -Ls -o /dev/null -w %{url_effective} https://github.com/zegl/kube-score/releases/latest)
+          LATEST_TAG=$(basename "$LATEST_URL")
+          VERSION=${LATEST_TAG#v}
+          curl -L "https://github.com/zegl/kube-score/releases/download/${LATEST_TAG}/kube-score_${VERSION}_linux_amd64.tar.gz" | tar xz
           sudo mv kube-score /usr/local/bin/
 
           # Install kustomize
-          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+          LATEST_KUSTOMIZE_URL=$(curl -Ls -o /dev/null -w %{url_effective} https://github.com/kubernetes-sigs/kustomize/releases/latest)
+          LATEST_KUSTOMIZE_TAG=$(basename "$LATEST_KUSTOMIZE_URL")
+          curl -L "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2F${LATEST_KUSTOMIZE_TAG}/kustomize_${LATEST_KUSTOMIZE_TAG}_linux_amd64.tar.gz" | tar xz
           sudo mv kustomize /usr/local/bin/
 
           # Install Polaris for policy checking
-          curl -L https://github.com/FairwindsOps/polaris/releases/latest/download/polaris_linux_amd64.tar.gz | tar xz
+          LATEST_POLARIS_URL=$(curl -Ls -o /dev/null -w %{url_effective} https://github.com/FairwindsOps/polaris/releases/latest)
+          LATEST_POLARIS_TAG=$(basename "$LATEST_POLARIS_URL")
+          VERSION_POLARIS=${LATEST_POLARIS_TAG#v}
+          curl -L "https://github.com/FairwindsOps/polaris/releases/download/${LATEST_POLARIS_TAG}/polaris_linux_amd64.tar.gz" | tar xz
           sudo mv polaris /usr/local/bin/
 
       - name: Generate Kubernetes manifests
