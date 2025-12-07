@@ -268,7 +268,10 @@ jobs:
 
       - name: Setup kube-score
         run: |
-          curl -L https://github.com/zegl/kube-score/releases/latest/download/kube-score_linux_amd64.tar.gz | tar xz
+          LATEST_VERSION=$(curl -s https://api.github.com/repos/zegl/kube-score/releases/latest | jq -r .tag_name)
+          VERSION_NUM="${LATEST_VERSION#v}"
+          echo "Installing kube-score ${LATEST_VERSION}"
+          curl -L "https://github.com/zegl/kube-score/releases/download/${LATEST_VERSION}/kube-score_${VERSION_NUM}_linux_amd64.tar.gz" | tar xz
           sudo mv kube-score /usr/local/bin/
           kube-score version
 
@@ -418,7 +421,10 @@ jobs:
 
       - name: Setup GitLeaks
         run: |
-          curl -L https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks_linux_x64.tar.gz | tar xz
+          LATEST_VERSION=$(curl -s https://api.github.com/repos/gitleaks/gitleaks/releases/latest | jq -r .tag_name)
+          VERSION_NUM="${LATEST_VERSION#v}"
+          echo "Installing GitLeaks ${LATEST_VERSION}"
+          curl -L "https://github.com/gitleaks/gitleaks/releases/download/${LATEST_VERSION}/gitleaks_${VERSION_NUM}_linux_x64.tar.gz" | tar xz
           sudo mv gitleaks /usr/local/bin/
           gitleaks version
 
