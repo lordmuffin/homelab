@@ -133,3 +133,5 @@ test/storage/*
 tilt_modules
 utilities/*
 venv
+opentofu\talosconfig
+opentofu\params.json
