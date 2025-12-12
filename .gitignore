@@ -134,4 +134,5 @@ tilt_modules
 utilities/*
 venv
 opentofu\talosconfig
-opentofu\params.jsonopentofu\params.json
+opentofu\params.json
+
