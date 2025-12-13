@@ -47,6 +47,8 @@ spec:
       additionalContainers: []
       initContainers: []
     ports:
+      traefik:
+        port: 9000
       web:
         redirections:
           entryPoint:
