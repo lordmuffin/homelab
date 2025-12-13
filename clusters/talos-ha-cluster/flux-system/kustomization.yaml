@@ -4,3 +4,5 @@ resources:
 - .gitkeep
 - gotk-components.yaml
 - gotk-sync.yaml
+- traefik.yaml
+- traefik-kustomize.yaml

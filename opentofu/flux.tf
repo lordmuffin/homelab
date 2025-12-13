@@ -1,34 +1,35 @@
-# Flux Configuration
-
-# Use the kubeconfig retrieved from Talos to configure the Kubernetes and Flux providers.
-provider "kubernetes" {
-  host = talos_cluster_kubeconfig.this.kubernetes_client_configuration.host
-  client_certificate     = base64decode(talos_cluster_kubeconfig.this.kubernetes_client_configuration.client_certificate)
-  client_key             = base64decode(talos_cluster_kubeconfig.this.kubernetes_client_configuration.client_key)
-  cluster_ca_certificate = base64decode(talos_cluster_kubeconfig.this.kubernetes_client_configuration.ca_certificate)
+data "talos_cluster_health" "this" {
+  depends_on = [
+    talos_machine_configuration_apply.controlplane,
+    talos_machine_bootstrap.this
+  ]
+  skip_kubernetes_checks = false
+  client_configuration   = talos_machine_secrets.this.client_configuration
+  control_plane_nodes    = [for ip in var.control_plane_ips : split("/", ip)[0]]
+  endpoints              = [for ip in var.control_plane_ips : split("/", ip)[0]]
+  timeouts = {
+    read = "10m"
+  }
 }
 
-provider "flux" {
-  kubernetes = {
-    host = talos_cluster_kubeconfig.this.kubernetes_client_configuration.host
-    client_certificate     = base64decode(talos_cluster_kubeconfig.this.kubernetes_client_configuration.client_certificate)
-    client_key             = base64decode(talos_cluster_kubeconfig.this.kubernetes_client_configuration.client_key)
-    cluster_ca_certificate = base64decode(talos_cluster_kubeconfig.this.kubernetes_client_configuration.ca_certificate)
-  }
-  git = {
-    url = "https://github.com/${var.github_org}/${var.github_repository}.git"
-    http = {
-      username = "git" # username is ignored for token auth usually, or use 'git'
-      password = var.github_token
-    }
-  }
+resource "tls_private_key" "flux" {
+  algorithm = "ED25519"
+}
+
+resource "github_repository_deploy_key" "flux" {
+  title      = "flux-deploy-key"
+  repository = var.github_repository
+  key        = tls_private_key.flux.public_key_openssh
+  read_only  = true
 }
 
 resource "flux_bootstrap_git" "this" {
   depends_on = [
-    talos_machine_bootstrap.this,
-    talos_cluster_kubeconfig.this
+    github_repository_deploy_key.flux,
+    data.talos_cluster_health.this,
+    talos_machine_bootstrap.this
   ]
 
-  path = "clusters/${var.cluster_name}"
+  embedded_manifests = true
+  path               = "clusters/${var.cluster_name}"
 }
