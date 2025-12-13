@@ -48,9 +48,11 @@ spec:
       initContainers: []
     ports:
       web:
-        redirectTo:
-          port: websecure
-          priority: 10
+        redirections:
+          entryPoint:
+            to: websecure
+            scheme: https
+            permanent: true
       websecure:
         tls:
           enabled: true
@@ -58,8 +60,11 @@ spec:
           insecure: false
       web-int: 
         port: 8080
-        redirectTo:
-          port: web-int-tls
+        redirections:
+          entryPoint:
+            to: web-int-tls
+            scheme: https
+            permanent: true
       web-int-tls: 
         port: 8043
         tls:
