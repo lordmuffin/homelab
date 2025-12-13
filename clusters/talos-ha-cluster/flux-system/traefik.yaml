@@ -26,8 +26,7 @@ spec:
   targetNamespace: traefik
   install:
     createNamespace: true
-  upgrade:
-    createNamespace: true
+  upgrade: {}
   values:
     globalArguments:
       - "--global.sendanonymoususage=false"
