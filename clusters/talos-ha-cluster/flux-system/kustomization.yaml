@@ -6,3 +6,4 @@ resources:
 - gotk-sync.yaml
 - traefik.yaml
 - traefik-kustomize.yaml
+- metallb.yaml
