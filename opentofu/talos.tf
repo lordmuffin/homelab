@@ -16,7 +16,7 @@ resource "talos_machine_secrets" "this" {
 }
 
 data "talos_machine_configuration" "controlplane" {
-  cluster_name     = var.cluster_name
+  cluster_name     = local.cluster_name
   cluster_endpoint = "https://${var.cluster_vip}:6443"
   machine_type     = "controlplane"
   machine_secrets  = talos_machine_secrets.this.machine_secrets
@@ -83,13 +83,13 @@ resource "talos_machine_bootstrap" "this" {
 }
 
 data "talos_client_configuration" "this" {
-  cluster_name         = var.cluster_name
+  cluster_name         = local.cluster_name
   client_configuration = talos_machine_secrets.this.client_configuration
   endpoints            = [for ip in var.control_plane_ips : split("/", ip)[0]]
 }
 
 data "talos_machine_configuration" "worker" {
-  cluster_name     = var.cluster_name
+  cluster_name     = local.cluster_name
   cluster_endpoint = "https://${var.cluster_vip}:6443"
   machine_type     = "worker"
   machine_secrets  = talos_machine_secrets.this.machine_secrets
@@ -147,6 +147,16 @@ resource "talos_machine_configuration_apply" "worker" {
 resource "local_file" "talosconfig" {
   content  = data.talos_client_configuration.this.talos_config
   filename = "${path.module}/talosconfig"
+}
+
+data "talos_cluster_kubeconfig" "this" {
+  client_configuration = talos_machine_secrets.this.client_configuration
+  node                 = split("/", var.control_plane_ips[0])[0]
+}
+
+resource "local_file" "kubeconfig" {
+  content  = data.talos_cluster_kubeconfig.this.kubeconfig_raw
+  filename = "${path.module}/kubeconfig"
 }
 
 

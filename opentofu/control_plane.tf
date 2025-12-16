@@ -15,12 +15,13 @@
 
 resource "proxmox_virtual_environment_vm" "controlplane" {
   count     = var.control_plane_count
-  name      = "${var.cluster_name}-cp-${count.index + 1}"
+  name      = "${local.cluster_name}-cp-${format("%02d", count.index + 1)}"
   node_name = var.proxmox_node
   tags      = concat(var.tags, ["control-plane", "talos-${var.talos_version}", "flux-${var.flux_version}"])
+  boot_order = ["scsi0", "ide2", "ide3"]
   
   agent {
-    enabled = true
+    enabled = false
   }
 
   cpu {
@@ -54,10 +55,21 @@ resource "proxmox_virtual_environment_vm" "controlplane" {
 
   cdrom {
     # Reference the manually uploaded ISO
-    file_id = "local:iso/talos-v1.8.1-6ebbfe35c8225645c05d4d19eaad385bd1ec795954932d0ada671388272fec19.iso"
+    file_id = "local:iso/talos-v1.11.5-ce4c980550dd2ab1b17bbf2b08801c7eb59418eafe8f279833297925d67c7515.iso"
   }
 
   operating_system {
     type = "l26" # Linux 2.6+
   }
+
+  depends_on = [
+    local_file.talosconfig
+  ]
+
+#  provisioner "local-exec" {
+#    interpreter = ["bash", "-c"]
+#    command     = "sleep 60 && talosctl --talosconfig talosconfig reboot -n ${split("/", var.control_plane_ips[count.index])[0]}"
+#  }
+
+
 }

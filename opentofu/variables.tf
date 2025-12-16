@@ -21,15 +21,33 @@ variable "proxmox_node" {
 }
 
 variable "cluster_name" {
-  description = "Name of the Talos cluster"
+  description = "Name of the cluster (overrides auto-generated name if provided)"
   type        = string
-  default     = "talos-cluster"
+  default     = null
+}
+
+variable "cluster_env" {
+  description = "Environment (p, np, dev)"
+  type        = string
+  default     = "np"
+}
+
+variable "cluster_loc" {
+  description = "Location (home, aws, az, gcp, lnd, rs)"
+  type        = string
+  default     = "home"
+}
+
+variable "cluster_purpose" {
+  description = "Purpose of the cluster"
+  type        = string
+  default     = "homelab"
 }
 
 variable "talos_version" {
   description = "Talos version to use"
   type        = string
-  default     = "v1.8.0" # Example default, adjust as needed
+  default     = "v1.11.1" # Example default, adjust as needed
 }
 
 variable "control_plane_count" {

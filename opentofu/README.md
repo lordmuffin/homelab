@@ -220,3 +220,82 @@ The cluster is deployed with `cni.name: none`, so nodes will remain in a `NotRea
 ## Security Note
 
 This plan outputs sensitive secrets (Talos machine secrets, Kubeconfig data) to the OpenTofu state file. **Ensure your state file is stored securely** (e.g., using a remote backend with encryption) and strict permissions are applied to your local directory.
+
+# 🏷️ Kubernetes Naming Convention
+
+This document defines the standard naming convention for all Kubernetes clusters and nodes within the homelab environment, ensuring consistency, predictability, and ease of management across on-premise and multiple cloud providers.
+
+## Principles
+
+1.  **Clarity:** Names are easily readable and parseable by humans.
+2.  **Uniqueness:** Every resource has a unique identifier based on its location and purpose.
+3.  **Predictability:** New resources can be named consistently using the defined components.
+
+## Cluster Naming Pattern
+
+All cluster names must follow the three-part structure separated by hyphens (`-`):
+
+$$\text{[ENV]}-\text{[LOC]}-\text{[PURPOSE]}$$
+
+### 1. ENV (Environment)
+
+| Value | Description |
+| :--- | :--- |
+| **p** | **Production:** Critical, stable, highly available services. |
+| **np** | **Non-Production:** Staging, UAT, and non-critical services. |
+| **dev** | **Development:** Testing, sandbox environments, and new features. |
+
+### 2. LOC (Location/Provider)
+
+This identifies where the cluster physically resides.
+
+| Value | Provider |
+| :--- | :--- |
+| **home** | On-Premise/House (Primary Homelab) |
+| **aws** | Amazon Web Services |
+| **az** | Microsoft Azure |
+| **gcp** | Google Cloud Platform |
+| **lnd** | Linode |
+| **rs** | Rackspace |
+
+### 3. PURPOSE (User-Defined)
+
+A short, descriptive name for the cluster's function.
+* **Default:** `homelab` (Used for general-purpose clusters).
+* **Examples:** `web`, `jenkins`, `db-core`, `storage`.
+
+---
+
+## Node Naming Pattern
+
+Node names are derived from the parent cluster name, with two additional components appended:
+
+$$\text{[Cluster Name]}-\text{[ROLE]}-\text{[INDEX]}$$
+
+### 1. ROLE (Node Group/Type)
+
+This defines the primary function of the node within the cluster.
+
+| Value | Description |
+| :--- | :--- |
+| **cp** | **Control Plane:** Runs master components (etcd, API server, scheduler). |
+| **w** | **Worker:** Standard worker node/node pool. |
+| **scale** | **Scaled:** Cloud-managed node groups (e.g., AKS/EKS/GKE autoscaled nodes). |
+
+### 2. INDEX (Double-Digit Index)
+
+A sequential, double-digit number for uniqueness within the cluster's role group. **Must be two digits.**
+
+* **Examples:** `01`, `02`, `10`, `15`.
+
+---
+
+## Example Usage
+
+| Resource | Example Name |
+| :--- | :--- |
+| **Prod AWS Cluster** | `p-aws-web` |
+| **Non-Prod Home Cluster** | `np-home-homelab` |
+| **Control Plane Node** | `p-aws-web-cp-01` |
+| **Worker Node 12** | `np-home-homelab-w-12` |
+| **Linode Scaled Node 05** | `dev-lnd-test-scale-05` |
