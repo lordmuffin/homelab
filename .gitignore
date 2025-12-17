@@ -135,3 +135,4 @@ utilities/*
 venv
 opentofu/talosconfig
 opentofu/params.json
+opentofu/kubeconfig
