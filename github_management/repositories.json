@@ -1,0 +1,7 @@
+{
+    "np-home-homelab": {
+        "description": "Primary GitOps fleet-infrastructure for NP-Home; manages FluxCD clusters, infrastructure controllers, and app deployments.",
+        "is_existing": false,
+        "visibility": "private"
+    }
+}
