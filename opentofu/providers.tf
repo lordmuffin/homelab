@@ -18,6 +18,10 @@ terraform {
       source  = "integrations/github"
       version = ">= 6.0"
     }
+    helm = {
+      source  = "hashicorp/helm"
+      version = ">= 2.10.0"
+    }
   }
 
   backend "s3" {
@@ -64,4 +68,9 @@ provider "flux" {
 provider "github" {
   owner = var.github_owner
   token = var.github_token
+}
+
+provider "helm" {
+  # Kubernetes configuration is removed to allow for template-only usage
+  # preventing the provider from trying to connect to a non-existent cluster during plan.
 }

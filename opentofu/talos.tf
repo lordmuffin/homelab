@@ -33,6 +33,22 @@ data "talos_machine_configuration" "controlplane" {
           }
         }
       }
+      cluster = {
+        network = {
+          cni = {
+            name = "none"
+          }
+        }
+        proxy = {
+          disabled = true
+        }
+        inlineManifests = [
+          {
+            name = "cilium"
+            contents = file("${path.module}/cilium.yaml")
+          }
+        ]
+      }
     })
   ]
 }
@@ -106,6 +122,16 @@ data "talos_machine_configuration" "worker" {
           }
         }
       }
+      cluster = {
+        network = {
+          cni = {
+            name = "none"
+          }
+        }
+        proxy = {
+          disabled = true
+        }
+      }
     })
   ]
 }
@@ -149,13 +175,16 @@ resource "local_file" "talosconfig" {
   filename = "${path.module}/talosconfig"
 }
 
-data "talos_cluster_kubeconfig" "this" {
+resource "talos_cluster_kubeconfig" "this" {
   client_configuration = talos_machine_secrets.this.client_configuration
   node                 = split("/", var.control_plane_ips[0])[0]
+  depends_on = [
+    talos_machine_bootstrap.this
+  ]
 }
 
 resource "local_file" "kubeconfig" {
-  content  = data.talos_cluster_kubeconfig.this.kubeconfig_raw
+  content  = resource.talos_cluster_kubeconfig.this.kubeconfig_raw
   filename = "${path.module}/kubeconfig"
 }
 

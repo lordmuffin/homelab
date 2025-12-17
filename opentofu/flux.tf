@@ -3,7 +3,7 @@ data "talos_cluster_health" "this" {
     talos_machine_configuration_apply.controlplane,
     talos_machine_bootstrap.this
   ]
-  skip_kubernetes_checks = false
+  skip_kubernetes_checks = true
   client_configuration   = talos_machine_secrets.this.client_configuration
   control_plane_nodes    = [for ip in var.control_plane_ips : split("/", ip)[0]]
   worker_nodes           = [for ip in var.worker_node_ips : split("/", ip)[0]]
