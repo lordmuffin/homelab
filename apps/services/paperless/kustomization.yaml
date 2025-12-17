@@ -1,6 +1,6 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-bases:
+resources:
 - ./base
 - github.com/lordmuffin/homelab/apps/data/postgres/exporter
 namespace: paperless

@@ -3,10 +3,8 @@ kind: Kustomization
 
 namespace: grill-stats-dev
 
-bases:
-- ../../base
-
 resources:
+- ../../base
 - namespace.yaml
 - vault-dev-config.yaml
 - network-policies-dev.yaml

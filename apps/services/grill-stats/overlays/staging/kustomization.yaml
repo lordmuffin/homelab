@@ -3,10 +3,8 @@ kind: Kustomization
 
 namespace: grill-stats-staging
 
-bases:
-- ../../base
-
 resources:
+- ../../base
 - namespace.yaml
 - network-policies-staging.yaml
 

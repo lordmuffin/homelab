@@ -3,16 +3,8 @@ kind: Kustomization
 
 namespace: grill-stats
 
-bases:
-- ../../base
-
-patches:
-- path: patches/hpa-patch.yaml
-- path: patches/pdb-patch.yaml
-- path: patches/resources-patch.yaml
-- path: patches/grill-stats-ingress-patch.yaml
-
 resources:
+- ../../base
 - patches/grill-stats-hpa.yaml
 - vault-prod-config.yaml
 - network-policies-prod.yaml

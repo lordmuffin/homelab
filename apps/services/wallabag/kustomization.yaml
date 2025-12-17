@@ -1,6 +1,6 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-bases:
+resources:
 - ./base
 namespace: services
 patches:
@@ -16,3 +16,4 @@ images:
   newTag: 2.6.7
 commonAnnotations:
   reloader.stakater.com/auto: "true"
+
