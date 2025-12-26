@@ -71,7 +71,7 @@ variable "node_memory" {
 variable "node_disk_size" {
   description = "Disk size (GB) per node"
   type        = number
-  default     = 20
+  default     = 40
 }
 
 variable "storage_pool" {

@@ -18,7 +18,7 @@ resource "proxmox_virtual_environment_vm" "controlplane" {
   name      = "${local.cluster_name}-cp-${format("%02d", count.index + 1)}"
   node_name = var.proxmox_node
   tags      = concat(var.tags, ["control-plane", "talos-${var.talos_version}", "flux-${var.flux_version}"])
-  boot_order = ["scsi0", "ide2", "ide3"]
+  boot_order = ["scsi0"]
   
   agent {
     enabled = false

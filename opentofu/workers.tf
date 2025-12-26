@@ -3,7 +3,7 @@ resource "proxmox_virtual_environment_vm" "worker" {
   name      = "${local.cluster_name}-w-${format("%02d", count.index + 1)}"
   node_name = var.proxmox_node
   tags      = concat(var.tags, ["worker", "talos-${var.talos_version}", "flux-${var.flux_version}"])
-  boot_order = ["scsi0", "ide2", "ide3"]
+  boot_order = ["scsi0"]
 
   agent {
     enabled = false
